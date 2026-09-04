@@ -13,7 +13,7 @@ A beautiful desktop AI coding agent built with Electron, React, and OpenRouter. 
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - OpenRouter API key ([get one here](https://openrouter.ai/keys))
 
 ## Setup
