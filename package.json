@@ -64,6 +64,7 @@
   "build": {
     "appId": "com.openrouter.agent",
     "productName": "OpenRouter Agent",
+    "icon": "build/icon.png",
     "directories": {
       "output": "release"
     },
