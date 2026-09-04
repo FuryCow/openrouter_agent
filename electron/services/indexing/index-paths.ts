@@ -23,10 +23,25 @@ export function getVectorIndexPath(indexDir: string): string {
 }
 
 export function resolveSearchRoot(workspacePath: string, root?: string): string {
-  const workspace = normalize(resolve(workspacePath))
+  const workspace = normalizeWorkspacePath(workspacePath)
   if (!root?.trim()) return workspace
   const candidate = root.trim()
-  if (isAbsoluteSearchRoot(candidate)) return normalize(resolveAbsoluteSearchRoot(candidate))
+  if (isAbsoluteSearchRoot(candidate)) return resolveAbsoluteSearchRoot(candidate)
+  return joinSearchRoot(workspace, candidate)
+}
+
+function normalizeWorkspacePath(workspacePath: string): string {
+  const trimmed = workspacePath.trim()
+  if (win32.isAbsolute(trimmed) && !isAbsolute(trimmed)) {
+    return win32.normalize(trimmed)
+  }
+  return normalize(resolve(trimmed))
+}
+
+function joinSearchRoot(workspace: string, candidate: string): string {
+  if (win32.isAbsolute(workspace) && !isAbsolute(workspace)) {
+    return win32.normalize(win32.join(workspace, candidate))
+  }
   return normalize(join(workspace, candidate))
 }
 
@@ -36,7 +51,7 @@ function isAbsoluteSearchRoot(candidate: string): boolean {
 
 function resolveAbsoluteSearchRoot(candidate: string): string {
   if (win32.isAbsolute(candidate) && !isAbsolute(candidate)) {
-    return win32.resolve(candidate)
+    return win32.normalize(candidate)
   }
-  return resolve(candidate)
+  return normalize(resolve(candidate))
 }
