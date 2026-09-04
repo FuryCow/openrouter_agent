@@ -19,6 +19,7 @@ import {
 import { getRecentAnalyticsRuns, getAnalyticsLogDir } from './services/tool-analytics'
 import { loadChatMessages, saveChatMessages } from './services/chat-persistence'
 import { modeRequiresWorkspace } from './services/agent-modes'
+import { withRecentWorkspace } from './lib/recent-workspaces'
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
   const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
@@ -125,6 +126,14 @@ function sendToRenderer(channel: string, ...args: unknown[]): void {
   }
 }
 
+function applyWorkspaceSelection(workspacePath: string): AppSettings {
+  assertAllowedWorkspace(workspacePath)
+  const next = withRecentWorkspace(sanitizeSettings(store.get('settings')), workspacePath)
+  store.set('settings', next)
+  setWorkspaceWatch(workspacePath)
+  return next
+}
+
 function setWorkspaceWatch(dir: string): void {
   if (!dir || isInsideAgentApp(dir)) {
     workspaceWatcher.stop()
@@ -195,12 +204,18 @@ function registerIpc(): void {
       properties: ['openDirectory']
     })
     if (result.canceled || !result.filePaths[0]) return null
-    const path = result.filePaths[0]
-    assertAllowedWorkspace(path)
-    const settings = sanitizeSettings(store.get('settings'))
-    store.set('settings', { ...settings, workingDirectory: path })
-    setWorkspaceWatch(path)
-    return path
+    return applyWorkspaceSelection(result.filePaths[0]).workingDirectory
+  })
+
+  ipcMain.handle('fs:set-workspace', (_event, workspacePath: string) => {
+    if (!workspacePath || typeof workspacePath !== 'string') {
+      throw new Error('Workspace path is required')
+    }
+    return applyWorkspaceSelection(workspacePath).workingDirectory
+  })
+
+  ipcMain.handle('fs:list-workspace-files', async () => {
+    return codebaseIndexer.listWorkspaceFiles()
   })
 
   ipcMain.handle('fs:read-file', (_event, filePath: string) => {

@@ -59,6 +59,8 @@ Creates installers in the `release/` directory.
 |----------|--------|
 | `Ctrl+S` | Save current file |
 | `Ctrl+\`` | Toggle terminal |
+| `Ctrl+P` | Quick open file |
+| `Ctrl+/` | Keyboard shortcuts |
 | `Ctrl+L` | Open settings |
 
 ## Configuration
@@ -77,12 +79,14 @@ The agent can autonomously use these tools:
 
 | Tool | Description |
 |------|-------------|
-| `read_file` | Read file contents |
+| `read_file` | Read one file (deprecated — use `read_files`) |
+| `read_files` | Read 1–10 files in one call (primary read tool) |
 | `write_file` | Create or update files |
 | `list_directory` | List directory contents |
-| `search_files` | Regex text search (ripgrep; deprecated, use `codebase_search`) |
+| `search_files` | Regex text search (deprecated, use `grep_workspace` or `codebase_search`) |
+| `grep_workspace` | Regex search across workspace files (ripgrep) |
 | `codebase_search` | Hybrid search: FTS + symbols + local semantic embeddings |
-| `run_terminal` | Execute shell commands |
+| `run_terminal` | Execute shell commands (build/test/server — not for grepping code) |
 | `web_search` | Search the web via DuckDuckGo |
 | `get_open_files` | Get context from open editor tabs |
 

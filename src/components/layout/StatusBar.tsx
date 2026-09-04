@@ -1,5 +1,5 @@
-import { FolderOpen, Terminal as TerminalIcon, BarChart3, Database } from 'lucide-react'
-import { useFileStore } from '@/stores/fileStore'
+import { WorkspaceSwitcher } from './WorkspaceSwitcher'
+import { Terminal as TerminalIcon, BarChart3, Database } from 'lucide-react'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAnalyticsStore } from '@/stores/analyticsStore'
 import { useIndexStore } from '@/stores/indexStore'
@@ -23,7 +23,6 @@ function formatIndexLabel(status: ReturnType<typeof useIndexStore.getState>['sta
 }
 
 export function StatusBar(): React.ReactElement {
-  const workingDirectory = useFileStore((s) => s.workingDirectory)
   const settings = useSettingsStore((s) => s.settings)
   const modelCount = useSettingsStore((s) => s.models.length)
   const currentModel = useSettingsStore((s) => s.models.find((m) => m.id === s.settings.model))
@@ -39,12 +38,7 @@ export function StatusBar(): React.ReactElement {
   return (
     <div className="flex h-6 items-center justify-between border-t border-white/5 bg-[#0a0a0f] px-3 text-[10px] text-zinc-500">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <FolderOpen className="h-3 w-3" />
-          <span className="truncate max-w-md">
-            {workingDirectory || 'No folder open'}
-          </span>
-        </div>
+        <WorkspaceSwitcher />
         <button
           type="button"
           onClick={() => void rebuildIndex()}

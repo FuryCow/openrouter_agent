@@ -343,6 +343,23 @@ export class CodebaseIndexer {
     )
   }
 
+  async listWorkspaceFiles(): Promise<string[]> {
+    if (!this.workspacePath) return []
+
+    if (this.store) {
+      const manifest = this.store.listManifest()
+      if (manifest.length > 0) {
+        return manifest.map((entry) => join(this.workspacePath!, entry.path))
+      }
+    }
+
+    const manifest = await scanWorkspaceManifest(
+      this.workspacePath,
+      this.settings.maxFileSizeKb * 1024
+    )
+    return manifest.map((entry) => join(this.workspacePath!, entry.path))
+  }
+
   async searchFiles(query: string, root: string): Promise<SearchResult[]> {
     return ripgrepSearch(query, root, 100)
   }

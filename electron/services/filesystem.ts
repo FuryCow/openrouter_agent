@@ -109,4 +109,33 @@ export class FileSystemService {
     }
     return ripgrepSearch(query, root, 100)
   }
+
+  async grepWorkspace(
+    query: string,
+    root: string,
+    options?: { limit?: number; pathGlob?: string }
+  ): Promise<SearchResult[]> {
+    return ripgrepSearch(query, root, {
+      limit: options?.limit ?? 100,
+      pathGlob: options?.pathGlob
+    })
+  }
+
+  async readFiles(
+    filePaths: string[]
+  ): Promise<Array<{ path: string; content?: string; error?: string }>> {
+    const results: Array<{ path: string; content?: string; error?: string }> = []
+
+    for (const filePath of filePaths) {
+      try {
+        const content = await readFile(filePath, 'utf-8')
+        results.push({ path: filePath, content })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to read file'
+        results.push({ path: filePath, error: message })
+      }
+    }
+
+    return results
+  }
 }

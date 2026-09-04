@@ -28,6 +28,8 @@ export interface ElectronAPI {
   }
   fs: {
     openFolder: () => Promise<string | null>
+    setWorkspace: (path: string) => Promise<string>
+    listWorkspaceFiles: () => Promise<string[]>
     readFile: (path: string) => Promise<string>
     writeFile: (path: string, content: string) => Promise<void>
     listDir: (path: string) => Promise<DirEntry[]>
@@ -89,6 +91,8 @@ const api: ElectronAPI = {
   },
   fs: {
     openFolder: () => ipcRenderer.invoke('fs:open-folder'),
+    setWorkspace: (path) => ipcRenderer.invoke('fs:set-workspace', path),
+    listWorkspaceFiles: () => ipcRenderer.invoke('fs:list-workspace-files'),
     readFile: (path) => ipcRenderer.invoke('fs:read-file', path),
     writeFile: (path, content) => ipcRenderer.invoke('fs:write-file', path, content),
     listDir: (path) => ipcRenderer.invoke('fs:list-dir', path),

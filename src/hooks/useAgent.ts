@@ -5,6 +5,7 @@ import { useFileStore } from '../stores/fileStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useToastStore } from '../stores/toastStore'
 import { useAnalyticsStore } from '../stores/analyticsStore'
+import { useTokenUsageStore } from '../stores/tokenUsageStore'
 import { getChatModeConfig } from '../lib/chatModes'
 
 function buildImplementPlanPrompt(planContent: string, originalTask?: string): string {
@@ -78,6 +79,7 @@ export function useAgent(): {
         case 'run_analytics':
           if (event.analytics) {
             useAnalyticsStore.getState().addRun(event.analytics)
+            useTokenUsageStore.getState().addUsage(event.analytics.tokenUsage)
           }
           break
         case 'approval_request':

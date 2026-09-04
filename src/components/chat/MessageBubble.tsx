@@ -26,10 +26,12 @@ const FILE_CHANGE_TOOLS = new Set(['write_file', 'search_replace'])
 
 const toolIcons: Record<string, string> = {
   read_file: '📄',
+  read_files: '📚',
   write_file: '✏️',
   search_replace: '🩹',
   list_directory: '📁',
   search_files: '🔍',
+  grep_workspace: '🔎',
   codebase_search: '🧭',
   run_terminal: '💻',
   web_search: '🌐',
@@ -66,7 +68,7 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }): React.Re
   }, [expanded])
 
   useLayoutEffect(() => {
-    if (!expanded || toolCall.status !== 'running' || showDiff) return
+    if (!expanded || toolCall.status === 'running' || showDiff) return
     const body = bodyRef.current
     if (!body || !stickToBottomRef.current) return
     body.scrollTop = body.scrollHeight
@@ -179,12 +181,10 @@ function ThinkingBlock({
   }, [expanded])
 
   useLayoutEffect(() => {
-    if (!expanded) return
+    if (!expanded || isStreaming) return
     const body = bodyRef.current
-    if (!body) return
-    if (isStreaming && stickToBottomRef.current) {
-      body.scrollTop = body.scrollHeight
-    }
+    if (!body || !stickToBottomRef.current) return
+    body.scrollTop = body.scrollHeight
   }, [reasoning, isStreaming, expanded])
 
   return (

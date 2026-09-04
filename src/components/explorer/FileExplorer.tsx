@@ -13,7 +13,7 @@ import { ScrollArea } from '../ui/scroll-area'
 import { ExplorerContextMenu, type ContextMenuItem } from './ExplorerContextMenu'
 import { NameInputDialog } from './NameInputDialog'
 import { useFileStore } from '@/stores/fileStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useWorkspace } from '@/hooks/useWorkspace'
 import { useToastStore } from '@/stores/toastStore'
 import type { DirEntry } from '@/types'
 import { cn } from '@/lib/utils'
@@ -179,7 +179,7 @@ export function FileExplorer(): React.ReactElement {
   const openFile = useFileStore((s) => s.openFile)
   const closeTabsUnderPath = useFileStore((s) => s.closeTabsUnderPath)
   const renameTabPath = useFileStore((s) => s.renameTabPath)
-  const settings = useSettingsStore((s) => s.settings)
+  const { openFolderPicker } = useWorkspace()
   const addToast = useToastStore((s) => s.addToast)
   const [rootEntries, setRootEntries] = useState<DirEntry[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
@@ -212,16 +212,8 @@ export function FileExplorer(): React.ReactElement {
     return window.api.fs.onWorkspaceChanged(() => refresh())
   }, [workingDirectory, refresh])
 
-  const handleOpenFolder = async (): Promise<void> => {
-    try {
-      const path = await window.api.fs.openFolder()
-      if (path) {
-        setWorkingDirectory(path)
-        await window.api.settings.save({ ...settings, workingDirectory: path })
-      }
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'This folder cannot be used as workspace', 'error')
-    }
+  const handleOpenFolder = (): void => {
+    void openFolderPicker()
   }
 
   const handleFileClick = async (path: string): Promise<void> => {

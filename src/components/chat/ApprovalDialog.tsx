@@ -20,7 +20,12 @@ export function ApprovalDialog(): React.ReactElement {
   const showDiff = Boolean(pendingApproval?.fileDiff || pendingApproval?.diff)
 
   return (
-    <Dialog open={Boolean(pendingApproval)} onOpenChange={() => setPendingApproval(null)}>
+    <Dialog
+      open={Boolean(pendingApproval)}
+      onOpenChange={(open) => {
+        if (!open && pendingApproval) void handleResponse(false)
+      }}
+    >
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-baseline gap-x-2">

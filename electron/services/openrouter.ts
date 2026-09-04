@@ -1,4 +1,4 @@
-import type { AppSettings, ModelInfo } from '../types'
+import type { AppSettings, ModelInfo, TokenUsage } from '../types'
 import { fetchAgentVisionModels } from './models'
 import { apiFetch } from './http'
 
@@ -41,6 +41,7 @@ export interface StreamResult {
   reasoning: string
   toolCalls: ToolCall[]
   finishReason: string | null
+  usage?: TokenUsage
 }
 
 function formatApiError(payload: unknown): string {
@@ -232,6 +233,7 @@ export class OpenRouterClient {
     let reasoning = ''
     const toolCallsMap = new Map<number, ToolCall>()
     let finishReason: string | null = null
+    let usage: TokenUsage | undefined
 
     while (true) {
       const { done, value } = await reader.read()
@@ -250,6 +252,11 @@ export class OpenRouterClient {
         try {
           const parsed = JSON.parse(data) as {
             error?: unknown
+            usage?: {
+              prompt_tokens?: number
+              completion_tokens?: number
+              total_tokens?: number
+            }
             choices?: Array<{
               finish_reason: string | null
               delta: {
@@ -267,6 +274,14 @@ export class OpenRouterClient {
 
           if (parsed.error) {
             throw new Error(formatApiError(parsed))
+          }
+
+          if (parsed.usage) {
+            usage = {
+              promptTokens: parsed.usage.prompt_tokens ?? 0,
+              completionTokens: parsed.usage.completion_tokens ?? 0,
+              totalTokens: parsed.usage.total_tokens ?? 0
+            }
           }
 
           const choice = parsed.choices?.[0]
@@ -319,7 +334,8 @@ export class OpenRouterClient {
       content,
       reasoning,
       toolCalls: Array.from(toolCallsMap.values()),
-      finishReason
+      finishReason,
+      usage
     }
   }
 

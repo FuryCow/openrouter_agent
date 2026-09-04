@@ -20,11 +20,19 @@ async function getRgPath(): Promise<string> {
   return rgPathPromise
 }
 
+export interface RipgrepSearchOptions {
+  limit?: number
+  pathGlob?: string
+}
+
 export async function ripgrepSearch(
   query: string,
   root: string,
-  limit = 100
+  limitOrOptions: number | RipgrepSearchOptions = 100
 ): Promise<SearchResult[]> {
+  const options =
+    typeof limitOrOptions === 'number' ? { limit: limitOrOptions } : limitOrOptions
+  const limit = options.limit ?? 100
   const rgPath = await getRgPath()
 
   return new Promise((resolve, reject) => {
@@ -34,6 +42,7 @@ export async function ripgrepSearch(
       '--no-heading',
       '--max-count',
       String(limit),
+      ...(options.pathGlob ? ['--glob', options.pathGlob] : []),
       '--glob',
       '!.git/*',
       '--glob',

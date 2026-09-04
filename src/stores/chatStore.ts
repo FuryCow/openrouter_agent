@@ -14,6 +14,7 @@ import {
   timelineToLegacyFields,
   upsertTimelineTool
 } from '../lib/timeline'
+import { useTokenUsageStore } from './tokenUsageStore'
 
 let streamBuffer = { text: '', reasoning: '' }
 let flushRaf: number | null = null
@@ -226,5 +227,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeTimeline: [],
       isStreaming: false
     })
+    useTokenUsageStore.getState().resetSession()
   }
 }))

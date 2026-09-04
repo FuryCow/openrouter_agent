@@ -9,15 +9,24 @@ import { useAgent } from '@/hooks/useAgent'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useToastStore } from '@/stores/toastStore'
 import { getChatModeConfig } from '@/lib/chatModes'
+import { scheduleInAnimationFrame } from '@/lib/animation-frame'
+import { cn } from '@/lib/utils'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ChatOnboarding } from './ChatOnboarding'
+import { TokenUsageRing } from './TokenUsageRing'
+import { useUiStore } from '@/stores/uiStore'
 
 export function ChatPanel(): React.ReactElement {
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<string[]>([])
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [inputIsMultiline, setInputIsMultiline] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const MAX_INPUT_ROWS = 10
   const stickToBottomRef = useRef(true)
   const wasStreamingRef = useRef(false)
   const {
@@ -34,6 +43,7 @@ export function ChatPanel(): React.ReactElement {
   const settings = useSettingsStore((s) => s.settings)
   const models = useSettingsStore((s) => s.models)
   const setSettingsOpen = useSettingsStore((s) => s.setSettingsOpen)
+  const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen)
 
   const modeConfig = getChatModeConfig(chatMode)
   const visibleMessages = useMemo(
@@ -46,10 +56,38 @@ export function ChatPanel(): React.ReactElement {
 
   const scrollToBottom = useCallback((force = false) => {
     if (!force && !stickToBottomRef.current) return
-    const container = scrollRef.current
-    if (!container) return
-    container.scrollTop = container.scrollHeight
+    scheduleInAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ block: 'end' })
+    })
   }, [])
+
+  const resizeInput = useCallback(() => {
+    const el = inputRef.current
+    if (!el) return
+    const style = window.getComputedStyle(el)
+    const lineHeight = Number.parseFloat(style.lineHeight) || 20
+    const padding =
+      Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+    const maxHeight = lineHeight * MAX_INPUT_ROWS + padding
+    const singleLineHeight = lineHeight + padding
+
+    if (!el.value) {
+      el.style.height = `${singleLineHeight}px`
+      el.style.overflowY = 'hidden'
+      setInputIsMultiline(false)
+      return
+    }
+
+    el.style.height = '0px'
+    const nextHeight = Math.max(singleLineHeight, Math.min(el.scrollHeight, maxHeight))
+    el.style.height = `${nextHeight}px`
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    setInputIsMultiline(nextHeight > singleLineHeight + 1 || el.value.includes('\n'))
+  }, [])
+
+  useLayoutEffect(() => {
+    resizeInput()
+  }, [input, resizeInput])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -61,33 +99,6 @@ export function ChatPanel(): React.ReactElement {
     container.addEventListener('scroll', onScroll, { passive: true })
     return () => container.removeEventListener('scroll', onScroll)
   }, [])
-
-  useEffect(() => {
-    const content = contentRef.current
-    if (!content) return
-    const onContentChange = (): void => {
-      if (stickToBottomRef.current) scrollToBottom(true)
-    }
-    const resizeObserver = new ResizeObserver(onContentChange)
-    resizeObserver.observe(content)
-    const mutationObserver = new MutationObserver(onContentChange)
-    mutationObserver.observe(content, { childList: true, subtree: true, characterData: true })
-    return () => {
-      resizeObserver.disconnect()
-      mutationObserver.disconnect()
-    }
-  }, [isStreaming, scrollToBottom])
-
-  useEffect(() => {
-    if (!isStreaming) return
-    let frameId = 0
-    const tick = (): void => {
-      if (stickToBottomRef.current) scrollToBottom(true)
-      frameId = requestAnimationFrame(tick)
-    }
-    frameId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frameId)
-  }, [isStreaming, scrollToBottom])
 
   useLayoutEffect(() => {
     if (isStreaming && !wasStreamingRef.current) stickToBottomRef.current = true
@@ -179,7 +190,11 @@ export function ChatPanel(): React.ReactElement {
   }
 
   const handleClear = (): void => {
-    if (!window.confirm(`Clear all ${visibleMessages.length} messages in ${modeConfig.label}?`)) return
+    if (visibleMessages.length === 0) return
+    setClearConfirmOpen(true)
+  }
+
+  const confirmClear = (): void => {
     clearMessages()
   }
 
@@ -233,19 +248,25 @@ export function ChatPanel(): React.ReactElement {
         </div>
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div ref={contentRef} className="space-y-4 p-4">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain [overflow-anchor:auto]"
+      >
+        <div className="space-y-4 p-4">
           {visibleMessages.length === 0 && !isStreaming && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center py-16 text-center"
+              className="flex flex-col items-center justify-center py-10 text-center"
             >
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border border-white/5">
                 <modeConfig.icon className={`h-8 w-8 ${modeConfig.accentClass} opacity-60`} />
               </div>
               <h3 className="text-sm font-medium text-zinc-300">{modeConfig.label}</h3>
               <p className="mt-1 max-w-xs text-xs text-zinc-500">{modeConfig.description}</p>
+              <div className="mt-5 w-full px-2">
+                <ChatOnboarding />
+              </div>
             </motion.div>
           )}
 
@@ -316,7 +337,12 @@ export function ChatPanel(): React.ReactElement {
           </div>
         )}
 
-        <div className="relative flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.02] p-1.5 focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20 transition-all">
+        <div
+          className={cn(
+            'relative flex gap-1 rounded-xl border border-white/10 bg-white/[0.02] p-1.5 focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20 transition-all',
+            inputIsMultiline ? 'items-end' : 'items-center'
+          )}
+        >
           <input
             ref={fileInputRef}
             type="file"
@@ -337,14 +363,16 @@ export function ChatPanel(): React.ReactElement {
             <Paperclip className="h-4 w-4" />
           </Button>
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             placeholder={editingMessageId ? 'Edit message…' : modeConfig.placeholder}
             rows={1}
-            className="flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none min-h-9 max-h-32"
+            className="flex-1 resize-none overflow-hidden bg-transparent px-1 py-2 text-sm leading-5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
           />
+          <TokenUsageRing />
           {isStreaming ? (
             <Button variant="destructive" size="icon" className="size-9 shrink-0" onClick={abort}>
               <Square className="h-4 w-4" />
@@ -360,7 +388,42 @@ export function ChatPanel(): React.ReactElement {
             </Button>
           )}
         </div>
+        <p className="mt-2 px-1 text-[10px] text-zinc-600">
+          <button
+            type="button"
+            className="hover:text-zinc-400 underline-offset-2 hover:underline"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            Enter — отправить
+          </button>
+          {' · '}
+          <button
+            type="button"
+            className="hover:text-zinc-400 underline-offset-2 hover:underline"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            Shift+Enter — новая строка
+          </button>
+          {' · '}
+          <button
+            type="button"
+            className="hover:text-zinc-400 underline-offset-2 hover:underline"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            Ctrl+/ — все клавиши
+          </button>
+        </p>
       </div>
+
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        onOpenChange={setClearConfirmOpen}
+        title="Очистить чат?"
+        description={`Удалить все ${visibleMessages.length} сообщений в режиме «${modeConfig.label}»? Счётчик токенов сессии тоже сбросится.`}
+        confirmLabel="Очистить"
+        destructive
+        onConfirm={confirmClear}
+      />
     </div>
   )
 }

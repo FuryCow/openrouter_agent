@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useFileStore } from '@/stores/fileStore'
 import { Button } from '../ui/button'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { scheduleInAnimationFrame } from '@/lib/animation-frame'
 
 export function TerminalPanel(): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -69,18 +70,16 @@ export function TerminalPanel(): React.ReactElement {
 
     init()
 
-    const handleResize = (): void => {
-      fitAddon.fit()
+    const scheduleFit = (): void => {
+      scheduleInAnimationFrame(() => fitAddon.fit())
     }
-    window.addEventListener('resize', handleResize)
+    window.addEventListener('resize', scheduleFit)
 
-    const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(() => fitAddon.fit())
-    })
+    const resizeObserver = new ResizeObserver(scheduleFit)
     resizeObserver.observe(containerRef.current)
 
     return () => {
-      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('resize', scheduleFit)
       resizeObserver.disconnect()
       unsubData?.()
       if (termIdRef.current) {

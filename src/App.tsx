@@ -20,6 +20,9 @@ import { ApprovalDialog } from './components/chat/ApprovalDialog'
 import { useChatPersistence } from './hooks/useChatPersistence'
 import { useIndexStore } from './stores/indexStore'
 import { Toaster } from './components/ui/toaster'
+import { QuickOpenModal } from './components/layout/QuickOpenModal'
+import { ShortcutsModal } from './components/layout/ShortcutsModal'
+import { useUiStore } from './stores/uiStore'
 
 function ResizeHandle({ direction }: { direction: 'horizontal' | 'vertical' }): React.ReactElement {
   return (
@@ -88,6 +91,14 @@ export default function App(): React.ReactElement {
         e.preventDefault()
         useSettingsStore.getState().setSettingsOpen(true)
       }
+      if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault()
+        useUiStore.getState().setQuickOpenOpen(true)
+      }
+      if (e.ctrlKey && e.key === '/') {
+        e.preventDefault()
+        useUiStore.getState().setShortcutsOpen(true)
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -148,6 +159,8 @@ export default function App(): React.ReactElement {
       <Toaster />
       <ToolAnalyticsPanel />
       <ApprovalDialog />
+      <QuickOpenModal />
+      <ShortcutsModal />
     </div>
   )
 }

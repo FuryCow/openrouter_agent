@@ -4,6 +4,7 @@ export interface AppSettings {
   apiKey: string
   model: string
   workingDirectory: string
+  recentWorkspaces?: string[]
   temperature?: number
   maxTokens?: number
   customSystemPrompt?: string
@@ -182,6 +183,12 @@ export type ToolValidationIssue =
 
 export type ToolCallOutcome = 'success' | 'error' | 'invalid_args'
 
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
 export interface ToolCallAnalytics {
   id: string
   toolCallId: string
@@ -209,6 +216,7 @@ export interface AgentRunAnalytics {
   maxIterations: number
   error?: string
   toolCalls: ToolCallAnalytics[]
+  tokenUsage?: TokenUsage
   summary: {
     totalTools: number
     success: number

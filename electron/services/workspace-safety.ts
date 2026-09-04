@@ -15,6 +15,24 @@ const DANGEROUS_COMMAND_PATTERNS = [
   /\bgit\s+reset\s+--hard/i
 ]
 
+/** Shell patterns used to search/grep source — use grep_workspace or codebase_search instead. */
+export const CODE_SEARCH_SHELL_PATTERNS = [
+  /\b(rg|ripgrep)\b/i,
+  /\bgrep\b/i,
+  /\bgit\s+grep\b/i,
+  /\bfindstr\b/i,
+  /\bSelect-String\b/i,
+  /\bwhere\s+\/r\b/i,
+  /\bGet-ChildItem\b[^\n|]*-Recurse[^\n|]*\|\s*Select-String/i,
+  /\bfind\b[^\n]*(-exec|\bxargs\b)[^\n]*\bgrep\b/i
+]
+
+export function isCodeSearchShellCommand(command: string): boolean {
+  const trimmed = command.trim()
+  if (!trimmed) return false
+  return CODE_SEARCH_SHELL_PATTERNS.some((pattern) => pattern.test(trimmed))
+}
+
 let cachedAgentAppRoot: string | null = null
 
 function looksLikeAgentAppRoot(dir: string): boolean {
@@ -102,6 +120,12 @@ export function assertSafeTerminalCommand(command: string): void {
   const trimmed = command.trim()
   if (!trimmed) {
     throw new Error('Empty command')
+  }
+
+  if (isCodeSearchShellCommand(trimmed)) {
+    throw new Error(
+      'Blocked: do not use the shell to search or grep source files. Use grep_workspace (regex) or codebase_search (hybrid navigation) instead.'
+    )
   }
 
   for (const pattern of DANGEROUS_COMMAND_PATTERNS) {

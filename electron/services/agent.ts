@@ -1,5 +1,5 @@
 import { join, isAbsolute } from 'path'
-import type { AgentContext, AgentEvent, ChatMode, ToolCallInfo, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest, FileDiffPreview, CodebaseSearchMode } from '../types'
+import type { AgentContext, AgentEvent, ChatMode, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest, FileDiffPreview, CodebaseSearchMode } from '../types'
 import type { FileSystemService } from './filesystem'
 import type { TerminalService } from './terminal'
 import type { WebSearchService } from './websearch'
@@ -25,12 +25,10 @@ import {
   expandHistoryForApi
 } from './agent-modes'
 import { buildFallbackFileDiffPreview, formatFileChangeDiff } from '../lib/diff'
+import { processToolCallsBatch } from '../lib/tool-call-runner'
 import {
   ToolAnalyticsCollector,
-  validateToolArguments,
-  classifyToolResult,
-  persistRunAnalytics,
-  type ToolCallOutcome
+  persistRunAnalytics
 } from './tool-analytics'
 
 const TOOLS: ToolDefinition[] = [
@@ -38,7 +36,8 @@ const TOOLS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'read_file',
-      description: 'Read the contents of a file at the given path',
+      description:
+        'Deprecated: use read_files instead (paths: ["file"] for a single file). Kept for backward compatibility only.',
       parameters: {
         type: 'object',
         properties: {
@@ -51,9 +50,28 @@ const TOOLS: ToolDefinition[] = [
   {
     type: 'function',
     function: {
+      name: 'read_files',
+      description:
+        'Primary read tool: load 1–10 files in one call. Workflow: search/grep to gather scope → one read_files with all needed paths → edit. Do not read files one-by-one while exploring.',
+      parameters: {
+        type: 'object',
+        properties: {
+          paths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'File paths relative to workspace (max 10)'
+          }
+        },
+        required: ['paths']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'write_file',
       description:
-        'Create a new file or fully overwrite an existing file. For partial edits, use search_replace instead.',
+        'Create a new file or fully overwrite an existing file. For partial edits, use search_replace instead. Batch new files: multiple write_file tool_calls in one response.',
       parameters: {
         type: 'object',
         properties: {
@@ -69,7 +87,7 @@ const TOOLS: ToolDefinition[] = [
     function: {
       name: 'search_replace',
       description:
-        'Replace an exact text fragment in an existing file. Prefer this for small edits. old_string must match exactly (whitespace, indentation). Must be unique unless replace_all is true.',
+        'Replace an exact text fragment in an existing file. Prefer this for small edits. old_string must match exactly (whitespace, indentation). Must be unique unless replace_all is true. Batch related file edits: send multiple search_replace tool_calls in one response.',
       parameters: {
         type: 'object',
         properties: {
@@ -89,7 +107,8 @@ const TOOLS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'list_directory',
-      description: 'List files and directories in a given path',
+      description:
+        'List immediate children of one directory. Fallback only: index not ready, folder layout, or a path outside the index. Do not walk the repo tree — use codebase_search instead.',
       parameters: {
         type: 'object',
         properties: {
@@ -119,7 +138,7 @@ const TOOLS: ToolDefinition[] = [
     function: {
       name: 'codebase_search',
       description:
-        'Search the codebase using hybrid ranking (text, symbols, semantic). Prefer this for code navigation.',
+        'Primary tool for code navigation. Hybrid ranking (text, symbols, semantic). Use first to find relevant files and locations; then read_file only for files you will edit.',
       parameters: {
         type: 'object',
         properties: {
@@ -140,8 +159,27 @@ const TOOLS: ToolDefinition[] = [
   {
     type: 'function',
     function: {
+      name: 'grep_workspace',
+      description:
+        'Regex search across workspace files via ripgrep. Use for exact patterns (CSS classes, imports, string literals). Do NOT use run_terminal for grep/find/Select-String — use this tool instead.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Regex pattern to search for' },
+          root: { type: 'string', description: 'Optional subdirectory relative to workspace' },
+          path_glob: { type: 'string', description: 'Optional glob filter (e.g. templates/**/*.html)' },
+          limit: { type: 'number', description: 'Max matches (default 100)' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'run_terminal',
-      description: 'Execute a shell command in the working directory',
+      description:
+        'Execute a shell command for builds, tests, dev servers, and package managers. Do NOT use for searching or grepping source code — use grep_workspace or codebase_search.',
       parameters: {
         type: 'object',
         properties: {
@@ -176,6 +214,9 @@ const TOOLS: ToolDefinition[] = [
 ]
 
 const MUTATING_TOOLS = new Set(['write_file', 'search_replace', 'run_terminal'])
+const MAX_READ_FILES = 10
+const MAX_CHARS_PER_FILE = 50_000
+const MAX_TOTAL_READ_FILES_CHARS = 150_000
 
 export class AgentService {
   private abortController: AbortController | null = null
@@ -384,6 +425,8 @@ export class AgentService {
           maxTokens: context.maxTokens
         })
 
+        analytics.addTokenUsage(result.usage)
+
         const iterationReasoning = (result.reasoning || streamedReasoning).trim()
         if (iterationReasoning) {
           timeline.push({
@@ -409,88 +452,26 @@ export class AgentService {
             tool_calls: result.toolCalls
           })
 
-          for (const call of result.toolCalls) {
-            const toolInfo: ToolCallInfo = {
-              id: call.id,
-              name: call.function.name,
-              arguments: call.function.arguments,
-              status: 'running'
-            }
-            emit({ type: 'tool_start', toolCall: toolInfo })
-
-            const startedAt = Date.now()
-            const argsValidation = validateToolArguments(
-              call.function.name,
-              call.function.arguments,
-              mode
-            )
-
-            let toolResult: string
-            let outcome: ToolCallOutcome
-            let issues = [...argsValidation.issues]
-            const fileChange = await this.buildFileChangePreview(call, context)
-
-            if (!argsValidation.ok) {
-              toolResult = `Error: ${argsValidation.errorMessage}`
-              toolInfo.status = 'error'
-              toolInfo.result = toolResult
-              outcome = 'invalid_args'
-            } else {
-              try {
-                const approved = await this.waitForApproval(call, context, emit)
-                if (!approved) {
-                  toolResult = 'Error: User rejected this action.'
-                  toolInfo.status = 'error'
-                  toolInfo.result = toolResult
-                  outcome = 'error'
-                  issues = [...issues, 'execution_error']
-                } else {
-                  toolResult = await this.executeTool(call, context, mode)
-                  const classified = classifyToolResult(call.function.name, toolResult)
-                  outcome = classified.outcome
-                  issues = [...issues, ...classified.issues]
-                  toolInfo.status = outcome === 'success' ? 'done' : 'error'
-                  toolInfo.result = toolResult
-                  if (fileChange && outcome === 'success') {
-                    toolInfo.fileDiff = fileChange.fileDiff
-                    toolInfo.filePath = fileChange.path
-                  }
-                }
-              } catch (err) {
-                toolResult = `Error: ${err instanceof Error ? err.message : String(err)}`
-                toolInfo.status = 'error'
-                toolInfo.result = toolResult
-                outcome = 'error'
-                issues = [...issues, 'execution_error']
+          await processToolCallsBatch({
+            toolCalls: result.toolCalls,
+            mode,
+            cwd: context.workingDirectory,
+            iteration: iterations,
+            timeline,
+            messages,
+            onToolStart: (toolCall) => emit({ type: 'tool_start', toolCall }),
+            onToolDone: (toolCall) => emit({ type: 'tool_done', toolCall }),
+            onRecordAnalytics: (record) => analytics.recordToolCall(record),
+            requestApproval: (call) => this.waitForApproval(call, context, emit),
+            executeTool: (call) => this.executeTool(call, context, mode),
+            onExecuteSuccess: async (call, toolInfo) => {
+              const fileChange = await this.buildFileChangePreview(call, context)
+              if (fileChange) {
+                toolInfo.fileDiff = fileChange.fileDiff
+                toolInfo.filePath = fileChange.path
               }
             }
-
-            analytics.recordToolCall({
-              toolCallId: call.id,
-              iteration: iterations,
-              name: call.function.name,
-              argumentsRaw: call.function.arguments,
-              argumentsParsed: argsValidation.parsed,
-              durationMs: Date.now() - startedAt,
-              outcome,
-              issues,
-              result: toolResult
-            })
-
-            emit({ type: 'tool_done', toolCall: toolInfo })
-            timeline.push({
-              id: call.id,
-              type: 'tool',
-              toolCall: { ...toolInfo }
-            })
-
-            messages.push({
-              role: 'tool',
-              tool_call_id: call.id,
-              name: call.function.name,
-              content: toolResult
-            })
-          }
+          })
 
           emit({ type: 'stream', content: '' })
           continue
@@ -640,10 +621,7 @@ export class AgentService {
       return `Error: Tool "${call.function.name}" is not available in ${mode} mode.`
     }
 
-    const args = JSON.parse(call.function.arguments || '{}') as Record<
-      string,
-      string | boolean | undefined
-    >
+    const args = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>
     const cwd = context.workingDirectory
 
     switch (call.function.name) {
@@ -651,7 +629,45 @@ export class AgentService {
         const path = this.resolvePath(String(args.path ?? ''), cwd)
         assertPathNotInAgentApp(path)
         const content = await this.fs.readFile(path)
-        return content.slice(0, 50000)
+        return content.slice(0, MAX_CHARS_PER_FILE)
+      }
+      case 'read_files': {
+        const rawPaths = args.paths
+        if (!Array.isArray(rawPaths) || rawPaths.length === 0) {
+          return 'Error: paths must be a non-empty array'
+        }
+        if (rawPaths.length > MAX_READ_FILES) {
+          return `Error: read_files supports at most ${MAX_READ_FILES} paths per call`
+        }
+
+        const resolvedPaths = rawPaths.map((p) => {
+          const path = this.resolvePath(String(p ?? ''), cwd)
+          assertPathNotInAgentApp(path)
+          return path
+        })
+
+        const reads = await this.fs.readFiles(resolvedPaths)
+        const parts: string[] = []
+        let totalChars = 0
+
+        for (const item of reads) {
+          if (item.error) {
+            parts.push(`=== ${item.path} ===\nError: ${item.error}`)
+            continue
+          }
+
+          const remaining = MAX_TOTAL_READ_FILES_CHARS - totalChars
+          if (remaining <= 0) {
+            parts.push(`=== ${item.path} ===\n[truncated: total read_files budget exceeded]`)
+            continue
+          }
+
+          const slice = (item.content ?? '').slice(0, Math.min(MAX_CHARS_PER_FILE, remaining))
+          totalChars += slice.length
+          parts.push(`=== ${item.path} ===\n${slice}`)
+        }
+
+        return parts.join('\n\n')
       }
       case 'write_file': {
         const path = this.resolvePath(String(args.path ?? ''), cwd)
@@ -681,6 +697,16 @@ export class AgentService {
         const root = args.root ? this.resolvePath(String(args.root), cwd) : cwd
         assertPathNotInAgentApp(root)
         const results = await this.fs.searchFiles(String(args.query ?? ''), root)
+        if (results.length === 0) return 'No matches found'
+        return results.map((r) => `${r.file}:${r.line}: ${r.content}`).join('\n')
+      }
+      case 'grep_workspace': {
+        const root = args.root ? this.resolvePath(String(args.root), cwd) : cwd
+        assertPathNotInAgentApp(root)
+        const results = await this.fs.grepWorkspace(String(args.query ?? ''), root, {
+          limit: args.limit ? Number(args.limit) : 100,
+          pathGlob: args.path_glob ? String(args.path_glob) : undefined
+        })
         if (results.length === 0) return 'No matches found'
         return results.map((r) => `${r.file}:${r.line}: ${r.content}`).join('\n')
       }

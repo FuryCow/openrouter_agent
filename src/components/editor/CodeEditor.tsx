@@ -82,17 +82,6 @@ export function CodeEditor(): React.ReactElement {
   }, [clearEditorReveal])
 
   useEffect(() => {
-    const container = editorContainerRef.current
-    if (!container) return
-
-    const observer = new ResizeObserver(() => {
-      monacoEditorRef.current?.layout()
-    })
-    observer.observe(container)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
     if (!pendingEditorReveal || !activeTab) return
     if (!pathsMatch(activeTab.path, pendingEditorReveal.path)) return
 
@@ -161,6 +150,7 @@ export function CodeEditor(): React.ReactElement {
             onChange={(value) => updateTabContent(activeTab.path, value || '')}
             theme="vs-dark"
             options={{
+              automaticLayout: true,
               fontSize: 13,
               fontFamily: "'JetBrains Mono', monospace",
               minimap: { enabled: true },

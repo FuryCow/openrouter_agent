@@ -1,14 +1,16 @@
 import { appendFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
-import type { ChatMode, ToolCallAnalytics, AgentRunAnalytics, ToolValidationIssue } from '../types'
+import type { ChatMode, ToolCallAnalytics, AgentRunAnalytics, ToolValidationIssue, TokenUsage } from '../types'
 
 const TOOLS_KNOWN: Record<string, true> = {
   read_file: true,
+  read_files: true,
   write_file: true,
   search_replace: true,
   list_directory: true,
   search_files: true,
+  grep_workspace: true,
   codebase_search: true,
   run_terminal: true,
   web_search: true,
@@ -17,10 +19,12 @@ const TOOLS_KNOWN: Record<string, true> = {
 
 const REQUIRED_ARGS: Record<string, string[]> = {
   read_file: ['path'],
+  read_files: ['paths'],
   write_file: ['path', 'content'],
   search_replace: ['path', 'old_string', 'new_string'],
   list_directory: [],
   search_files: ['query'],
+  grep_workspace: ['query'],
   codebase_search: ['query'],
   run_terminal: ['command'],
   web_search: ['query'],
@@ -78,7 +82,22 @@ export function validateToolArguments(
   if (toolName === 'read_file' || toolName === 'write_file' || toolName === 'search_replace') {
     if (!String(parsed.path ?? '').trim()) issues.push('empty_path')
   }
-  if (toolName === 'search_files' || toolName === 'web_search' || toolName === 'codebase_search') {
+  if (toolName === 'read_files') {
+    const paths = parsed.paths
+    if (!Array.isArray(paths) || paths.length === 0) {
+      issues.push('missing_required_argument')
+    } else if (paths.length > 10) {
+      issues.push('missing_required_argument')
+    } else if (paths.some((p) => !String(p ?? '').trim())) {
+      issues.push('empty_path')
+    }
+  }
+  if (
+    toolName === 'search_files' ||
+    toolName === 'grep_workspace' ||
+    toolName === 'web_search' ||
+    toolName === 'codebase_search'
+  ) {
     if (!String(parsed.query ?? '').trim()) issues.push('empty_query')
   }
   if (toolName === 'run_terminal') {
@@ -116,6 +135,7 @@ export function classifyToolResult(
       issues.push('search_replace_ambiguous')
     } else if (message.includes('identical')) issues.push('search_replace_identical')
     else if (message.includes('blocked potentially destructive')) issues.push('terminal_blocked')
+    else if (message.includes('do not use the shell to search or grep')) issues.push('terminal_blocked')
     else if (message.includes('not available in')) issues.push('tool_not_allowed_in_mode')
     else if (message.includes('invalid tool call')) issues.push('missing_required_argument')
     else issues.push('execution_error')
@@ -123,7 +143,12 @@ export function classifyToolResult(
     return { outcome: 'error', issues }
   }
 
-  if ((toolName === 'search_files' || toolName === 'codebase_search') && result === 'No matches found') {
+  if (
+    (toolName === 'search_files' ||
+      toolName === 'grep_workspace' ||
+      toolName === 'codebase_search') &&
+    result === 'No matches found'
+  ) {
     issues.push('no_results')
   }
   if (toolName === 'codebase_search' && result.includes('index_not_ready')) {
@@ -168,6 +193,7 @@ export class ToolAnalyticsCollector {
   private readonly runId: string
   private readonly startedAt: string
   private readonly toolCalls: ToolCallAnalytics[] = []
+  private tokenUsage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
 
   constructor(
     private readonly mode: ChatMode,
@@ -208,6 +234,15 @@ export class ToolAnalyticsCollector {
     return record
   }
 
+  addTokenUsage(usage?: TokenUsage): void {
+    if (!usage || usage.totalTokens <= 0) return
+    this.tokenUsage = {
+      promptTokens: this.tokenUsage.promptTokens + usage.promptTokens,
+      completionTokens: this.tokenUsage.completionTokens + usage.completionTokens,
+      totalTokens: this.tokenUsage.totalTokens + usage.totalTokens
+    }
+  }
+
   finish(
     status: AgentRunAnalytics['status'],
     iterations: number,
@@ -225,6 +260,7 @@ export class ToolAnalyticsCollector {
       maxIterations: this.maxIterations,
       error,
       toolCalls: [...this.toolCalls],
+      tokenUsage: this.tokenUsage.totalTokens > 0 ? { ...this.tokenUsage } : undefined,
       summary: buildSummary(this.toolCalls)
     }
   }

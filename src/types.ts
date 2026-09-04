@@ -38,5 +38,6 @@ export type {
   IndexProgress,
   CodebaseSearchRequest,
   CodebaseSearchHit,
-  CodebaseSearchMode
+  CodebaseSearchMode,
+  TokenUsage
 } from '../../electron/types'
