@@ -55,6 +55,9 @@
     "vite": "^6.2.0",
     "vitest": "^3.0.5"
   },
+  "overrides": {
+    "node-gyp": "^12.4.0"
+  },
   "build": {
     "appId": "com.openrouter.agent",
     "productName": "OpenRouter Agent",
