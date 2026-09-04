@@ -119,12 +119,22 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: List installers
+        run: find artifacts -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) -ls
+
+      - name: Delete previous release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete "${{ github.ref_name }}" --yes || true
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           files: |
             artifacts/**/*.exe
             artifacts/**/*.dmg
             artifacts/**/*.AppImage
           generate_release_notes: true
-          overwrite: true
+          overwrite_files: true
+          fail_on_unmatched_files: true
