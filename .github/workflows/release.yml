@@ -32,7 +32,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Setup Python
@@ -52,11 +52,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools
           echo "PYTHON=${{ steps.setup-python.outputs.python-path }}" >> "$GITHUB_ENV"
-          echo "npm_config_python=${{ steps.setup-python.outputs.python-path }}" >> "$GITHUB_ENV"
 
       - name: Enable MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Verify toolchain
+        shell: bash
+        run: |
+          echo "Node $(node -v)"
+          echo "npm $(npm -v)"
+          echo "Python $(python --version)"
 
       - name: Cache Electron
         uses: actions/cache@v4
@@ -69,7 +75,7 @@ jobs:
           key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
-        run: npm ci --prefer-offline
+        run: npm ci --prefer-offline --loglevel=error
 
       - name: Run tests
         run: npm test
