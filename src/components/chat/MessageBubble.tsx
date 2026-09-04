@@ -18,6 +18,11 @@ import type { TimelineItem, ToolCallInfo } from '@/types'
 import { cn } from '@/lib/utils'
 import { resolveMessageTimeline } from '@/lib/timeline'
 import { MarkdownContent } from './MarkdownContent'
+import { DiffView } from './DiffView'
+import { parseToolFilePath } from '@/lib/parseDiff'
+import { FilePathLink } from './FilePathLink'
+
+const FILE_CHANGE_TOOLS = new Set(['write_file', 'search_replace'])
 
 const toolIcons: Record<string, string> = {
   read_file: '📄',
@@ -34,6 +39,10 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }): React.Re
   const [expanded, setExpanded] = useState(toolCall.status === 'running')
   const bodyRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
+  const isFileChange = FILE_CHANGE_TOOLS.has(toolCall.name)
+  const filePath =
+    toolCall.filePath ?? (isFileChange ? parseToolFilePath(toolCall.name, toolCall.arguments) : undefined)
+  const showDiff = isFileChange && Boolean(toolCall.fileDiff || toolCall.diff)
 
   useEffect(() => {
     if (toolCall.status === 'running') {
@@ -56,11 +65,11 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }): React.Re
   }, [expanded])
 
   useLayoutEffect(() => {
-    if (!expanded || toolCall.status !== 'running') return
+    if (!expanded || toolCall.status !== 'running' || showDiff) return
     const body = bodyRef.current
     if (!body || !stickToBottomRef.current) return
     body.scrollTop = body.scrollHeight
-  }, [toolCall.arguments, toolCall.result, toolCall.status, expanded])
+  }, [toolCall.arguments, toolCall.result, toolCall.status, expanded, showDiff])
 
   return (
     <motion.div
@@ -74,9 +83,15 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }): React.Re
       >
         <span className="text-sm">{toolIcons[toolCall.name] || '🔧'}</span>
         <Wrench className="h-3 w-3 text-indigo-400" />
-        <span className="text-xs font-medium text-zinc-300">
+        <span className="min-w-0 flex-1 text-xs font-medium text-zinc-300">
           {toolCall.name === 'preparing' ? 'Подготовка tool call…' : toolCall.name}
-          {toolCall.status === 'running' && toolCall.arguments.length > 0 && (
+          {filePath && (
+            <>
+              <span className="text-zinc-500"> · </span>
+              <FilePathLink path={filePath} className="ml-1 truncate" fileDiff={toolCall.fileDiff} />
+            </>
+          )}
+          {toolCall.status === 'running' && !filePath && toolCall.arguments.length > 0 && (
             <span className="ml-1 text-zinc-500">({toolCall.arguments.length} chars)</span>
           )}
         </span>
@@ -100,16 +115,30 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }): React.Re
 
       {expanded && (
         <div className="border-t border-white/5 px-3 py-2">
-          <div ref={bodyRef} className="tool-scroll space-y-2">
-            <pre className="text-[10px] text-zinc-500 font-mono whitespace-pre-wrap break-words">
-              {toolCall.arguments ||
-                (toolCall.status === 'running' ? 'Генерация аргументов…' : '')}
-            </pre>
+          <div ref={bodyRef} className={cn('space-y-2', !showDiff && 'tool-scroll')}>
+            {showDiff ? (
+              <DiffView fileDiff={toolCall.fileDiff} diff={toolCall.diff} />
+            ) : isFileChange && toolCall.status === 'running' ? (
+              <pre className="text-[10px] text-zinc-500 font-mono whitespace-pre-wrap break-words">
+                {toolCall.arguments || 'Генерация аргументов…'}
+              </pre>
+            ) : (
+              <pre className="text-[10px] text-zinc-500 font-mono whitespace-pre-wrap break-words">
+                {toolCall.arguments ||
+                  (toolCall.status === 'running' ? 'Генерация аргументов…' : '')}
+              </pre>
+            )}
+
             {toolCall.result && (
-              <pre className="rounded-md bg-black/30 p-2 text-[10px] text-zinc-400 font-mono whitespace-pre-wrap break-words">
+              <p
+                className={cn(
+                  'text-[10px] font-mono',
+                  toolCall.status === 'error' ? 'text-red-300' : 'text-zinc-500'
+                )}
+              >
                 {toolCall.result.slice(0, 2000)}
                 {toolCall.result.length > 2000 && '...'}
-              </pre>
+              </p>
             )}
           </div>
         </div>

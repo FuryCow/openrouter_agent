@@ -1,21 +1,85 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { X } from 'lucide-react'
-import { useFileStore } from '@/stores/fileStore'
+import { useFileStore, type EditorRevealRequest } from '@/stores/fileStore'
 import { getFileName, cn } from '@/lib/utils'
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').toLowerCase()
+}
+
+function pathsMatch(a: string, b: string): boolean {
+  return normalizePath(a) === normalizePath(b)
+}
+
+function applyEditorReveal(
+  editorInstance: editor.IStandaloneCodeEditor,
+  monaco: typeof import('monaco-editor'),
+  request: EditorRevealRequest,
+  decorationIdsRef: React.MutableRefObject<string[]>
+): void {
+  editorInstance.revealLineInCenter(request.scrollToLine)
+
+  if (decorationIdsRef.current.length > 0) {
+    editorInstance.deltaDecorations(decorationIdsRef.current, [])
+  }
+
+  decorationIdsRef.current = editorInstance.deltaDecorations(
+    [],
+    request.highlightRanges.map((range) => ({
+      range: new monaco.Range(range.startLine, 1, range.endLine, 1),
+      options: {
+        isWholeLine: true,
+        className: 'file-diff-highlight-line',
+        linesDecorationsClassName: 'file-diff-highlight-gutter'
+      }
+    }))
+  )
+}
 
 export function CodeEditor(): React.ReactElement {
   const tabs = useFileStore((s) => s.tabs)
   const activeTabPath = useFileStore((s) => s.activeTabPath)
+  const pendingEditorReveal = useFileStore((s) => s.pendingEditorReveal)
   const setActiveTab = useFileStore((s) => s.setActiveTab)
   const closeTab = useFileStore((s) => s.closeTab)
   const updateTabContent = useFileStore((s) => s.updateTabContent)
   const markTabSaved = useFileStore((s) => s.markTabSaved)
+  const clearEditorReveal = useFileStore((s) => s.clearEditorReveal)
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const monacoEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  const monacoApiRef = useRef<typeof import('monaco-editor') | null>(null)
+  const diffDecorationIdsRef = useRef<string[]>([])
+  const revealClearTimerRef = useRef<number | null>(null)
 
   const activeTab = tabs.find((t) => t.path === activeTabPath)
+
+  const tryApplyPendingReveal = useCallback((): boolean => {
+    const editorInstance = monacoEditorRef.current
+    const monaco = monacoApiRef.current
+    const pending = useFileStore.getState().pendingEditorReveal
+    const activePath = useFileStore.getState().activeTabPath
+
+    if (!editorInstance || !monaco || !pending || !activePath) return false
+    if (!pathsMatch(activePath, pending.path)) return false
+
+    applyEditorReveal(editorInstance, monaco, pending, diffDecorationIdsRef)
+    clearEditorReveal()
+
+    if (revealClearTimerRef.current !== null) {
+      window.clearTimeout(revealClearTimerRef.current)
+    }
+    revealClearTimerRef.current = window.setTimeout(() => {
+      if (diffDecorationIdsRef.current.length > 0) {
+        editorInstance.deltaDecorations(diffDecorationIdsRef.current, [])
+        diffDecorationIdsRef.current = []
+      }
+      revealClearTimerRef.current = null
+    }, 10000)
+
+    return true
+  }, [clearEditorReveal])
 
   useEffect(() => {
     const container = editorContainerRef.current
@@ -26,6 +90,29 @@ export function CodeEditor(): React.ReactElement {
     })
     observer.observe(container)
     return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!pendingEditorReveal || !activeTab) return
+    if (!pathsMatch(activeTab.path, pendingEditorReveal.path)) return
+
+    const frame = window.requestAnimationFrame(() => {
+      if (!tryApplyPendingReveal()) {
+        window.requestAnimationFrame(() => {
+          tryApplyPendingReveal()
+        })
+      }
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [pendingEditorReveal, activeTab, activeTabPath, tryApplyPendingReveal])
+
+  useEffect(() => {
+    return () => {
+      if (revealClearTimerRef.current !== null) {
+        window.clearTimeout(revealClearTimerRef.current)
+      }
+    }
   }, [])
 
   const handleSave = async (): Promise<void> => {
@@ -87,6 +174,7 @@ export function CodeEditor(): React.ReactElement {
             }}
             onMount={((editorInstance, monaco) => {
               monacoEditorRef.current = editorInstance
+              monacoApiRef.current = monaco
               monaco.editor.defineTheme('agent-dark', {
                 base: 'vs-dark',
                 inherit: true,
@@ -99,6 +187,10 @@ export function CodeEditor(): React.ReactElement {
                 }
               })
               monaco.editor.setTheme('agent-dark')
+
+              window.requestAnimationFrame(() => {
+                tryApplyPendingReveal()
+              })
             }) satisfies OnMount}
           />
         ) : (

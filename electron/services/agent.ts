@@ -1,5 +1,5 @@
 import { join, isAbsolute } from 'path'
-import type { AgentContext, AgentEvent, ChatMode, ToolCallInfo, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest } from '../types'
+import type { AgentContext, AgentEvent, ChatMode, ToolCallInfo, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest, FileDiffPreview } from '../types'
 import type { FileSystemService } from './filesystem'
 import type { TerminalService } from './terminal'
 import type { WebSearchService } from './websearch'
@@ -23,7 +23,7 @@ import {
   modeRequiresWorkspace,
   expandHistoryForApi
 } from './agent-modes'
-import { simpleLineDiff } from '../lib/diff'
+import { buildFallbackFileDiffPreview, formatFileChangeDiff } from '../lib/diff'
 import {
   ToolAnalyticsCollector,
   validateToolArguments,
@@ -403,6 +403,7 @@ export class AgentService {
             let toolResult: string
             let outcome: ToolCallOutcome
             let issues = [...argsValidation.issues]
+            const fileChange = await this.buildFileChangePreview(call, context)
 
             if (!argsValidation.ok) {
               toolResult = `Error: ${argsValidation.errorMessage}`
@@ -425,6 +426,10 @@ export class AgentService {
                   issues = [...issues, ...classified.issues]
                   toolInfo.status = outcome === 'success' ? 'done' : 'error'
                   toolInfo.result = toolResult
+                  if (fileChange && outcome === 'success') {
+                    toolInfo.fileDiff = fileChange.fileDiff
+                    toolInfo.filePath = fileChange.path
+                  }
                 }
               } catch (err) {
                 toolResult = `Error: ${err instanceof Error ? err.message : String(err)}`
@@ -565,23 +570,12 @@ export class AgentService {
 
     const args = JSON.parse(call.function.arguments || '{}') as Record<string, string>
     let preview = ''
-    let diff = ''
+    const fileChange = await this.buildFileChangePreview(call, context)
 
     if (call.function.name === 'write_file') {
       preview = `Write ${args.path ?? ''} (${(args.content ?? '').length} chars)`
     } else if (call.function.name === 'search_replace') {
       preview = `Patch ${args.path ?? ''}`
-      try {
-        const path = this.resolvePath(String(args.path ?? ''), context.workingDirectory)
-        const current = await this.fs.readFile(path)
-        const next = current.replace(
-          String(args.old_string ?? ''),
-          String(args.new_string ?? '')
-        )
-        diff = simpleLineDiff(current, next)
-      } catch {
-        diff = `-${args.old_string}\n+${args.new_string}`
-      }
     } else if (call.function.name === 'run_terminal') {
       preview = `Run: ${args.command ?? ''}`
     }
@@ -593,7 +587,8 @@ export class AgentService {
       name: call.function.name,
       arguments: call.function.arguments,
       preview,
-      diff
+      fileDiff: fileChange?.fileDiff,
+      filePath: fileChange?.path
     }
 
     emit({ type: 'approval_request', approval: request })
@@ -687,5 +682,54 @@ export class AgentService {
   private resolvePath(filePath: string, cwd: string): string {
     if (!filePath) return cwd
     return isAbsolute(filePath) ? filePath : join(cwd, filePath)
+  }
+
+  private async buildFileChangePreview(
+    call: ToolCall,
+    context: AgentContext
+  ): Promise<{ path: string; fileDiff: FileDiffPreview } | null> {
+    if (call.function.name !== 'write_file' && call.function.name !== 'search_replace') {
+      return null
+    }
+
+    const args = JSON.parse(call.function.arguments || '{}') as Record<string, string>
+    const relativePath = String(args.path ?? '').trim()
+    if (!relativePath) return null
+
+    const path = this.resolvePath(relativePath, context.workingDirectory)
+
+    try {
+      if (call.function.name === 'write_file') {
+        let current = ''
+        try {
+          current = await this.fs.readFile(path)
+        } catch {
+          current = ''
+        }
+        const next = String(args.content ?? '')
+        return { path: relativePath, fileDiff: formatFileChangeDiff(current, next) }
+      }
+
+      const current = await this.fs.readFile(path)
+      const next = current.replace(String(args.old_string ?? ''), String(args.new_string ?? ''))
+      return { path: relativePath, fileDiff: formatFileChangeDiff(current, next) }
+    } catch {
+      if (call.function.name === 'search_replace') {
+        const fileDiff = buildFallbackFileDiffPreview(
+          '',
+          '',
+          args.old_string,
+          args.new_string
+        )
+        return fileDiff.lines.length > 0 ? { path: relativePath, fileDiff } : null
+      }
+
+      const content = String(args.content ?? '')
+      if (!content) return null
+      return {
+        path: relativePath,
+        fileDiff: formatFileChangeDiff('', content)
+      }
+    }
   }
 }

@@ -62,6 +62,16 @@ body {
   overscroll-behavior-y: auto;
 }
 
+.monaco-editor .file-diff-highlight-line {
+  background-color: rgba(52, 211, 153, 0.14) !important;
+}
+
+.monaco-editor .file-diff-highlight-gutter {
+  background-color: rgba(52, 211, 153, 0.75);
+  width: 3px !important;
+  margin-left: 4px;
+}
+
 .chat-markdown {
   word-break: break-word;
 }

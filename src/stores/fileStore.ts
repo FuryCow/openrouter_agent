@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { getLanguageFromPath } from '../lib/utils'
+import type { DiffHighlightRange } from '../types'
 
 export interface EditorTab {
   path: string
@@ -8,10 +9,17 @@ export interface EditorTab {
   isDirty: boolean
 }
 
+export interface EditorRevealRequest {
+  path: string
+  scrollToLine: number
+  highlightRanges: DiffHighlightRange[]
+}
+
 interface FileState {
   workingDirectory: string | null
   tabs: EditorTab[]
   activeTabPath: string | null
+  pendingEditorReveal: EditorRevealRequest | null
   setWorkingDirectory: (path: string | null) => void
   openFile: (path: string, content: string) => void
   closeTab: (path: string) => void
@@ -19,7 +27,10 @@ interface FileState {
   renameTabPath: (oldPath: string, newPath: string) => void
   setActiveTab: (path: string) => void
   updateTabContent: (path: string, content: string) => void
+  replaceTabContent: (path: string, content: string) => void
   markTabSaved: (path: string) => void
+  requestEditorReveal: (request: EditorRevealRequest) => void
+  clearEditorReveal: () => void
   reloadCleanTabsFromDisk: () => Promise<void>
   getOpenFilesContext: () => Array<{ path: string; content: string; language: string }>
 }
@@ -28,6 +39,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   workingDirectory: null,
   tabs: [],
   activeTabPath: null,
+  pendingEditorReveal: null,
 
   setWorkingDirectory: (path) => set({ workingDirectory: path }),
 
@@ -93,10 +105,21 @@ export const useFileStore = create<FileState>((set, get) => ({
       )
     })),
 
+  replaceTabContent: (path, content) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.path === path ? { ...t, content, isDirty: false } : t
+      )
+    })),
+
   markTabSaved: (path) =>
     set((s) => ({
       tabs: s.tabs.map((t) => (t.path === path ? { ...t, isDirty: false } : t))
     })),
+
+  requestEditorReveal: (request) => set({ pendingEditorReveal: request }),
+
+  clearEditorReveal: () => set({ pendingEditorReveal: null }),
 
   reloadCleanTabsFromDisk: async () => {
     const { tabs } = get()

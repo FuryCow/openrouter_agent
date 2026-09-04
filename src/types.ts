@@ -30,5 +30,8 @@ export type {
   ToolCallAnalytics,
   ToolValidationIssue,
   ApiChatMessage,
-  ToolApprovalRequest
+  ToolApprovalRequest,
+  DiffHighlightRange,
+  DiffDisplayLine,
+  FileDiffPreview
 } from '../../electron/types'

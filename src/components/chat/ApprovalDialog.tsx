@@ -1,6 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { useChatStore } from '@/stores/chatStore'
+import { DiffView } from './DiffView'
+import { FilePathLink } from './FilePathLink'
 
 export function ApprovalDialog(): React.ReactElement {
   const pendingApproval = useChatStore((s) => s.pendingApproval)
@@ -15,11 +17,25 @@ export function ApprovalDialog(): React.ReactElement {
     setPendingApproval(null)
   }
 
+  const showDiff = Boolean(pendingApproval?.fileDiff || pendingApproval?.diff)
+
   return (
     <Dialog open={Boolean(pendingApproval)} onOpenChange={() => setPendingApproval(null)}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Подтверждение: {pendingApproval?.name}</DialogTitle>
+          <DialogTitle className="flex flex-wrap items-baseline gap-x-2">
+            <span>Подтверждение: {pendingApproval?.name}</span>
+            {pendingApproval?.filePath && (
+              <>
+                <span className="font-normal text-zinc-500">·</span>
+                <FilePathLink
+                  path={pendingApproval.filePath}
+                  className="text-sm font-normal"
+                  fileDiff={pendingApproval.fileDiff}
+                />
+              </>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         {pendingApproval && (
@@ -28,17 +44,15 @@ export function ApprovalDialog(): React.ReactElement {
               <p className="text-sm text-zinc-300">{pendingApproval.preview}</p>
             )}
 
-            <pre className="max-h-48 overflow-auto rounded-md bg-black/40 p-3 text-[11px] text-zinc-400 font-mono whitespace-pre-wrap break-words">
-              {pendingApproval.arguments}
-            </pre>
-
-            {pendingApproval.diff && (
-              <div>
-                <p className="mb-1 text-xs font-medium text-zinc-500">Diff preview</p>
-                <pre className="max-h-64 overflow-auto rounded-md bg-black/40 p-3 text-[11px] text-zinc-400 font-mono whitespace-pre-wrap">
-                  {pendingApproval.diff}
-                </pre>
-              </div>
+            {showDiff ? (
+              <DiffView
+                fileDiff={pendingApproval.fileDiff}
+                diff={pendingApproval.diff}
+              />
+            ) : (
+              <pre className="max-h-48 overflow-auto rounded-md bg-black/40 p-3 text-[11px] text-zinc-400 font-mono whitespace-pre-wrap break-words">
+                {pendingApproval.arguments}
+              </pre>
             )}
 
             <div className="flex flex-wrap gap-2">

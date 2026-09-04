@@ -45,12 +45,34 @@ export interface AgentContext {
   autoApproveTerminal?: boolean
 }
 
+export interface DiffHighlightRange {
+  startLine: number
+  endLine: number
+}
+
+export interface DiffDisplayLine {
+  type: 'add' | 'del' | 'ctx' | 'sep'
+  content: string
+  oldLine?: number
+  newLine?: number
+}
+
+export interface FileDiffPreview {
+  lines: DiffDisplayLine[]
+  scrollToLine: number
+  highlightRanges: DiffHighlightRange[]
+}
+
 export interface ToolCallInfo {
   id: string
   name: string
   arguments: string
   result?: string
   status: 'running' | 'done' | 'error'
+  /** @deprecated Use fileDiff */
+  diff?: string
+  filePath?: string
+  fileDiff?: FileDiffPreview
 }
 
 export type TimelineItem =
@@ -147,7 +169,10 @@ export interface ToolApprovalRequest {
   name: string
   arguments: string
   preview?: string
+  /** @deprecated Use fileDiff */
   diff?: string
+  filePath?: string
+  fileDiff?: FileDiffPreview
 }
 
 export interface AgentEvent {
