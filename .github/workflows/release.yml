@@ -85,11 +85,26 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npm run package -- --${{ matrix.platform }} --publish never
 
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p dist-installers
+          shopt -s nullglob
+          for file in release/*.exe release/*.dmg release/*.AppImage; do
+            cp "$file" dist-installers/
+          done
+          echo "Installers:"
+          ls -lh dist-installers/
+          if [ -z "$(ls -A dist-installers)" ]; then
+            echo "::error::No installer found in release/"
+            exit 1
+          fi
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}
-          path: release/
+          path: dist-installers/
           if-no-files-found: error
 
   publish:
@@ -107,5 +122,9 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
           generate_release_notes: true
+          overwrite: true
