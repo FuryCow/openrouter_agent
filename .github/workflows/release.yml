@@ -36,6 +36,7 @@ jobs:
           cache: npm
 
       - name: Setup Python
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -50,7 +51,8 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip setuptools
-          npm config set python "$(python -c 'import sys; print(sys.executable)')"
+          echo "PYTHON=${{ steps.setup-python.outputs.python-path }}" >> "$GITHUB_ENV"
+          echo "npm_config_python=${{ steps.setup-python.outputs.python-path }}" >> "$GITHUB_ENV"
 
       - name: Cache Electron
         uses: actions/cache@v4
