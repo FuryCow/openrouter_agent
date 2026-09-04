@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'fs'
-import { dirname, join, normalize, relative, resolve } from 'path'
+import { dirname, join, normalize, resolve, sep } from 'path'
 import { app } from 'electron'
 
 export const AGENT_APP_WORKSPACE_ERROR =
@@ -61,15 +61,28 @@ export function getAgentAppRoot(): string {
     }
   }
 
-  cachedAgentAppRoot = normalize(candidates[0] || process.cwd())
+  cachedAgentAppRoot = normalize(candidates[0] ?? process.cwd())
   return cachedAgentAppRoot
+}
+export function isPathInside(parent: string, child: string): boolean {
+  const parentResolved = normalize(resolve(parent))
+  const childResolved = normalize(resolve(child))
+
+  if (process.platform === 'win32') {
+    const parentLower = parentResolved.toLowerCase()
+    const childLower = childResolved.toLowerCase()
+    if (childLower === parentLower) return true
+    const prefix = parentLower.endsWith('\\') ? parentLower : `${parentLower}\\`
+    return childLower.startsWith(prefix)
+  }
+
+  if (childResolved === parentResolved) return true
+  const prefix = parentResolved.endsWith(sep) ? parentResolved : `${parentResolved}${sep}`
+  return childResolved.startsWith(prefix)
 }
 
 export function isInsideAgentApp(targetPath: string): boolean {
-  const root = getAgentAppRoot()
-  const resolved = normalize(resolve(targetPath))
-  const rel = relative(root, resolved)
-  return rel === '' || (!rel.startsWith('..') && !rel.includes('..'))
+  return isPathInside(getAgentAppRoot(), targetPath)
 }
 
 export function assertAllowedWorkspace(dir: string): void {
