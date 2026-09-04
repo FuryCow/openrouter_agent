@@ -18,6 +18,7 @@ import { useToastStore } from './stores/toastStore'
 import { ToolAnalyticsPanel } from './components/debug/ToolAnalyticsPanel'
 import { ApprovalDialog } from './components/chat/ApprovalDialog'
 import { useChatPersistence } from './hooks/useChatPersistence'
+import { useIndexStore } from './stores/indexStore'
 import { Toaster } from './components/ui/toaster'
 
 function ResizeHandle({ direction }: { direction: 'horizontal' | 'vertical' }): React.ReactElement {
@@ -55,6 +56,10 @@ export default function App(): React.ReactElement {
   }, [loadSettings])
 
   useChatPersistence()
+
+  useEffect(() => {
+    return useIndexStore.getState().subscribe()
+  }, [])
 
   useEffect(() => {
     return window.api.fs.onWorkspaceChanged(() => {

@@ -6,7 +6,11 @@ import type {
   AppSettings,
   DirEntry,
   ModelInfo,
-  SearchResult
+  SearchResult,
+  IndexStatus,
+  IndexProgress,
+  CodebaseSearchRequest,
+  CodebaseSearchHit
 } from './types'
 
 export interface ElectronAPI {
@@ -59,6 +63,14 @@ export interface ElectronAPI {
   }
   shell: {
     openExternal: (url: string) => Promise<void>
+  }
+  index: {
+    getStatus: () => Promise<IndexStatus>
+    rebuild: () => Promise<IndexStatus>
+    search: (request: CodebaseSearchRequest) => Promise<CodebaseSearchHit[]>
+    onProgress: (callback: (progress: IndexProgress) => void) => () => void
+    onStatus: (callback: (status: IndexStatus) => void) => () => void
+    onFilesChanged: (callback: (paths: string[]) => void) => () => void
   }
 }
 
@@ -128,6 +140,26 @@ const api: ElectronAPI = {
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:open-external', url)
+  },
+  index: {
+    getStatus: () => ipcRenderer.invoke('index:get-status'),
+    rebuild: () => ipcRenderer.invoke('index:rebuild'),
+    search: (request) => ipcRenderer.invoke('index:search', request),
+    onProgress: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: IndexProgress) => callback(progress)
+      ipcRenderer.on('index:progress', handler)
+      return () => ipcRenderer.removeListener('index:progress', handler)
+    },
+    onStatus: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: IndexStatus) => callback(status)
+      ipcRenderer.on('index:status', handler)
+      return () => ipcRenderer.removeListener('index:status', handler)
+    },
+    onFilesChanged: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, paths: string[]) => callback(paths)
+      ipcRenderer.on('index:files-changed', handler)
+      return () => ipcRenderer.removeListener('index:files-changed', handler)
+    }
   }
 }
 

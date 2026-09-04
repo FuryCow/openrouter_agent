@@ -1,8 +1,9 @@
 import { join, isAbsolute } from 'path'
-import type { AgentContext, AgentEvent, ChatMode, ToolCallInfo, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest, FileDiffPreview } from '../types'
+import type { AgentContext, AgentEvent, ChatMode, ToolCallInfo, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest, FileDiffPreview, CodebaseSearchMode } from '../types'
 import type { FileSystemService } from './filesystem'
 import type { TerminalService } from './terminal'
 import type { WebSearchService } from './websearch'
+import type { CodebaseIndexer } from './indexing/codebase-indexer'
 import {
   OpenRouterClient,
   type ChatCompletionMessage,
@@ -102,12 +103,35 @@ const TOOLS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'search_files',
-      description: 'Search for text in project files (grep-like)',
+      description: 'Deprecated: use codebase_search instead. Regex text search in project files.',
       parameters: {
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Search query (regex supported)' },
           root: { type: 'string', description: 'Root directory to search in' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'codebase_search',
+      description:
+        'Search the codebase using hybrid ranking (text, symbols, semantic). Prefer this for code navigation.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Natural language or keyword query' },
+          mode: {
+            type: 'string',
+            enum: ['hybrid', 'text', 'semantic', 'symbol'],
+            description: 'Search channel mix (default hybrid)'
+          },
+          root: { type: 'string', description: 'Optional subdirectory relative to workspace (e.g. minigame), not the full path' },
+          limit: { type: 'number', description: 'Max results (default 20)' },
+          path_glob: { type: 'string', description: 'Optional path glob filter' }
         },
         required: ['query']
       }
@@ -164,7 +188,8 @@ export class AgentService {
     private openRouter: OpenRouterClient,
     private fs: FileSystemService,
     private terminal: TerminalService,
-    private webSearch: WebSearchService
+    private webSearch: WebSearchService,
+    private indexer: CodebaseIndexer
   ) {}
 
   get isRunning(): boolean {
@@ -658,6 +683,23 @@ export class AgentService {
         const results = await this.fs.searchFiles(String(args.query ?? ''), root)
         if (results.length === 0) return 'No matches found'
         return results.map((r) => `${r.file}:${r.line}: ${r.content}`).join('\n')
+      }
+      case 'codebase_search': {
+        const mode = (String(args.mode ?? 'hybrid') as CodebaseSearchMode) || 'hybrid'
+        const results = await this.indexer.search({
+          query: String(args.query ?? ''),
+          mode,
+          root: args.root ? String(args.root) : undefined,
+          limit: args.limit ? Number(args.limit) : 20,
+          pathGlob: args.path_glob ? String(args.path_glob) : undefined
+        })
+        if (results.length === 0) return 'No matches found'
+        return results
+          .map((hit) => {
+            const symbol = hit.symbolName ? ` ${hit.symbolName}` : ''
+            return `${hit.path}:${hit.startLine}-${hit.endLine} [${hit.channel}]${symbol} ${hit.snippet}`
+          })
+          .join('\n')
       }
       case 'run_terminal': {
         if (!cwd) return 'Error: No working directory set'

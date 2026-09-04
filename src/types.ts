@@ -33,5 +33,10 @@ export type {
   ToolApprovalRequest,
   DiffHighlightRange,
   DiffDisplayLine,
-  FileDiffPreview
+  FileDiffPreview,
+  IndexStatus,
+  IndexProgress,
+  CodebaseSearchRequest,
+  CodebaseSearchHit,
+  CodebaseSearchMode
 } from '../../electron/types'

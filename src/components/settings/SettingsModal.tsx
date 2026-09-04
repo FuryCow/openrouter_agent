@@ -29,6 +29,9 @@ function syncFormFromSettings(
     setAutoApproveTerminal: (v: boolean) => void
     setSearchApiKey: (v: string) => void
     setSearchProvider: (v: AppSettings['searchProvider']) => void
+    setIndexOnOpen: (v: boolean) => void
+    setMaxFileSizeKb: (v: string) => void
+    setSemanticSearchEnabled: (v: boolean) => void
   }
 ): void {
   setters.setApiKey(settings.apiKey ?? '')
@@ -38,6 +41,9 @@ function syncFormFromSettings(
   setters.setAutoApproveTerminal(settings.autoApproveTerminal ?? false)
   setters.setSearchApiKey(settings.searchApiKey ?? '')
   setters.setSearchProvider(settings.searchProvider ?? 'duckduckgo')
+  setters.setIndexOnOpen(settings.indexOnOpen ?? true)
+  setters.setMaxFileSizeKb(String(settings.maxFileSizeKb ?? 1024))
+  setters.setSemanticSearchEnabled(settings.semanticSearchEnabled ?? true)
 }
 
 export function SettingsModal(): React.ReactElement {
@@ -50,6 +56,11 @@ export function SettingsModal(): React.ReactElement {
   const [searchApiKey, setSearchApiKey] = useState(settings.searchApiKey ?? '')
   const [searchProvider, setSearchProvider] = useState<AppSettings['searchProvider']>(
     settings.searchProvider ?? 'duckduckgo'
+  )
+  const [indexOnOpen, setIndexOnOpen] = useState(settings.indexOnOpen ?? true)
+  const [maxFileSizeKb, setMaxFileSizeKb] = useState(String(settings.maxFileSizeKb ?? 1024))
+  const [semanticSearchEnabled, setSemanticSearchEnabled] = useState(
+    settings.semanticSearchEnabled ?? true
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -66,7 +77,10 @@ export function SettingsModal(): React.ReactElement {
         setAutoApproveWrites,
         setAutoApproveTerminal,
         setSearchApiKey,
-        setSearchProvider
+        setSearchProvider,
+        setIndexOnOpen,
+        setMaxFileSizeKb,
+        setSemanticSearchEnabled
       })
     })
   }, [settingsOpen, setSettings])
@@ -88,7 +102,10 @@ export function SettingsModal(): React.ReactElement {
         autoApproveWrites,
         autoApproveTerminal,
         searchApiKey,
-        searchProvider
+        searchProvider,
+        indexOnOpen,
+        maxFileSizeKb: Number(maxFileSizeKb) || 1024,
+        semanticSearchEnabled
       }
       await window.api.settings.save(newSettings)
       setSettings(newSettings)
@@ -199,6 +216,42 @@ export function SettingsModal(): React.ReactElement {
                 <PasswordInput value={searchApiKey} onChange={setSearchApiKey} placeholder="API key" />
               </div>
             )}
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Codebase Index</h3>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-3">
+              <div className="min-w-0">
+                <p className="text-sm text-zinc-200">Index on folder open</p>
+                <p className="text-[11px] text-zinc-500">Background FTS + symbols + embeddings</p>
+              </div>
+              <Switch checked={indexOnOpen} onCheckedChange={setIndexOnOpen} />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-3">
+              <div className="min-w-0">
+                <p className="text-sm text-zinc-200">Semantic search</p>
+                <p className="text-[11px] text-zinc-500">Local MiniLM embeddings (offline)</p>
+              </div>
+              <Switch checked={semanticSearchEnabled} onCheckedChange={setSemanticSearchEnabled} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Max file size (KB)</label>
+              <input
+                type="number"
+                min="64"
+                max="8192"
+                value={maxFileSizeKb}
+                onChange={(e) => setMaxFileSizeKb(e.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void window.api.index.rebuild()}
+            >
+              Rebuild index
+            </Button>
           </section>
 
           {saveError && <p className="text-xs text-red-400">{saveError}</p>}

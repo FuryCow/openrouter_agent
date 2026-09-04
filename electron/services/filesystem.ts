@@ -1,10 +1,15 @@
 import { readFile, writeFile, readdir, stat, mkdir, rm, rename } from 'fs/promises'
-import { join, relative, dirname } from 'path'
+import { join, dirname } from 'path'
 import type { DirEntry, SearchResult } from '../types'
-
-const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'out', 'release', '.next', 'build'])
+import type { CodebaseIndexer } from './indexing/codebase-indexer'
+import { ripgrepSearch } from './indexing/ripgrep-search'
 
 export class FileSystemService {
+  constructor(private indexer: CodebaseIndexer | null = null) {}
+
+  setIndexer(indexer: CodebaseIndexer): void {
+    this.indexer = indexer
+  }
   async readFile(filePath: string): Promise<string> {
     return readFile(filePath, 'utf-8')
   }
@@ -99,49 +104,9 @@ export class FileSystemService {
   }
 
   async searchFiles(query: string, root: string): Promise<SearchResult[]> {
-    const results: SearchResult[] = []
-    const regex = new RegExp(query, 'i')
-    await this.walkDir(root, async (filePath) => {
-      try {
-        const content = await readFile(filePath, 'utf-8')
-        const lines = content.split('\n')
-        lines.forEach((line, index) => {
-          if (regex.test(line)) {
-            results.push({
-              file: relative(root, filePath),
-              line: index + 1,
-              content: line.trim().slice(0, 200)
-            })
-          }
-        })
-      } catch {
-        // skip binary or unreadable files
-      }
-    })
-    return results.slice(0, 100)
-  }
-
-  private async walkDir(dir: string, onFile: (path: string) => Promise<void>): Promise<void> {
-    let entries
-    try {
-      entries = await readdir(dir)
-    } catch {
-      return
+    if (this.indexer) {
+      return this.indexer.searchFiles(query, root)
     }
-
-    for (const name of entries) {
-      if (name.startsWith('.') || IGNORED_DIRS.has(name)) continue
-      const fullPath = join(dir, name)
-      try {
-        const info = await stat(fullPath)
-        if (info.isDirectory()) {
-          await this.walkDir(fullPath, onFile)
-        } else if (info.isFile() && info.size < 1024 * 1024) {
-          await onFile(fullPath)
-        }
-      } catch {
-        // skip
-      }
-    }
+    return ripgrepSearch(query, root, 100)
   }
 }

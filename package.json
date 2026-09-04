@@ -1,6 +1,6 @@
 {
   "name": "openrouter-agent",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "LLM agent desktop app with chat, file browser, editor, and tools via OpenRouter",
   "author": "FuryCow",
   "repository": {
@@ -16,7 +16,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "node scripts/rebuild-native.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -28,12 +29,16 @@
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@vscode/ripgrep": "^1.18.0",
+    "@xenova/transformers": "^2.17.2",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
+    "better-sqlite3": "^11.9.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "electron-store": "^10.1.0",
     "framer-motion": "^12.43.0",
+    "hnswlib-node": "^3.0.0",
     "lucide-react": "^0.544.0",
     "node-pty": "^1.1.0",
     "react": "^19.2.0",
@@ -42,10 +47,12 @@
     "react-resizable-panels": "^2.1.9",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.3.1",
+    "xxhash-wasm": "^1.1.0",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -69,10 +76,14 @@
       "output": "release"
     },
     "files": [
-      "out/**/*"
+      "out/**/*",
+      "package.json"
     ],
     "asarUnpack": [
-      "**/*.node"
+      "**/*.node",
+      "node_modules/better-sqlite3/**",
+      "node_modules/hnswlib-node/**",
+      "node_modules/@vscode/ripgrep/**"
     ],
     "win": {
       "target": "nsis"

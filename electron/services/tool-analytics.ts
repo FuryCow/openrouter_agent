@@ -9,6 +9,7 @@ const TOOLS_KNOWN: Record<string, true> = {
   search_replace: true,
   list_directory: true,
   search_files: true,
+  codebase_search: true,
   run_terminal: true,
   web_search: true,
   get_open_files: true
@@ -20,6 +21,7 @@ const REQUIRED_ARGS: Record<string, string[]> = {
   search_replace: ['path', 'old_string', 'new_string'],
   list_directory: [],
   search_files: ['query'],
+  codebase_search: ['query'],
   run_terminal: ['command'],
   web_search: ['query'],
   get_open_files: []
@@ -76,7 +78,7 @@ export function validateToolArguments(
   if (toolName === 'read_file' || toolName === 'write_file' || toolName === 'search_replace') {
     if (!String(parsed.path ?? '').trim()) issues.push('empty_path')
   }
-  if (toolName === 'search_files' || toolName === 'web_search') {
+  if (toolName === 'search_files' || toolName === 'web_search' || toolName === 'codebase_search') {
     if (!String(parsed.query ?? '').trim()) issues.push('empty_query')
   }
   if (toolName === 'run_terminal') {
@@ -121,8 +123,11 @@ export function classifyToolResult(
     return { outcome: 'error', issues }
   }
 
-  if (toolName === 'search_files' && result === 'No matches found') {
+  if ((toolName === 'search_files' || toolName === 'codebase_search') && result === 'No matches found') {
     issues.push('no_results')
+  }
+  if (toolName === 'codebase_search' && result.includes('index_not_ready')) {
+    issues.push('index_not_ready')
   }
 
   return { outcome: 'success', issues }

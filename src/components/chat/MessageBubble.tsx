@@ -30,6 +30,7 @@ const toolIcons: Record<string, string> = {
   search_replace: '🩹',
   list_directory: '📁',
   search_files: '🔍',
+  codebase_search: '🧭',
   run_terminal: '💻',
   web_search: '🌐',
   get_open_files: '📋'
@@ -274,12 +275,12 @@ function TimelineView({
                 )}
               >
                 {item.content}
+                {isLast && (
+                  <span className="inline-block w-1.5 h-4 ml-0.5 align-text-bottom bg-indigo-400 animate-pulse rounded-sm" />
+                )}
               </div>
             ) : (
               <MarkdownContent content={item.content} isError={isError} />
-            )}
-            {isStreaming && isLast && (
-              <span className="inline-block w-1.5 h-4 ml-0.5 bg-indigo-400 animate-pulse rounded-sm align-text-bottom" />
             )}
           </div>
         )

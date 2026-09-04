@@ -8,7 +8,8 @@ A beautiful desktop AI coding agent built with Electron, React, and OpenRouter. 
 - **File Explorer** — Browse and open project files with lazy-loaded tree
 - **Code Editor** — Monaco editor with syntax highlighting and tabs
 - **Terminal** — Integrated shell via xterm.js + node-pty
-- **Agent Tools** — read/write files, grep search, run commands, web search
+- **Agent Tools** — read/write files, hybrid codebase search, run commands, web search
+- **Codebase Index** — Local ripgrep + SQLite FTS + symbols + semantic embeddings (offline)
 - **Beautiful UI** — Dark theme with indigo/violet accents, glass panels, smooth animations
 
 ## Prerequisites
@@ -21,6 +22,16 @@ A beautiful desktop AI coding agent built with Electron, React, and OpenRouter. 
 ```bash
 npm install
 ```
+
+Native modules (`better-sqlite3`, `hnswlib-node`) are rebuilt for Electron via `postinstall` (`node scripts/rebuild-native.mjs`). This removes Windows prebuilds and compiles against the bundled Electron headers. `node-pty` is left on its prebuild; if the terminal fails after an Electron upgrade, install [Spectre-mitigated MSVC libs](https://aka.ms/Ofhn4c) and run `npx electron-rebuild -f -o node-pty`.
+
+If indexing crashes on startup, rerun:
+
+```bash
+npm run postinstall
+```
+
+First semantic index run downloads the embedding model (~25MB) to your app user data folder.
 
 ## Development
 
@@ -69,7 +80,8 @@ The agent can autonomously use these tools:
 | `read_file` | Read file contents |
 | `write_file` | Create or update files |
 | `list_directory` | List directory contents |
-| `search_files` | Grep-like search in project |
+| `search_files` | Regex text search (ripgrep; deprecated, use `codebase_search`) |
+| `codebase_search` | Hybrid search: FTS + symbols + local semantic embeddings |
 | `run_terminal` | Execute shell commands |
 | `web_search` | Search the web via DuckDuckGo |
 | `get_open_files` | Get context from open editor tabs |

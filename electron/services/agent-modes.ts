@@ -6,6 +6,7 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'read_file',
   'list_directory',
   'search_files',
+  'codebase_search',
   'get_open_files',
   'web_search'
 ])
@@ -161,6 +162,7 @@ ${openFilesList}
 
 Guidelines:
 - Use read/search tools to understand the project before planning
+- Prefer codebase_search (hybrid) for code navigation; use mode symbol for exact symbols, text for regex
 - Output structured plans in Markdown with sections like: Goal, Assumptions, Steps, Files to touch, Risks, Testing
 - Number steps in execution order; keep steps small and verifiable
 - Never call write_file, search_replace, or run_terminal — planning only
@@ -177,6 +179,8 @@ ${openFilesList}
 
 Guidelines:
 - Use tools proactively to gather information before acting
+- For code navigation use codebase_search with mode hybrid; symbol for definitions; text for regex
+- search_files is deprecated — prefer codebase_search
 - Read files before editing them
 - Prefer search_replace for editing existing files; use write_file for new files or full rewrites
 - Avoid write_file with very large content in one call — split edits with search_replace

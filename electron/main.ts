@@ -6,6 +6,8 @@ import { FileSystemService } from './services/filesystem'
 import { WorkspaceWatcher } from './services/workspace-watcher'
 import { TerminalService } from './services/terminal'
 import { WebSearchService } from './services/websearch'
+import { CodebaseIndexer } from './services/indexing/codebase-indexer'
+import { DEFAULT_INDEX_SETTINGS } from './services/indexing/index-types'
 import { OpenRouterClient } from './services/openrouter'
 import { AgentService } from './services/agent'
 import type { AgentContext, AppSettings, ModelInfo } from './types'
@@ -42,13 +44,24 @@ const store = new Store<{ settings: AppSettings }>({
 })
 
 let mainWindow: BrowserWindow | null = null
+const codebaseIndexer = new CodebaseIndexer()
 const fsService = new FileSystemService()
+fsService.setIndexer(codebaseIndexer)
 const workspaceWatcher = new WorkspaceWatcher()
 const terminalService = new TerminalService()
 const webSearchService = new WebSearchService()
 let openRouterClient = new OpenRouterClient(store.get('settings'))
-let agentService = new AgentService(openRouterClient, fsService, terminalService, webSearchService)
+let agentService = new AgentService(openRouterClient, fsService, terminalService, webSearchService, codebaseIndexer)
 webSearchService.configure(store.get('settings'))
+
+function applyIndexSettings(settings: AppSettings): void {
+  codebaseIndexer.setSettings({
+    indexOnOpen: settings.indexOnOpen ?? DEFAULT_INDEX_SETTINGS.indexOnOpen,
+    embeddingModel: settings.embeddingModel ?? DEFAULT_INDEX_SETTINGS.embeddingModel,
+    maxFileSizeKb: settings.maxFileSizeKb ?? DEFAULT_INDEX_SETTINGS.maxFileSizeKb,
+    semanticSearchEnabled: settings.semanticSearchEnabled ?? DEFAULT_INDEX_SETTINGS.semanticSearchEnabled
+  })
+}
 
 function resolveAppIcon(): string | undefined {
   const candidates = [
@@ -115,9 +128,25 @@ function sendToRenderer(channel: string, ...args: unknown[]): void {
 function setWorkspaceWatch(dir: string): void {
   if (!dir || isInsideAgentApp(dir)) {
     workspaceWatcher.stop()
+    void codebaseIndexer.setWorkspace(null)
     return
   }
-  workspaceWatcher.watch(dir, () => sendToRenderer('fs:changed'))
+
+  void codebaseIndexer.setWorkspace(dir).catch((err) => {
+    console.error('[Index] Failed to open workspace index:', err)
+  })
+
+  setTimeout(() => {
+    try {
+      workspaceWatcher.watch(dir, (changedPaths) => {
+        sendToRenderer('fs:changed')
+        sendToRenderer('index:files-changed', changedPaths)
+        codebaseIndexer.queueChangedPaths(changedPaths)
+      })
+    } catch (err) {
+      console.error('[Workspace] Failed to watch directory:', err)
+    }
+  }, 500)
 }
 
 function shutdownApp(): void {
@@ -148,7 +177,8 @@ function registerIpc(): void {
     store.set('settings', normalized)
     openRouterClient = new OpenRouterClient(normalized)
     webSearchService.configure(normalized)
-    agentService = new AgentService(openRouterClient, fsService, terminalService, webSearchService)
+    applyIndexSettings(normalized)
+    agentService = new AgentService(openRouterClient, fsService, terminalService, webSearchService, codebaseIndexer)
     return normalized
   })
 
@@ -317,6 +347,15 @@ function registerIpc(): void {
     const logDir = getAnalyticsLogDir()
     await shell.openPath(logDir)
   })
+
+  ipcMain.handle('index:get-status', () => codebaseIndexer.getStatus())
+  ipcMain.handle('index:rebuild', async () => {
+    await codebaseIndexer.rebuild()
+    return codebaseIndexer.getStatus()
+  })
+  ipcMain.handle('index:search', async (_event, request: import('./types').CodebaseSearchRequest) => {
+    return codebaseIndexer.search(request)
+  })
 }
 
 app.whenReady().then(() => {
@@ -335,7 +374,19 @@ app.whenReady().then(() => {
 
   registerIpc()
   createWindow()
-  setWorkspaceWatch(settings.workingDirectory)
+  applyIndexSettings(settings)
+  codebaseIndexer.onProgress((progress) => {
+    sendToRenderer('index:progress', progress)
+    sendToRenderer('index:status', codebaseIndexer.getStatus())
+  })
+
+  const workspaceDir = settings.workingDirectory
+  const attachWorkspace = (): void => setWorkspaceWatch(workspaceDir)
+  if (mainWindow?.webContents.isLoading()) {
+    mainWindow.webContents.once('did-finish-load', attachWorkspace)
+  } else {
+    attachWorkspace()
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

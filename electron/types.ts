@@ -11,6 +11,10 @@ export interface AppSettings {
   autoApproveTerminal?: boolean
   searchApiKey?: string
   searchProvider?: 'duckduckgo' | 'tavily' | 'brave'
+  indexOnOpen?: boolean
+  embeddingModel?: string
+  maxFileSizeKb?: number
+  semanticSearchEnabled?: boolean
 }
 
 export interface DirEntry {
@@ -23,6 +27,57 @@ export interface SearchResult {
   file: string
   line: number
   content: string
+}
+
+export type IndexState = 'idle' | 'building' | 'ready' | 'error'
+
+export type IndexPhase =
+  | 'scanning'
+  | 'indexing_text'
+  | 'indexing_symbols'
+  | 'embedding'
+  | 'vectors'
+  | 'done'
+
+export interface IndexProgress {
+  phase: IndexPhase
+  filesDone: number
+  filesTotal: number
+  message?: string
+}
+
+export interface IndexStatus {
+  state: IndexState
+  workspacePath: string | null
+  filesIndexed: number
+  chunks: number
+  symbols: number
+  lastBuiltAt: string | null
+  progress: IndexProgress | null
+  error: string | null
+  semanticReady: boolean
+  symbolReady: boolean
+}
+
+export type CodebaseSearchMode = 'hybrid' | 'text' | 'semantic' | 'symbol'
+
+export interface CodebaseSearchRequest {
+  query: string
+  mode: CodebaseSearchMode
+  root?: string
+  limit?: number
+  pathGlob?: string
+}
+
+export interface CodebaseSearchHit {
+  path: string
+  startLine: number
+  endLine: number
+  score: number
+  channel: 'text' | 'semantic' | 'symbol'
+  snippet: string
+  symbolName?: string
+  symbolKind?: string
 }
 
 export interface OpenFileContext {
@@ -123,6 +178,7 @@ export type ToolValidationIssue =
   | 'search_replace_identical'
   | 'terminal_blocked'
   | 'no_results'
+  | 'index_not_ready'
 
 export type ToolCallOutcome = 'success' | 'error' | 'invalid_args'
 
