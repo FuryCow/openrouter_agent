@@ -269,6 +269,37 @@ function TimelineView({
   )
 }
 
+function MessageActions({
+  actions,
+  align = 'start'
+}: {
+  actions: Array<{ label: string; icon: React.ReactNode; onClick: () => void }>
+  align?: 'start' | 'end'
+}): React.ReactElement | null {
+  if (actions.length === 0) return null
+
+  return (
+    <div
+      className={cn(
+        'mt-1 flex flex-wrap gap-2',
+        align === 'end' ? 'justify-end' : 'justify-start'
+      )}
+    >
+      {actions.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          onClick={action.onClick}
+          className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-300"
+        >
+          {action.icon}
+          {action.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function MessageBubble({
   role,
   timeline,
@@ -315,95 +346,83 @@ export function MessageBubble({
   }
 
   if (isUser) {
+    const userActions = onEdit
+      ? [{ label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: onEdit }]
+      : []
+
     return (
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
-        className="group flex justify-end"
+        className="flex justify-end"
       >
-        <div className="max-w-[90%] rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3 text-sm leading-relaxed text-white shadow-lg shadow-indigo-500/10">
-          {images && images.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {images.map((src) => (
-                <img
-                  key={src.slice(0, 32)}
-                  src={src}
-                  alt="attachment"
-                  className="max-h-32 rounded-md border border-white/20"
-                />
-              ))}
-            </div>
-          )}
-          <div className="whitespace-pre-wrap break-words">{content}</div>
-          {onEdit && (
-            <div className="mt-2 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                type="button"
-                onClick={onEdit}
-                className="flex items-center gap-1 text-[10px] text-white/70 hover:text-white"
-              >
-                <Pencil className="h-3 w-3" /> Edit
-              </button>
-            </div>
-          )}
+        <div className="flex max-w-[90%] flex-col items-end">
+          <div className="rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3 text-sm leading-relaxed text-white shadow-lg shadow-indigo-500/10">
+            {images && images.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {images.map((src) => (
+                  <img
+                    key={src.slice(0, 32)}
+                    src={src}
+                    alt="attachment"
+                    className="max-h-32 rounded-md border border-white/20"
+                  />
+                ))}
+              </div>
+            )}
+            <div className="whitespace-pre-wrap break-words">{content}</div>
+          </div>
+          <MessageActions actions={userActions} align="end" />
         </div>
       </motion.div>
     )
   }
+
+  const assistantActions = [
+    ...(onCopy
+      ? [{ label: 'Copy', icon: <Copy className="h-3 w-3" />, onClick: onCopy }]
+      : []),
+    ...(onRetry
+      ? [{ label: 'Retry', icon: <RotateCcw className="h-3 w-3" />, onClick: onRetry }]
+      : [])
+  ]
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="group flex justify-start"
+      className="flex justify-start"
     >
-      <div
-        className={cn(
-          'max-w-[90%] rounded-xl px-4 py-3',
-          isError
-            ? 'bg-red-500/[0.08] border border-red-500/20'
-            : 'bg-white/[0.03] border border-white/5'
-        )}
-      >
-        {interrupted && (
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-amber-400/80">
-            Interrupted
-          </div>
-        )}
-        {hasTimeline ? (
-          <TimelineView timeline={resolvedTimeline} isStreaming={isStreaming} isError={isError} />
-        ) : isStreaming ? (
-          <span className="inline-flex items-center gap-2 text-sm text-zinc-500">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Working...
-          </span>
-        ) : null}
-
-        <div className="mt-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {onCopy && (
-            <button
-              type="button"
-              onClick={onCopy}
-              className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300"
-            >
-              <Copy className="h-3 w-3" /> Copy
-            </button>
+      <div className="flex max-w-[90%] flex-col items-start">
+        <div
+          className={cn(
+            'w-full rounded-xl px-4 py-3',
+            isError
+              ? 'bg-red-500/[0.08] border border-red-500/20'
+              : 'bg-white/[0.03] border border-white/5'
           )}
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300"
-            >
-              <RotateCcw className="h-3 w-3" /> Retry
-            </button>
+        >
+          {interrupted && (
+            <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-amber-400/80">
+              Interrupted
+            </div>
           )}
+          {hasTimeline ? (
+            <TimelineView timeline={resolvedTimeline} isStreaming={isStreaming} isError={isError} />
+          ) : isStreaming ? (
+            <span className="inline-flex items-center gap-2 text-sm text-zinc-500">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Working...
+            </span>
+          ) : null}
         </div>
 
+        <MessageActions actions={assistantActions} align="start" />
+
         {showImplementPlan && onImplementPlan && content?.trim() && (
-          <div className="mt-3 border-t border-white/5 pt-3">
+          <div className="mt-1">
             <Button
               type="button"
               size="sm"

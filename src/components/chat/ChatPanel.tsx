@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react'
-import { Send, Square, Trash2, Bot, RotateCcw } from 'lucide-react'
+import { Send, Square, Trash2, Bot, RotateCcw, Paperclip } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '../ui/button'
 import { MessageBubble } from './MessageBubble'
@@ -17,6 +17,7 @@ export function ChatPanel(): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const stickToBottomRef = useRef(true)
   const wasStreamingRef = useRef(false)
   const {
@@ -98,7 +99,10 @@ export function ChatPanel(): React.ReactElement {
 
   const addImageFiles = (files: FileList | File[]): void => {
     const list = Array.from(files).filter((f) => f.type.startsWith('image/'))
-    if (list.length === 0) return
+    if (list.length === 0) {
+      useToastStore.getState().addToast('Only image files can be attached', 'error')
+      return
+    }
     if (!visionSupported) {
       useToastStore.getState().addToast('Current model does not support vision', 'error')
       return
@@ -112,6 +116,21 @@ export function ChatPanel(): React.ReactElement {
       }
       reader.readAsDataURL(file)
     })
+  }
+
+  const handleAttachClick = (): void => {
+    if (!visionSupported) {
+      useToastStore.getState().addToast('Current model does not support vision', 'error')
+      return
+    }
+    fileInputRef.current?.click()
+  }
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    if (e.target.files && e.target.files.length > 0) {
+      addImageFiles(e.target.files)
+    }
+    e.target.value = ''
   }
 
   const handleSend = async (): Promise<void> => {
@@ -299,7 +318,26 @@ export function ChatPanel(): React.ReactElement {
           </div>
         )}
 
-        <div className="relative flex items-end gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-2 focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20 transition-all">
+        <div className="relative flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.02] p-1.5 focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20 transition-all">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileInputChange}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 shrink-0 text-zinc-500 hover:text-zinc-300"
+            onClick={handleAttachClick}
+            disabled={isStreaming}
+            title={visionSupported ? 'Attach image' : 'Vision not supported by current model'}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -307,21 +345,20 @@ export function ChatPanel(): React.ReactElement {
             onPaste={handlePaste}
             placeholder={editingMessageId ? 'Edit message…' : modeConfig.placeholder}
             rows={1}
-            className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none max-h-32"
-            style={{ minHeight: '36px' }}
+            className="flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none min-h-9 max-h-32"
           />
           {isStreaming ? (
-            <Button variant="destructive" size="icon" className="h-8 w-8 shrink-0" onClick={abort}>
-              <Square className="h-3.5 w-3.5" />
+            <Button variant="destructive" size="icon" className="size-9 shrink-0" onClick={abort}>
+              <Square className="h-4 w-4" />
             </Button>
           ) : (
             <Button
               size="icon"
-              className="h-8 w-8 shrink-0"
+              className="size-9 shrink-0"
               onClick={handleSend}
               disabled={!input.trim()}
             >
-              <Send className="h-3.5 w-3.5" />
+              <Send className="h-4 w-4" />
             </Button>
           )}
         </div>
