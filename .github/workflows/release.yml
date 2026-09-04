@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     name: Build (${{ matrix.os }})
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -34,14 +35,35 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential python3
+          sudo apt-get install -y build-essential python3-setuptools
+
+      - name: Prepare native module build tools
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip setuptools
+          npm config set python "$(python -c 'import sys; print(sys.executable)')"
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline
 
       - name: Run tests
         run: npm test
@@ -49,7 +71,7 @@ jobs:
       - name: Package app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npm run package -- --${{ matrix.platform }}
+        run: npm run package -- --${{ matrix.platform }} --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
