@@ -19,11 +19,6 @@ function buildImplementPlanPrompt(planContent: string, originalTask?: string): s
 ${planContent}`
 }
 
-function resolveModelForMode(mode: ChatMode): string {
-  const settings = useSettingsStore.getState().settings
-  return settings.modelsByMode?.[mode] || settings.model
-}
-
 export function useAgent(): {
   sendMessage: (
     message: string,
@@ -159,9 +154,8 @@ export function useAgent(): {
         workingDirectory,
         openFiles,
         history,
-        model: resolveModelForMode(mode),
+        model: settings.model,
         temperature: settings.temperature,
-        maxTokens: settings.maxTokens,
         images: options?.images,
         customSystemPrompt: settings.customSystemPrompt,
         autoApproveWrites: settings.autoApproveWrites,

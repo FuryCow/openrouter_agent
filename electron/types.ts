@@ -6,7 +6,6 @@ export interface AppSettings {
   workingDirectory: string
   temperature?: number
   maxTokens?: number
-  modelsByMode?: Partial<Record<ChatMode, string>>
   customSystemPrompt?: string
   autoApproveWrites?: boolean
   autoApproveTerminal?: boolean

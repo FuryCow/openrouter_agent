@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join, dirname } from 'path'
+import { existsSync } from 'fs'
 import Store from 'electron-store'
 import { FileSystemService } from './services/filesystem'
 import { WorkspaceWatcher } from './services/workspace-watcher'
@@ -18,10 +19,16 @@ import { loadChatMessages, saveChatMessages } from './services/chat-persistence'
 import { modeRequiresWorkspace } from './services/agent-modes'
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
-  if (settings.workingDirectory && isInsideAgentApp(settings.workingDirectory)) {
-    return { ...settings, workingDirectory: '' }
+  const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
+    settings as AppSettings & {
+      modelsByMode?: Partial<Record<string, string>>
+    }
+  let normalized = clean as AppSettings
+
+  if (normalized.workingDirectory && isInsideAgentApp(normalized.workingDirectory)) {
+    normalized = { ...normalized, workingDirectory: '' }
   }
-  return settings
+  return normalized
 }
 
 const store = new Store<{ settings: AppSettings }>({
@@ -43,6 +50,14 @@ let openRouterClient = new OpenRouterClient(store.get('settings'))
 let agentService = new AgentService(openRouterClient, fsService, terminalService, webSearchService)
 webSearchService.configure(store.get('settings'))
 
+function resolveAppIcon(): string | undefined {
+  const candidates = [
+    join(process.cwd(), 'build/icon.png'),
+    join(__dirname, '../../build/icon.png')
+  ]
+  return candidates.find((path) => existsSync(path))
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -53,6 +68,7 @@ function createWindow(): void {
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#0a0a0f',
+    icon: resolveAppIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -232,10 +248,7 @@ function registerIpc(): void {
     const settings = sanitizeSettings(store.get('settings'))
     const cwd = settings.workingDirectory || context.workingDirectory
     const mode = context.mode ?? 'agent'
-    const model =
-      context.model ||
-      settings.modelsByMode?.[mode] ||
-      settings.model
+    const model = context.model || settings.model
 
     if (modeRequiresWorkspace(mode) && !cwd) {
       sendToRenderer('agent:event', {
@@ -265,7 +278,7 @@ function registerIpc(): void {
         workingDirectory: cwd,
         model,
         temperature: context.temperature ?? settings.temperature,
-        maxTokens: context.maxTokens ?? settings.maxTokens,
+        maxTokens: context.maxTokens,
         customSystemPrompt: context.customSystemPrompt ?? settings.customSystemPrompt,
         autoApproveWrites: context.autoApproveWrites ?? settings.autoApproveWrites,
         autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal

@@ -35,7 +35,8 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        '@': resolve('src')
+        '@': resolve('src'),
+        '@app-icon': resolve('build/icon.png')
       }
     },
     plugins: [react(), tailwindcss()]

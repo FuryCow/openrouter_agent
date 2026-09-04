@@ -41,9 +41,7 @@ export function ChatPanel(): React.ReactElement {
     [messages, chatMode]
   )
 
-  const selectedModel = models.find(
-    (m) => m.id === (settings.modelsByMode?.[chatMode] || settings.model)
-  )
+  const selectedModel = models.find((m) => m.id === settings.model)
   const visionSupported = selectedModel?.supportsVision ?? false
 
   const scrollToBottom = useCallback((force = false) => {

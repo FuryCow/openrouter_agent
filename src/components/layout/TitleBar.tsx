@@ -1,8 +1,8 @@
-import { Minus, Square, X, Sparkles } from 'lucide-react'
+import { Minus, Square, X } from 'lucide-react'
 import { Button } from '../ui/button'
 import { ModelPicker } from '../models/ModelPicker'
+import { AppLogo } from '../brand/AppLogo'
 import { useSettingsStore } from '@/stores/settingsStore'
-
 export function TitleBar(): React.ReactElement {
   const { settings, models, modelsLoading, setSettings, setSettingsOpen, loadModels } =
     useSettingsStore()
@@ -15,13 +15,10 @@ export function TitleBar(): React.ReactElement {
 
   return (
     <div className="drag-region flex h-10 items-center justify-between border-b border-white/5 bg-[#0a0a0f]/90 px-3 backdrop-blur-xl">
-      <div className="flex items-center gap-2 no-drag">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-violet-600">
-          <Sparkles className="h-3.5 w-3.5 text-white" />
-        </div>
+      <div className="flex items-center gap-2.5 no-drag">
+        <AppLogo size="sm" />
         <span className="text-sm font-semibold gradient-text">OpenRouter Agent</span>
       </div>
-
       <div className="flex items-center gap-2 no-drag">
         <ModelPicker
           compact
