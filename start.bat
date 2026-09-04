@@ -21,6 +21,16 @@ if not exist "node_modules\" (
     )
 )
 
+if not exist "node_modules\.bin\electron-vite.cmd" (
+    echo Dependencies incomplete, reinstalling...
+    call npm install
+    if errorlevel 1 (
+        echo [ERROR] npm install failed.
+        pause
+        exit /b 1
+    )
+)
+
 echo Stopping old Electron processes...
 taskkill /F /IM electron.exe >nul 2>&1
 taskkill /F /IM "OpenRouter Agent.exe" >nul 2>&1
