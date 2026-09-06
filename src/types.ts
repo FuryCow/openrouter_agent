@@ -39,5 +39,9 @@ export type {
   CodebaseSearchRequest,
   CodebaseSearchHit,
   CodebaseSearchMode,
-  TokenUsage
+  TokenUsage,
+  McpServerConfig,
+  McpServerStatus,
+  McpStatusSnapshot,
+  McpTransportType
 } from '../../electron/types'

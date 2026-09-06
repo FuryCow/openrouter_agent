@@ -1,5 +1,7 @@
 import type { AgentContext, ChatMode, ChatMessage, ApiChatMessage } from '../types'
 import type { ToolDefinition } from './openrouter'
+import type { McpManager } from './mcp/mcp-manager'
+import { isMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
 import { estimateTokens, trimToTokenBudget, DEFAULT_CONTEXT_BUDGET } from '../lib/tokens'
 
 const READ_ONLY_TOOL_NAMES = new Set([
@@ -59,10 +61,31 @@ export function filterHistoryForApi(history: ChatMessage[], mode: ChatMode): Cha
     .slice(-30)
 }
 
-export function isToolAllowedInMode(toolName: string, mode: ChatMode): boolean {
+export function isToolAllowedInMode(
+  toolName: string,
+  mode: ChatMode,
+  mcpManager?: McpManager
+): boolean {
+  if (isMcpQualifiedToolName(toolName)) {
+    return mcpManager?.isToolAllowedInMode(toolName, mode) ?? false
+  }
   if (mode === 'agent') return true
   if (mode === 'ask') return false
   return READ_ONLY_TOOL_NAMES.has(toolName)
+}
+
+export function formatMcpServersSection(
+  servers: Array<{ id: string; name: string; toolCount: number }>
+): string {
+  if (servers.length === 0) return ''
+
+  const lines = servers.map(
+    (s) => `- ${s.name} (${s.toolCount} tools) — prefer built-in grep_workspace/codebase_search over MCP filesystem duplicates`
+  )
+  return `Connected MCP servers:
+${lines.join('\n')}
+
+Use MCP tools when they provide capabilities not covered by built-in tools.`
 }
 
 function formatOpenFiles(context: AgentContext): string {
@@ -150,11 +173,15 @@ const EDITING_WORKFLOW = `Editing workflow:
 - Keep multiple edits to the same file in order (first call before second)
 - After edits, one short summary to the user — do not re-read files you just wrote unless verification failed`
 
-export function buildSystemPrompt(context: AgentContext): string {
+export function buildSystemPrompt(
+  context: AgentContext,
+  mcpServers: Array<{ id: string; name: string; toolCount: number }> = []
+): string {
   const openFilesList = formatOpenFiles(context)
   const workspaceLine = context.workingDirectory
     ? `Working directory: ${context.workingDirectory}`
     : 'Working directory: not set'
+  const mcpSection = formatMcpServersSection(mcpServers)
 
   switch (context.mode) {
     case 'ask':
@@ -213,7 +240,7 @@ ${openFilesList}
 ${EXPLORATION_WORKFLOW}
 
 ${EDITING_WORKFLOW}
-
+${mcpSection ? `\n${mcpSection}\n` : ''}
 Guidelines:
 - Read target files (via read_files) before editing; search snippets are not enough for search_replace
 - Prefer search_replace for editing existing files; use write_file for new files or full rewrites

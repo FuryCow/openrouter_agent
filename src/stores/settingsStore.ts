@@ -9,10 +9,11 @@ interface SettingsState {
   modelsLoading: boolean
   modelsError: string | null
   settingsOpen: boolean
+  settingsFocusSection: 'general' | 'mcp' | null
   terminalOpen: boolean
   setSettings: (settings: AppSettings) => void
   setModels: (models: ModelInfo[]) => void
-  setSettingsOpen: (open: boolean) => void
+  setSettingsOpen: (open: boolean, focusSection?: 'general' | 'mcp') => void
   setTerminalOpen: (open: boolean) => void
   loadSettings: () => Promise<void>
   loadModels: () => Promise<void>
@@ -28,11 +29,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   modelsLoading: false,
   modelsError: null,
   settingsOpen: false,
+  settingsFocusSection: null,
   terminalOpen: true,
 
   setSettings: (settings) => set({ settings }),
   setModels: (models) => set({ models }),
-  setSettingsOpen: (open) => set({ settingsOpen: open }),
+  setSettingsOpen: (open, focusSection = 'general') =>
+    set({ settingsOpen: open, settingsFocusSection: open ? focusSection : null }),
   setTerminalOpen: (open) => set({ terminalOpen: open }),
 
   loadModels: async () => {

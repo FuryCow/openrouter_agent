@@ -1,5 +1,6 @@
 import { join, isAbsolute } from 'path'
 import type { ToolCall } from '../services/openrouter'
+import { isMcpQualifiedToolName, parseMcpQualifiedToolName } from '../services/mcp/mcp-tool-mapper'
 
 export function resolveWorkspacePath(filePath: string, cwd: string): string {
   if (!filePath) return cwd
@@ -34,23 +35,36 @@ export function getAffectedPaths(call: ToolCall, cwd: string): string[] {
   }
 }
 
-/** Group tool calls into waves safe for parallel execution (same file → sequential). */
+/** Group tool calls into waves safe for parallel execution (same file or MCP server → sequential). */
 export function buildExecutionWaves(calls: ToolCall[], cwd: string): ToolCall[][] {
   const waves: ToolCall[][] = []
   let current: ToolCall[] = []
   let pathsInWave = new Set<string>()
+  let mcpServersInWave = new Set<string>()
 
   const flush = (): void => {
     if (current.length === 0) return
     waves.push(current)
     current = []
     pathsInWave = new Set()
+    mcpServersInWave = new Set()
   }
 
   for (const call of calls) {
     if (call.function.name === 'run_terminal') {
       flush()
       waves.push([call])
+      continue
+    }
+
+    if (isMcpQualifiedToolName(call.function.name)) {
+      const parsed = parseMcpQualifiedToolName(call.function.name)
+      const serverId = parsed?.serverId
+      if (serverId && mcpServersInWave.has(serverId)) {
+        flush()
+      }
+      current.push(call)
+      if (serverId) mcpServersInWave.add(serverId)
       continue
     }
 

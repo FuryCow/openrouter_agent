@@ -12,6 +12,7 @@ import {
 } from '../ui/select'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { AppSettings } from '@/types'
+import { McpSettingsPanel } from './McpSettingsPanel'
 
 const SEARCH_PROVIDERS: Array<{ value: AppSettings['searchProvider']; label: string }> = [
   { value: 'duckduckgo', label: 'DuckDuckGo (no key)' },
@@ -47,7 +48,9 @@ function syncFormFromSettings(
 }
 
 export function SettingsModal(): React.ReactElement {
-  const { settings, settingsOpen, setSettingsOpen, setSettings, loadModels } = useSettingsStore()
+  const { settings, settingsOpen, settingsFocusSection, setSettingsOpen, setSettings, loadModels } =
+    useSettingsStore()
+  const [draftSettings, setDraftSettings] = useState<AppSettings>(settings)
   const [apiKey, setApiKey] = useState(settings.apiKey)
   const [temperature, setTemperature] = useState(String(settings.temperature ?? 0.7))
   const [customSystemPrompt, setCustomSystemPrompt] = useState(settings.customSystemPrompt ?? '')
@@ -70,6 +73,7 @@ export function SettingsModal(): React.ReactElement {
 
     void window.api.settings.get().then((loaded) => {
       setSettings(loaded)
+      setDraftSettings(loaded)
       syncFormFromSettings(loaded, {
         setApiKey,
         setTemperature,
@@ -95,7 +99,7 @@ export function SettingsModal(): React.ReactElement {
     setSaveError('')
     try {
       const newSettings = {
-        ...settings,
+        ...draftSettings,
         apiKey,
         temperature: Number(temperature) || 0.7,
         customSystemPrompt,
@@ -253,6 +257,12 @@ export function SettingsModal(): React.ReactElement {
               Rebuild index
             </Button>
           </section>
+
+          <McpSettingsPanel
+            settings={draftSettings}
+            onSettingsChange={setDraftSettings}
+            initialTab={settingsFocusSection === 'mcp' ? 'servers' : undefined}
+          />
 
           {saveError && <p className="text-xs text-red-400">{saveError}</p>}
 

@@ -30,6 +30,8 @@ import {
   ToolAnalyticsCollector,
   persistRunAnalytics
 } from './tool-analytics'
+import type { McpManager } from './mcp/mcp-manager'
+import { parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
 
 const TOOLS: ToolDefinition[] = [
   {
@@ -230,7 +232,8 @@ export class AgentService {
     private fs: FileSystemService,
     private terminal: TerminalService,
     private webSearch: WebSearchService,
-    private indexer: CodebaseIndexer
+    private indexer: CodebaseIndexer,
+    private mcpManager: McpManager
   ) {}
 
   get isRunning(): boolean {
@@ -301,7 +304,7 @@ export class AgentService {
     const signal = this.abortController.signal
     this.running = true
 
-    const tools = getToolsForMode(mode, TOOLS)
+    const tools = [...getToolsForMode(mode, TOOLS), ...this.mcpManager.getToolsForMode(mode)]
     const maxIterations = getMaxIterations(mode)
     const expandedHistory = expandHistoryForApi(context.history, mode)
     const analytics = new ToolAnalyticsCollector(
@@ -326,7 +329,10 @@ export class AgentService {
       return run
     }
 
-    const systemPrompt = buildSystemPrompt({ ...context, mode })
+    const systemPrompt = buildSystemPrompt(
+      { ...context, mode },
+      this.mcpManager.getConnectedServerSummaries()
+    )
     const messages: ChatCompletionMessage[] = [
       { role: 'system', content: systemPrompt },
       ...expandedHistory.map((m) => ({
@@ -463,6 +469,8 @@ export class AgentService {
             onToolDone: (toolCall) => emit({ type: 'tool_done', toolCall }),
             onRecordAnalytics: (record) => analytics.recordToolCall(record),
             requestApproval: (call) => this.waitForApproval(call, context, emit),
+            requiresApproval: (name) =>
+              MUTATING_TOOLS.has(name) || this.mcpManager.requiresApproval(name),
             executeTool: (call) => this.executeTool(call, context, mode),
             onExecuteSuccess: async (call, toolInfo) => {
               const fileChange = await this.buildFileChangePreview(call, context)
@@ -561,7 +569,12 @@ export class AgentService {
     context: AgentContext,
     emit: (event: AgentEvent) => void
   ): Promise<boolean> {
-    if (!MUTATING_TOOLS.has(call.function.name)) return true
+    const needsBuiltinApproval = MUTATING_TOOLS.has(call.function.name)
+    const needsMcpApproval =
+      this.mcpManager.isMcpTool(call.function.name) &&
+      this.mcpManager.requiresApproval(call.function.name)
+
+    if (!needsBuiltinApproval && !needsMcpApproval) return true
 
     const autoWrites = context.autoApproveWrites || this.sessionAutoApproveWrites
     const autoTerminal = context.autoApproveTerminal || this.sessionAutoApproveTerminal
@@ -576,14 +589,24 @@ export class AgentService {
 
     const args = JSON.parse(call.function.arguments || '{}') as Record<string, string>
     let preview = ''
-    const fileChange = await this.buildFileChangePreview(call, context)
+    let fileChange: { path: string; fileDiff: FileDiffPreview } | null = null
 
-    if (call.function.name === 'write_file') {
-      preview = `Write ${args.path ?? ''} (${(args.content ?? '').length} chars)`
-    } else if (call.function.name === 'search_replace') {
-      preview = `Patch ${args.path ?? ''}`
-    } else if (call.function.name === 'run_terminal') {
-      preview = `Run: ${args.command ?? ''}`
+    if (needsBuiltinApproval) {
+      fileChange = await this.buildFileChangePreview(call, context)
+      if (call.function.name === 'write_file') {
+        preview = `Write ${args.path ?? ''} (${(args.content ?? '').length} chars)`
+      } else if (call.function.name === 'search_replace') {
+        preview = `Patch ${args.path ?? ''}`
+      } else if (call.function.name === 'run_terminal') {
+        preview = `Run: ${args.command ?? ''}`
+      }
+    } else if (needsMcpApproval) {
+      const parsed = parseMcpQualifiedToolName(call.function.name)
+      const serverName = parsed
+        ? this.mcpManager.getServerName(parsed.serverId)
+        : 'MCP'
+      const toolLabel = parsed?.toolName ?? call.function.name
+      preview = `MCP ${serverName} · ${toolLabel}\n${JSON.stringify(args, null, 2)}`
     }
 
     const approvalId = `approval-${call.id}`
@@ -617,8 +640,13 @@ export class AgentService {
     context: AgentContext,
     mode: ChatMode
   ): Promise<string> {
-    if (!isToolAllowedInMode(call.function.name, mode)) {
+    if (!isToolAllowedInMode(call.function.name, mode, this.mcpManager)) {
       return `Error: Tool "${call.function.name}" is not available in ${mode} mode.`
+    }
+
+    if (this.mcpManager.isMcpTool(call.function.name)) {
+      const args = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>
+      return this.mcpManager.callTool(call.function.name, args)
     }
 
     const args = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>

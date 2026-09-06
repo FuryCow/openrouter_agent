@@ -22,16 +22,19 @@ const markdownComponents: Components = {
 export function MarkdownContent({
   content,
   className,
-  isError
+  isError,
+  variant = 'chat'
 }: {
   content: string
   className?: string
   isError?: boolean
+  variant?: 'chat' | 'document'
 }): React.ReactElement {
   return (
     <div
       className={cn(
-        'chat-markdown text-sm leading-relaxed',
+        variant === 'document' ? 'doc-markdown' : 'chat-markdown',
+        variant === 'chat' ? 'text-sm leading-relaxed' : null,
         isError ? 'text-red-200' : 'text-zinc-300',
         className
       )}

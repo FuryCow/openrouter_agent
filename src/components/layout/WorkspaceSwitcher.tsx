@@ -23,7 +23,7 @@ export function WorkspaceSwitcher(): React.ReactElement {
           )}
           title={workingDirectory || 'Открыть папку проекта'}
         >
-          <FolderOpen className="h-3 w-3 shrink-0" />
+          <FolderOpen className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{workingDirectory || 'No folder open'}</span>
         </button>
       </Popover.Trigger>

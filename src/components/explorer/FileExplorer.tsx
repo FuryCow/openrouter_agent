@@ -1,14 +1,13 @@
 import {
   ChevronRight,
   ChevronDown,
-  File,
-  Folder,
   FolderOpen,
   RefreshCw
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '../ui/button'
+import { FileIcon } from '../ui/FileIcon'
 import { ScrollArea } from '../ui/scroll-area'
 import { ExplorerContextMenu, type ContextMenuItem } from './ExplorerContextMenu'
 import { NameInputDialog } from './NameInputDialog'
@@ -16,43 +15,9 @@ import { useFileStore } from '@/stores/fileStore'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useToastStore } from '@/stores/toastStore'
 import type { DirEntry } from '@/types'
-import { cn } from '@/lib/utils'
 
 function isValidEntryName(name: string): boolean {
   return name.length > 0 && !/[\\/<>:"|?*]/.test(name)
-}
-
-function FileIcon({
-  name,
-  isDirectory,
-  isOpen
-}: {
-  name: string
-  isDirectory: boolean
-  isOpen?: boolean
-}): React.ReactElement {
-  if (isDirectory) {
-    return isOpen ? (
-      <FolderOpen className="h-4 w-4 text-indigo-400" />
-    ) : (
-      <Folder className="h-4 w-4 text-indigo-400/70" />
-    )
-  }
-
-  const ext = name.split('.').pop()?.toLowerCase()
-  const colorMap: Record<string, string> = {
-    ts: 'text-blue-400',
-    tsx: 'text-blue-400',
-    js: 'text-yellow-400',
-    jsx: 'text-yellow-400',
-    json: 'text-amber-400',
-    md: 'text-zinc-400',
-    css: 'text-pink-400',
-    html: 'text-orange-400',
-    py: 'text-green-400'
-  }
-
-  return <File className={cn('h-4 w-4', colorMap[ext || ''] || 'text-zinc-500')} />
 }
 
 function TreeNode({
@@ -164,6 +129,7 @@ interface MenuState {
   x: number
   y: number
   entry: DirEntry
+  kind: 'entry' | 'background'
 }
 
 interface NamePromptState {
@@ -226,25 +192,98 @@ export function FileExplorer(): React.ReactElement {
     setNamePrompt(config)
   }
 
-  const handleContextMenu = (event: React.MouseEvent, entry: DirEntry): void => {
-    event.preventDefault()
-    event.stopPropagation()
-    setMenu({ x: event.clientX, y: event.clientY, entry })
-  }
-
-  const handleWorkspaceContextMenu = (event: React.MouseEvent): void => {
-    if (!workingDirectory) return
-    event.preventDefault()
-    setMenu({
-      x: event.clientX,
-      y: event.clientY,
-      entry: {
+  const workspaceEntry = workingDirectory
+    ? {
         name: workingDirectory.split(/[/\\]/).pop() || workingDirectory,
         path: workingDirectory,
         isDirectory: true
       }
+    : null
+
+  const promptCreateFile = (directoryPath: string): void => {
+    openNamePrompt({
+      title: 'Новый файл',
+      defaultValue: 'untitled.txt',
+      confirmLabel: 'Создать',
+      onConfirm: (name) => {
+        if (!isValidEntryName(name)) {
+          addToast('Недопустимое имя файла', 'error')
+          return
+        }
+        void window.api.fs
+          .createFile(directoryPath, name)
+          .then((path) => {
+            setExpandPath(directoryPath)
+            refresh()
+            addToast(`Создан файл ${name}`, 'success')
+            return handleFileClick(path)
+          })
+          .catch((err) =>
+            addToast(err instanceof Error ? err.message : 'Не удалось создать файл', 'error')
+          )
+      }
     })
   }
+
+  const promptCreateFolder = (directoryPath: string): void => {
+    openNamePrompt({
+      title: 'Новая папка',
+      defaultValue: 'new-folder',
+      confirmLabel: 'Создать',
+      onConfirm: (name) => {
+        if (!isValidEntryName(name)) {
+          addToast('Недопустимое имя папки', 'error')
+          return
+        }
+        void window.api.fs
+          .createDirectory(directoryPath, name)
+          .then(() => {
+            setExpandPath(directoryPath)
+            refresh()
+            addToast(`Создана папка ${name}`, 'success')
+          })
+          .catch((err) =>
+            addToast(err instanceof Error ? err.message : 'Не удалось создать папку', 'error')
+          )
+      }
+    })
+  }
+
+  const handleContextMenu = (event: React.MouseEvent, entry: DirEntry): void => {
+    event.preventDefault()
+    event.stopPropagation()
+    setMenu({ x: event.clientX, y: event.clientY, entry, kind: 'entry' })
+  }
+
+  const handleBackgroundContextMenu = (event: React.MouseEvent): void => {
+    if (!workspaceEntry) return
+    if ((event.target as HTMLElement).closest('button')) return
+    event.preventDefault()
+    setMenu({
+      x: event.clientX,
+      y: event.clientY,
+      entry: workspaceEntry,
+      kind: 'background'
+    })
+  }
+
+  const buildBackgroundMenuItems = (directory: DirEntry): ContextMenuItem[] => [
+    {
+      id: 'new-file',
+      label: 'Новый файл',
+      onClick: () => promptCreateFile(directory.path)
+    },
+    {
+      id: 'new-folder',
+      label: 'Новая папка',
+      onClick: () => promptCreateFolder(directory.path)
+    },
+    {
+      id: 'refresh',
+      label: 'Обновить',
+      onClick: refresh
+    }
+  ]
 
   const buildMenuItems = (entry: DirEntry): ContextMenuItem[] => {
     const items: ContextMenuItem[] = []
@@ -264,57 +303,12 @@ export function FileExplorer(): React.ReactElement {
         {
           id: 'new-file',
           label: 'Новый файл',
-          onClick: () => {
-            openNamePrompt({
-              title: 'Новый файл',
-              defaultValue: 'untitled.txt',
-              confirmLabel: 'Создать',
-              onConfirm: (name) => {
-                if (!isValidEntryName(name)) {
-                  addToast('Недопустимое имя файла', 'error')
-                  return
-                }
-                void window.api.fs
-                  .createFile(entry.path, name)
-                  .then((path) => {
-                    setExpandPath(entry.path)
-                    refresh()
-                    addToast(`Создан файл ${name}`, 'success')
-                    return handleFileClick(path)
-                  })
-                  .catch((err) =>
-                    addToast(err instanceof Error ? err.message : 'Не удалось создать файл', 'error')
-                  )
-              }
-            })
-          }
+          onClick: () => promptCreateFile(entry.path)
         },
         {
           id: 'new-folder',
           label: 'Новая папка',
-          onClick: () => {
-            openNamePrompt({
-              title: 'Новая папка',
-              defaultValue: 'new-folder',
-              confirmLabel: 'Создать',
-              onConfirm: (name) => {
-                if (!isValidEntryName(name)) {
-                  addToast('Недопустимое имя папки', 'error')
-                  return
-                }
-                void window.api.fs
-                  .createDirectory(entry.path, name)
-                  .then(() => {
-                    setExpandPath(entry.path)
-                    refresh()
-                    addToast(`Создана папка ${name}`, 'success')
-                  })
-                  .catch((err) =>
-                    addToast(err instanceof Error ? err.message : 'Не удалось создать папку', 'error')
-                  )
-              }
-            })
-          }
+          onClick: () => promptCreateFolder(entry.path)
         }
       )
     }
@@ -416,8 +410,9 @@ export function FileExplorer(): React.ReactElement {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-1" onContextMenu={handleWorkspaceContextMenu}>
+      <div className="min-h-0 flex-1" onContextMenu={handleBackgroundContextMenu}>
+        <ScrollArea className="h-full">
+          <div className="min-h-full p-1">
           {!workingDirectory ? (
             <button
               type="button"
@@ -442,14 +437,19 @@ export function FileExplorer(): React.ReactElement {
               />
             ))
           )}
-        </div>
-      </ScrollArea>
+          </div>
+        </ScrollArea>
+      </div>
 
       {menu && (
         <ExplorerContextMenu
           x={menu.x}
           y={menu.y}
-          items={buildMenuItems(menu.entry)}
+          items={
+            menu.kind === 'background'
+              ? buildBackgroundMenuItems(menu.entry)
+              : buildMenuItems(menu.entry)
+          }
           onClose={() => setMenu(null)}
         />
       )}

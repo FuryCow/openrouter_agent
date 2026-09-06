@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join, dirname } from 'path'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import Store from 'electron-store'
 import { FileSystemService } from './services/filesystem'
 import { WorkspaceWatcher } from './services/workspace-watcher'
@@ -10,7 +10,7 @@ import { CodebaseIndexer } from './services/indexing/codebase-indexer'
 import { DEFAULT_INDEX_SETTINGS } from './services/indexing/index-types'
 import { OpenRouterClient } from './services/openrouter'
 import { AgentService } from './services/agent'
-import type { AgentContext, AppSettings, ModelInfo } from './types'
+import type { AgentContext, AppSettings, ModelInfo, McpServerConfig } from './types'
 import {
   assertAllowedWorkspace,
   assertPathNotInAgentApp,
@@ -20,6 +20,14 @@ import { getRecentAnalyticsRuns, getAnalyticsLogDir } from './services/tool-anal
 import { loadChatMessages, saveChatMessages } from './services/chat-persistence'
 import { modeRequiresWorkspace } from './services/agent-modes'
 import { withRecentWorkspace } from './lib/recent-workspaces'
+import { McpManager } from './services/mcp/mcp-manager'
+import {
+  getDefaultCursorMcpPath,
+  getWorkspaceCursorMcpPath,
+  mergeMcpServerConfigs,
+  parseCursorMcpJson,
+  validateMcpServerConfigs
+} from './services/mcp/mcp-config'
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
   const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
@@ -52,7 +60,18 @@ const workspaceWatcher = new WorkspaceWatcher()
 const terminalService = new TerminalService()
 const webSearchService = new WebSearchService()
 let openRouterClient = new OpenRouterClient(store.get('settings'))
-let agentService = new AgentService(openRouterClient, fsService, terminalService, webSearchService, codebaseIndexer)
+const mcpManager = new McpManager(
+  () => sanitizeSettings(store.get('settings')),
+  (status) => sendToRenderer('mcp:status-changed', status)
+)
+let agentService = new AgentService(
+  openRouterClient,
+  fsService,
+  terminalService,
+  webSearchService,
+  codebaseIndexer,
+  mcpManager
+)
 webSearchService.configure(store.get('settings'))
 
 function applyIndexSettings(settings: AppSettings): void {
@@ -158,10 +177,22 @@ function setWorkspaceWatch(dir: string): void {
   }, 500)
 }
 
+function recreateAgentService(): void {
+  agentService = new AgentService(
+    openRouterClient,
+    fsService,
+    terminalService,
+    webSearchService,
+    codebaseIndexer,
+    mcpManager
+  )
+}
+
 function shutdownApp(): void {
   agentService.abort()
   workspaceWatcher.stop()
   terminalService.destroyAll()
+  void mcpManager.shutdown()
   mainWindow = null
 }
 
@@ -187,7 +218,8 @@ function registerIpc(): void {
     openRouterClient = new OpenRouterClient(normalized)
     webSearchService.configure(normalized)
     applyIndexSettings(normalized)
-    agentService = new AgentService(openRouterClient, fsService, terminalService, webSearchService, codebaseIndexer)
+    recreateAgentService()
+    await mcpManager.reconnectAll()
     return normalized
   })
 
@@ -332,6 +364,7 @@ function registerIpc(): void {
         sendToRenderer('agent:event', event)
       }
     )
+    await mcpManager.flushPendingReconnect()
   })
 
   ipcMain.handle('agent:approve', (_event, approvalId: string, approved: boolean) => {
@@ -371,6 +404,81 @@ function registerIpc(): void {
   ipcMain.handle('index:search', async (_event, request: import('./types').CodebaseSearchRequest) => {
     return codebaseIndexer.search(request)
   })
+
+  ipcMain.handle('mcp:getStatus', () => mcpManager.getStatus())
+  ipcMain.handle('mcp:getConfig', () => mcpManager.getConfig())
+
+  ipcMain.handle('mcp:saveConfig', async (_event, servers: McpServerConfig[]) => {
+    if (agentService.isRunning) {
+      mcpManager.queueReconnectAfterRun()
+    }
+    const error = validateMcpServerConfigs(servers)
+    if (error) throw new Error(error)
+
+    const settings = sanitizeSettings(store.get('settings'))
+    const next = { ...settings, mcpServers: servers }
+    store.set('settings', next)
+
+    if (!agentService.isRunning) {
+      await mcpManager.reconnectAll()
+    }
+    return servers
+  })
+
+  ipcMain.handle('mcp:importFromFile', async (_event, filePath?: string) => {
+    let path = filePath
+    if (!path) {
+      const result = await dialog.showOpenDialog(getWindow(), {
+        properties: ['openFile'],
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+      })
+      if (result.canceled || !result.filePaths[0]) return null
+      path = result.filePaths[0]
+    }
+
+    const raw = readFileSync(path, 'utf-8')
+    const imported = parseCursorMcpJson(JSON.parse(raw))
+    const settings = sanitizeSettings(store.get('settings'))
+    const merged = mergeMcpServerConfigs(settings.mcpServers ?? [], imported)
+    return merged
+  })
+
+  ipcMain.handle('mcp:importDefaultCursor', () => {
+    const defaultPath = getDefaultCursorMcpPath()
+    if (!existsSync(defaultPath)) {
+      throw new Error(`Cursor MCP config not found at ${defaultPath}`)
+    }
+    const raw = readFileSync(defaultPath, 'utf-8')
+    const imported = parseCursorMcpJson(JSON.parse(raw))
+
+    const settings = sanitizeSettings(store.get('settings'))
+    let merged = mergeMcpServerConfigs(settings.mcpServers ?? [], imported)
+
+    const workspace = settings.workingDirectory
+    if (workspace) {
+      const workspacePath = getWorkspaceCursorMcpPath(workspace)
+      if (existsSync(workspacePath)) {
+        const workspaceRaw = readFileSync(workspacePath, 'utf-8')
+        const workspaceImported = parseCursorMcpJson(JSON.parse(workspaceRaw))
+        merged = mergeMcpServerConfigs(merged, workspaceImported)
+      }
+    }
+
+    return merged
+  })
+
+  ipcMain.handle('mcp:testServer', (_event, config: McpServerConfig) => {
+    return mcpManager.testServer(config)
+  })
+
+  ipcMain.handle('mcp:reconnect', async () => {
+    if (agentService.isRunning) {
+      mcpManager.queueReconnectAfterRun()
+      return mcpManager.getStatus()
+    }
+    await mcpManager.reconnectAll()
+    return mcpManager.getStatus()
+  })
 }
 
 app.whenReady().then(() => {
@@ -390,6 +498,9 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   applyIndexSettings(settings)
+  void mcpManager.initialize().catch((err) => {
+    console.error('[MCP] Failed to initialize:', err)
+  })
   codebaseIndexer.onProgress((progress) => {
     sendToRenderer('index:progress', progress)
     sendToRenderer('index:status', codebaseIndexer.getStatus())

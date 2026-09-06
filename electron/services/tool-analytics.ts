@@ -2,6 +2,8 @@ import { appendFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
 import type { ChatMode, ToolCallAnalytics, AgentRunAnalytics, ToolValidationIssue, TokenUsage } from '../types'
+import { isMcpQualifiedToolName, parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
+import { isMcpToolReadOnly } from './mcp/mcp-policies'
 
 const TOOLS_KNOWN: Record<string, true> = {
   read_file: true,
@@ -59,18 +61,28 @@ export function validateToolArguments(
     }
   }
 
-  if (!Object.keys(TOOLS_KNOWN).includes(toolName)) {
+  if (!isMcpQualifiedToolName(toolName) && !Object.keys(TOOLS_KNOWN).includes(toolName)) {
     issues.push('unknown_tool')
   }
 
-  if (mode === 'planner' && ['write_file', 'search_replace', 'run_terminal'].includes(toolName)) {
+  if (
+    mode === 'planner' &&
+    !isMcpQualifiedToolName(toolName) &&
+    ['write_file', 'search_replace', 'run_terminal'].includes(toolName)
+  ) {
     issues.push('tool_not_allowed_in_mode')
   }
-  if (mode === 'ask') {
+  if (mode === 'ask' && !isMcpQualifiedToolName(toolName)) {
     issues.push('tool_not_allowed_in_mode')
+  }
+  if (mode === 'planner' && isMcpQualifiedToolName(toolName)) {
+    const parsed = parseMcpQualifiedToolName(toolName)
+    if (parsed && !isMcpToolReadOnly(parsed.toolName)) {
+      issues.push('tool_not_allowed_in_mode')
+    }
   }
 
-  const required = REQUIRED_ARGS[toolName] ?? []
+  const required = isMcpQualifiedToolName(toolName) ? [] : (REQUIRED_ARGS[toolName] ?? [])
   for (const key of required) {
     const value = parsed[key]
     if (value === undefined || value === null || value === '') {
@@ -79,7 +91,10 @@ export function validateToolArguments(
     }
   }
 
-  if (toolName === 'read_file' || toolName === 'write_file' || toolName === 'search_replace') {
+  if (
+    !isMcpQualifiedToolName(toolName) &&
+    (toolName === 'read_file' || toolName === 'write_file' || toolName === 'search_replace')
+  ) {
     if (!String(parsed.path ?? '').trim()) issues.push('empty_path')
   }
   if (toolName === 'read_files') {
@@ -93,14 +108,15 @@ export function validateToolArguments(
     }
   }
   if (
-    toolName === 'search_files' ||
-    toolName === 'grep_workspace' ||
-    toolName === 'web_search' ||
-    toolName === 'codebase_search'
+    !isMcpQualifiedToolName(toolName) &&
+    (toolName === 'search_files' ||
+      toolName === 'grep_workspace' ||
+      toolName === 'web_search' ||
+      toolName === 'codebase_search')
   ) {
     if (!String(parsed.query ?? '').trim()) issues.push('empty_query')
   }
-  if (toolName === 'run_terminal') {
+  if (toolName === 'run_terminal' && !isMcpQualifiedToolName(toolName)) {
     if (!String(parsed.command ?? '').trim()) issues.push('empty_command')
   }
 

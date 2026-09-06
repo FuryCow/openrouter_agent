@@ -10,7 +10,9 @@ import type {
   IndexStatus,
   IndexProgress,
   CodebaseSearchRequest,
-  CodebaseSearchHit
+  CodebaseSearchHit,
+  McpServerConfig,
+  McpStatusSnapshot
 } from './types'
 
 export interface ElectronAPI {
@@ -73,6 +75,16 @@ export interface ElectronAPI {
     onProgress: (callback: (progress: IndexProgress) => void) => () => void
     onStatus: (callback: (status: IndexStatus) => void) => () => void
     onFilesChanged: (callback: (paths: string[]) => void) => () => void
+  }
+  mcp: {
+    getStatus: () => Promise<McpStatusSnapshot>
+    getConfig: () => Promise<McpServerConfig[]>
+    saveConfig: (servers: McpServerConfig[]) => Promise<McpServerConfig[]>
+    importFromFile: (filePath?: string) => Promise<McpServerConfig[] | null>
+    importDefaultCursor: () => Promise<McpServerConfig[]>
+    testServer: (config: McpServerConfig) => Promise<{ ok: boolean; toolCount: number; error?: string }>
+    reconnect: () => Promise<McpStatusSnapshot>
+    onStatusChanged: (callback: (status: McpStatusSnapshot) => void) => () => void
   }
 }
 
@@ -163,6 +175,21 @@ const api: ElectronAPI = {
       const handler = (_event: Electron.IpcRendererEvent, paths: string[]) => callback(paths)
       ipcRenderer.on('index:files-changed', handler)
       return () => ipcRenderer.removeListener('index:files-changed', handler)
+    }
+  },
+  mcp: {
+    getStatus: () => ipcRenderer.invoke('mcp:getStatus'),
+    getConfig: () => ipcRenderer.invoke('mcp:getConfig'),
+    saveConfig: (servers) => ipcRenderer.invoke('mcp:saveConfig', servers),
+    importFromFile: (filePath) => ipcRenderer.invoke('mcp:importFromFile', filePath),
+    importDefaultCursor: () => ipcRenderer.invoke('mcp:importDefaultCursor'),
+    testServer: (config) => ipcRenderer.invoke('mcp:testServer', config),
+    reconnect: () => ipcRenderer.invoke('mcp:reconnect'),
+    onStatusChanged: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: McpStatusSnapshot) =>
+        callback(status)
+      ipcRenderer.on('mcp:status-changed', handler)
+      return () => ipcRenderer.removeListener('mcp:status-changed', handler)
     }
   }
 }

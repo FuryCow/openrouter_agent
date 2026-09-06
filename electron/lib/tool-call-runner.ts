@@ -32,6 +32,7 @@ export interface ProcessToolCallsOptions {
   onToolDone: (toolCall: ToolCallInfo) => void
   onRecordAnalytics: (record: ToolCallAnalyticsRecord) => void
   requestApproval: (call: ToolCall) => Promise<boolean>
+  requiresApproval?: (name: string) => boolean
   executeTool: (call: ToolCall) => Promise<string>
   onExecuteSuccess?: (call: ToolCall, toolInfo: ToolCallInfo) => Promise<void>
 }
@@ -62,6 +63,7 @@ export async function processToolCallsBatch(options: ProcessToolCallsOptions): P
     onToolDone,
     onRecordAnalytics,
     requestApproval,
+    requiresApproval = (name) => MUTATING_TOOLS.has(name),
     executeTool,
     onExecuteSuccess
   } = options
@@ -85,7 +87,7 @@ export async function processToolCallsBatch(options: ProcessToolCallsOptions): P
 
   for (const item of prepared) {
     if (!item.argsValidation.ok) continue
-    if (MUTATING_TOOLS.has(item.call.function.name)) {
+    if (requiresApproval(item.call.function.name)) {
       item.approved = await requestApproval(item.call)
     } else {
       item.approved = true

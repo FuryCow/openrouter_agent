@@ -1,5 +1,40 @@
 export type ChatMode = 'agent' | 'ask' | 'planner'
 
+export type McpTransportType = 'stdio' | 'streamable-http' | 'sse'
+
+export interface McpServerConfig {
+  id: string
+  name?: string
+  enabled: boolean
+  transport: McpTransportType
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  cwd?: string
+  url?: string
+  headers?: Record<string, string>
+  autoApprove?: boolean
+}
+
+export type McpConnectionStatus = 'connected' | 'connecting' | 'error' | 'disabled'
+
+export interface McpServerStatus {
+  id: string
+  name: string
+  enabled: boolean
+  transport: McpTransportType
+  status: McpConnectionStatus
+  toolCount: number
+  lastError?: string
+}
+
+export interface McpStatusSnapshot {
+  servers: McpServerStatus[]
+  totalTools: number
+  connectedCount: number
+  enabledCount: number
+}
+
 export interface AppSettings {
   apiKey: string
   model: string
@@ -16,6 +51,9 @@ export interface AppSettings {
   embeddingModel?: string
   maxFileSizeKb?: number
   semanticSearchEnabled?: boolean
+  mcpServers?: McpServerConfig[]
+  mcpImportPaths?: string[]
+  mcpRequireApproval?: boolean
 }
 
 export interface DirEntry {
