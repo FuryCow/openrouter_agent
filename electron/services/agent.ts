@@ -34,6 +34,14 @@ import type { McpManager } from './mcp/mcp-manager'
 import { parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
 import type { ProjectMemoryService } from './project-memory/project-memory-service'
 import type { ProjectMemoryCategory } from './project-memory/project-memory-types'
+import { RunCheckpoint } from './run-checkpoint'
+import {
+  buildRetryExhaustedError,
+  formatToolErrorFromMessage,
+  toolRetryKey
+} from '../lib/tool-errors'
+
+const MAX_TOOL_RETRIES = 2
 
 const TOOLS: ToolDefinition[] = [
   {
@@ -278,6 +286,10 @@ export class AgentService {
   private approvalResolvers = new Map<string, (approved: boolean) => void>()
   private sessionAutoApproveWrites = false
   private sessionAutoApproveTerminal = false
+  private runCheckpoint = new RunCheckpoint()
+  private lastCheckpoint: RunCheckpoint | null = null
+  private toolRetryCounts = new Map<string, number>()
+  private runEmit: ((event: AgentEvent) => void) | null = null
 
   constructor(
     private openRouter: OpenRouterClient,
@@ -291,6 +303,31 @@ export class AgentService {
 
   get isRunning(): boolean {
     return this.running
+  }
+
+  getRunCheckpointSummary() {
+    return this.lastCheckpoint?.summary ?? null
+  }
+
+  async restoreRunCheckpoint(): Promise<{ restored: number; deleted: number } | null> {
+    if (!this.lastCheckpoint?.hasChanges()) return null
+    const result = await this.lastCheckpoint.restore(this.fs)
+    this.lastCheckpoint.clear()
+    this.lastCheckpoint = null
+    return result
+  }
+
+  private emitRunStatus(
+    emit: (event: AgentEvent) => void,
+    runStatus: AgentEvent['runStatus'],
+    iterationsRemaining?: number
+  ): void {
+    emit({ type: 'run_status', runStatus, iterationsRemaining })
+  }
+
+  private emitCheckpointUpdated(emit: (event: AgentEvent) => void): void {
+    if (!this.runCheckpoint.hasChanges()) return
+    emit({ type: 'checkpoint_updated', checkpoint: this.runCheckpoint.summary })
   }
 
   resolveApproval(approvalId: string, approved: boolean): void {
@@ -356,6 +393,10 @@ export class AgentService {
     this.abortController = new AbortController()
     const signal = this.abortController.signal
     this.running = true
+    this.runCheckpoint = new RunCheckpoint()
+    this.toolRetryCounts.clear()
+    this.runEmit = emit
+    this.emitRunStatus(emit, 'running')
 
     const tools = [...getToolsForMode(mode, TOOLS), ...this.mcpManager.getToolsForMode(mode)]
     const maxIterations = getMaxIterations(mode)
@@ -455,6 +496,15 @@ export class AgentService {
       while (iterations < maxIterations) {
         iterations++
         if (signal.aborted) break
+
+        const iterationsRemaining = maxIterations - iterations
+        if (iterationsRemaining <= 3 && iterationsRemaining >= 0) {
+          emit({
+            type: 'iteration_warning',
+            iterationsRemaining,
+            error: `Only ${iterationsRemaining} tool step(s) remaining before the run limit.`
+          })
+        }
 
         let streamedContent = ''
         let streamedReasoning = ''
@@ -558,6 +608,11 @@ export class AgentService {
         }
 
         const run = await finishRun('completed', iterations)
+        this.emitRunStatus(emit, 'completed')
+        if (this.runCheckpoint.hasChanges()) {
+          this.lastCheckpoint = this.runCheckpoint
+          this.emitCheckpointUpdated(emit)
+        }
         const apiMessages: ApiChatMessage[] = messages
           .slice(runApiStartIndex)
           .map((m) => ({
@@ -584,6 +639,11 @@ export class AgentService {
 
       if (!analyticsClosed && signal.aborted) {
         await finishRun('aborted', iterations)
+        this.emitRunStatus(emit, 'aborted')
+        if (this.runCheckpoint.hasChanges()) {
+          this.lastCheckpoint = this.runCheckpoint
+          this.emitCheckpointUpdated(emit)
+        }
         if (timeline.length > 0) {
           await emitInterrupted('Run aborted.', 'aborted', timeline)
         }
@@ -591,12 +651,22 @@ export class AgentService {
 
       if (!analyticsClosed && iterations >= maxIterations) {
         const error = `Agent reached the maximum number of tool steps (${maxIterations}).`
+        this.emitRunStatus(emit, 'max_iterations')
+        if (this.runCheckpoint.hasChanges()) {
+          this.lastCheckpoint = this.runCheckpoint
+          this.emitCheckpointUpdated(emit)
+        }
         await emitInterrupted(error, 'max_iterations', timeline)
       }
     } catch (err) {
       if (!signal.aborted) {
         const message = err instanceof Error ? err.message : String(err)
         if (!analyticsClosed) await finishRun('error', iterations, message)
+        this.emitRunStatus(emit, 'error')
+        if (this.runCheckpoint.hasChanges()) {
+          this.lastCheckpoint = this.runCheckpoint
+          this.emitCheckpointUpdated(emit)
+        }
         if (timeline.length > 0) {
           await emitInterrupted(message, 'error', timeline)
         } else {
@@ -607,6 +677,11 @@ export class AgentService {
         }
       } else if (!analyticsClosed) {
         await finishRun('aborted', iterations)
+        this.emitRunStatus(emit, 'aborted')
+        if (this.runCheckpoint.hasChanges()) {
+          this.lastCheckpoint = this.runCheckpoint
+          this.emitCheckpointUpdated(emit)
+        }
         if (timeline.length > 0) {
           await emitInterrupted('Run aborted.', 'aborted', timeline)
         }
@@ -614,6 +689,7 @@ export class AgentService {
     } finally {
       this.running = false
       this.abortController = null
+      this.runEmit = null
     }
   }
 
@@ -678,21 +754,52 @@ export class AgentService {
     }
 
     emit({ type: 'approval_request', approval: request })
+    this.emitRunStatus(emit, 'awaiting_approval')
 
-    return new Promise<boolean>((resolve) => {
+    const approved = await new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => {
         this.approvalResolvers.delete(approvalId)
         resolve(false)
       }, 5 * 60 * 1000)
 
-      this.approvalResolvers.set(approvalId, (approved) => {
+      this.approvalResolvers.set(approvalId, (value) => {
         clearTimeout(timeout)
-        resolve(approved)
+        resolve(value)
       })
     })
+
+    this.emitRunStatus(emit, 'running')
+    return approved
   }
 
   private async executeTool(
+    call: ToolCall,
+    context: AgentContext,
+    mode: ChatMode
+  ): Promise<string> {
+    const key = toolRetryKey(call.function.name, call.function.arguments || '{}')
+    const attempt = (this.toolRetryCounts.get(key) ?? 0) + 1
+    this.toolRetryCounts.set(key, attempt)
+
+    let result: string
+    try {
+      result = await this.executeToolInner(call, context, mode)
+    } catch (err) {
+      result = `Error: ${err instanceof Error ? err.message : String(err)}`
+    }
+
+    if (!result.startsWith('Error')) {
+      return result
+    }
+
+    if (attempt >= MAX_TOOL_RETRIES) {
+      return buildRetryExhaustedError(call.function.name, attempt)
+    }
+
+    return formatToolErrorFromMessage(result)
+  }
+
+  private async executeToolInner(
     call: ToolCall,
     context: AgentContext,
     mode: ChatMode
@@ -757,12 +864,15 @@ export class AgentService {
       case 'write_file': {
         const path = this.resolvePath(String(args.path ?? ''), cwd)
         assertPathNotInAgentApp(path)
+        await this.runCheckpoint.captureBeforeMutation(this.fs, path)
         await this.fs.writeFile(path, String(args.content ?? ''))
+        if (this.runEmit) this.emitCheckpointUpdated(this.runEmit)
         return `Successfully wrote ${String(args.content ?? '').length} characters to ${path}`
       }
       case 'search_replace': {
         const path = this.resolvePath(String(args.path ?? ''), cwd)
         assertPathNotInAgentApp(path)
+        await this.runCheckpoint.captureBeforeMutation(this.fs, path)
         const replaceAll = args.replace_all === true || args.replace_all === 'true'
         const result = await this.fs.searchReplace(
           path,
@@ -770,6 +880,7 @@ export class AgentService {
           String(args.new_string ?? ''),
           replaceAll
         )
+        if (this.runEmit) this.emitCheckpointUpdated(this.runEmit)
         return `Successfully replaced ${result.replacements} occurrence(s) in ${path}`
       }
       case 'list_directory': {

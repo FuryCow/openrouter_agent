@@ -56,6 +56,7 @@ export interface AppSettings {
   mcpRequireApproval?: boolean
   projectMemoryEnabled?: boolean
   projectMemoryAutoLoadDocs?: boolean
+  agentAutoVerify?: boolean
 }
 
 export type ProjectMemoryCategory =
@@ -157,6 +158,8 @@ export interface AgentContext {
   autoApproveWrites?: boolean
   autoApproveTerminal?: boolean
   projectMemory?: string
+  workspaceState?: string
+  agentAutoVerify?: boolean
 }
 
 export interface DiffHighlightRange {
@@ -297,6 +300,19 @@ export interface ToolApprovalRequest {
   fileDiff?: FileDiffPreview
 }
 
+export type AgentRunStatus =
+  | 'running'
+  | 'awaiting_approval'
+  | 'completed'
+  | 'error'
+  | 'aborted'
+  | 'max_iterations'
+
+export interface RunCheckpointSummary {
+  paths: string[]
+  count: number
+}
+
 export interface AgentEvent {
   type:
     | 'stream'
@@ -308,12 +324,18 @@ export interface AgentEvent {
     | 'error'
     | 'run_analytics'
     | 'approval_request'
+    | 'run_status'
+    | 'iteration_warning'
+    | 'checkpoint_updated'
   content?: string
   toolCall?: ToolCallInfo
   message?: ChatMessage
   error?: string
   analytics?: AgentRunAnalytics
   approval?: ToolApprovalRequest
+  runStatus?: AgentRunStatus
+  iterationsRemaining?: number
+  checkpoint?: RunCheckpointSummary
 }
 
 export interface ModelInfo {

@@ -129,4 +129,31 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('grep_workspace')
     expect(prompt).not.toContain('run_terminal for builds')
   })
+
+  it('includes workspace state for agent and planner', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      workspaceState: 'Branch: main\nWorking tree: clean'
+    })
+    expect(prompt).toContain('Workspace state:')
+    expect(prompt).toContain('Branch: main')
+
+    const plannerPrompt = buildSystemPrompt({
+      ...baseContext,
+      mode: 'planner',
+      workspaceState: 'Branch: dev'
+    })
+    expect(plannerPrompt).toContain('Workspace state:')
+  })
+
+  it('includes verification workflow when agentAutoVerify is enabled', () => {
+    const prompt = buildSystemPrompt({ ...baseContext, agentAutoVerify: true })
+    expect(prompt).toContain('Verification workflow')
+    expect(prompt).toContain('npm test')
+  })
+
+  it('omits verification workflow when agentAutoVerify is disabled', () => {
+    const prompt = buildSystemPrompt({ ...baseContext, agentAutoVerify: false })
+    expect(prompt).not.toContain('Verification workflow')
+  })
 })

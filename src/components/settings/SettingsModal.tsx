@@ -66,6 +66,7 @@ function syncFormFromSettings(
     setSemanticSearchEnabled: (v: boolean) => void
     setProjectMemoryEnabled: (v: boolean) => void
     setProjectMemoryAutoLoadDocs: (v: boolean) => void
+    setAgentAutoVerify: (v: boolean) => void
   }
 ): void {
   setters.setApiKey(settings.apiKey ?? '')
@@ -80,6 +81,7 @@ function syncFormFromSettings(
   setters.setSemanticSearchEnabled(settings.semanticSearchEnabled ?? true)
   setters.setProjectMemoryEnabled(settings.projectMemoryEnabled !== false)
   setters.setProjectMemoryAutoLoadDocs(settings.projectMemoryAutoLoadDocs !== false)
+  setters.setAgentAutoVerify(settings.agentAutoVerify !== false)
 }
 
 export function SettingsModal(): React.ReactElement {
@@ -107,6 +109,7 @@ export function SettingsModal(): React.ReactElement {
   const [projectMemoryAutoLoadDocs, setProjectMemoryAutoLoadDocs] = useState(
     settings.projectMemoryAutoLoadDocs !== false
   )
+  const [agentAutoVerify, setAgentAutoVerify] = useState(settings.agentAutoVerify !== false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -129,7 +132,8 @@ export function SettingsModal(): React.ReactElement {
         setMaxFileSizeKb,
         setSemanticSearchEnabled,
         setProjectMemoryEnabled,
-        setProjectMemoryAutoLoadDocs
+        setProjectMemoryAutoLoadDocs,
+        setAgentAutoVerify
       })
     })
   }, [settingsOpen, settingsFocusSection, setSettings])
@@ -156,7 +160,8 @@ export function SettingsModal(): React.ReactElement {
         maxFileSizeKb: Number(maxFileSizeKb) || 1024,
         semanticSearchEnabled,
         projectMemoryEnabled,
-        projectMemoryAutoLoadDocs
+        projectMemoryAutoLoadDocs,
+        agentAutoVerify
       }
       await window.api.settings.save(newSettings)
       setSettings(newSettings)
@@ -220,6 +225,12 @@ export function SettingsModal(): React.ReactElement {
               autoLoadDocs={projectMemoryAutoLoadDocs}
               onEnabledChange={setProjectMemoryEnabled}
               onAutoLoadDocsChange={setProjectMemoryAutoLoadDocs}
+            />
+            <SettingsSwitchRow
+              title="Verify after edits"
+              description="Agent runs tests/lint/tsc after code changes (via run_terminal)"
+              checked={agentAutoVerify}
+              onCheckedChange={setAgentAutoVerify}
             />
           </div>
         )

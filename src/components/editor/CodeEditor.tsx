@@ -13,6 +13,7 @@ import {
 } from '@/components/explorer/ExplorerContextMenu'
 import { useEditorStore } from '@/stores/editorStore'
 import { buildEditorFileStats } from '@/lib/editorFileStats'
+import { setupMonacoEditorFeatures, registerResolveInChatEditorActions } from '@/lib/monacoEditorSetup'
 
 interface TabContextMenuState {
   x: number
@@ -73,6 +74,7 @@ export function CodeEditor(): React.ReactElement {
   const diffDecorationIdsRef = useRef<string[]>([])
   const revealClearTimerRef = useRef<number | null>(null)
   const editorStatsDisposablesRef = useRef<Array<{ dispose: () => void }>>([])
+  const resolveInChatDisposableRef = useRef<{ dispose: () => void } | null>(null)
   const [tabMenu, setTabMenu] = useState<TabContextMenuState | null>(null)
   const setEditorStats = useEditorStore((s) => s.setStats)
 
@@ -157,6 +159,8 @@ export function CodeEditor(): React.ReactElement {
         disposable.dispose()
       }
       editorStatsDisposablesRef.current = []
+      resolveInChatDisposableRef.current?.dispose()
+      resolveInChatDisposableRef.current = null
     }
   }, [])
 
@@ -285,6 +289,7 @@ export function CodeEditor(): React.ReactElement {
           ) : (
           <Editor
             height="100%"
+            path={activeTab.path}
             language={activeTab.language}
             value={activeTab.content}
             onChange={(value) => updateTabContent(activeTab.path, value || '')}
@@ -300,9 +305,17 @@ export function CodeEditor(): React.ReactElement {
               renderLineHighlight: 'line',
               cursorBlinking: 'smooth',
               smoothScrolling: true,
-              bracketPairColorization: { enabled: true }
+              bracketPairColorization: { enabled: true },
+              hover: { enabled: true },
+              lightbulb: { enabled: 'on' }
             }}
             onMount={((editorInstance, monaco) => {
+              setupMonacoEditorFeatures(monaco)
+              resolveInChatDisposableRef.current?.dispose()
+              resolveInChatDisposableRef.current = registerResolveInChatEditorActions(
+                editorInstance,
+                monaco
+              )
               monacoEditorRef.current = editorInstance
               monacoApiRef.current = monaco
 

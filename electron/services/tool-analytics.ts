@@ -148,7 +148,7 @@ export function classifyToolResult(
 ): { outcome: ToolCallOutcome; issues: ToolValidationIssue[] } {
   const issues: ToolValidationIssue[] = []
 
-  if (result.startsWith('Error:')) {
+  if (result.startsWith('Error:') || result.startsWith('Error [')) {
     const message = result.toLowerCase()
     if (message.includes('old_string not found')) issues.push('search_replace_not_found')
     else if (message.includes('matched') && message.includes('times')) {

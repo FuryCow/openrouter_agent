@@ -62,6 +62,15 @@ body {
   overscroll-behavior-y: auto;
 }
 
+.monaco-editor .monaco-hover a {
+  color: #a5b4fc;
+  text-decoration: none;
+}
+
+.monaco-editor .monaco-hover a:hover {
+  text-decoration: underline;
+}
+
 .monaco-editor .file-diff-highlight-line {
   background-color: rgba(52, 211, 153, 0.14) !important;
 }

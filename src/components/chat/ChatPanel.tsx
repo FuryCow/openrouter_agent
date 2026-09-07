@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react'
-import { Send, Square, Trash2, Bot, RotateCcw, Paperclip } from 'lucide-react'
+import { Send, Square, Trash2, Bot, RotateCcw, Paperclip, Undo2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '../ui/button'
 import { MessageBubble } from './MessageBubble'
@@ -17,6 +17,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ChatOnboarding } from './ChatOnboarding'
 import { TokenUsageRing } from './TokenUsageRing'
 import { useUiStore } from '@/stores/uiStore'
+import { useAgentRunStore } from '@/stores/agentRunStore'
 
 export function ChatPanel(): React.ReactElement {
   const [input, setInput] = useState('')
@@ -47,6 +48,11 @@ export function ChatPanel(): React.ReactElement {
   const models = useSettingsStore((s) => s.models)
   const setSettingsOpen = useSettingsStore((s) => s.setSettingsOpen)
   const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen)
+  const chatDraftFocusToken = useUiStore((s) => s.chatDraftFocusToken)
+  const chatDraft = useUiStore((s) => s.chatDraft)
+  const clearChatDraft = useUiStore((s) => s.clearChatDraft)
+  const runCheckpoint = useAgentRunStore((s) => s.checkpoint)
+  const clearRunCheckpoint = useAgentRunStore((s) => s.clearCheckpoint)
 
   const modeConfig = getChatModeConfig(chatMode)
   const visibleMessages = useMemo(
@@ -91,6 +97,16 @@ export function ChatPanel(): React.ReactElement {
   useLayoutEffect(() => {
     resizeInput()
   }, [input, resizeInput])
+
+  useEffect(() => {
+    if (!chatDraft) return
+    setInput(chatDraft)
+    clearChatDraft()
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      resizeInput()
+    })
+  }, [chatDraftFocusToken, chatDraft, clearChatDraft, resizeInput])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -201,6 +217,28 @@ export function ChatPanel(): React.ReactElement {
     clearMessages()
   }
 
+  const handleRestoreRunCheckpoint = async (): Promise<void> => {
+    if (isStreaming) return
+    try {
+      const result = await window.api.agent.restoreRunCheckpoint()
+      if (!result) {
+        useToastStore.getState().addToast('Nothing to revert from the last run', 'info')
+        return
+      }
+      clearRunCheckpoint()
+      await useFileStore.getState().reloadCleanTabsFromDisk()
+      useToastStore.getState().addToast(
+        `Reverted ${result.restored + result.deleted} file change(s) from last agent run`,
+        'success'
+      )
+    } catch (err) {
+      useToastStore.getState().addToast(
+        err instanceof Error ? err.message : 'Failed to revert changes',
+        'error'
+      )
+    }
+  }
+
   const handleImplementPlan = async (planContent: string): Promise<void> => {
     if (isStreaming) return
     if (!settings.apiKey) {
@@ -268,6 +306,19 @@ export function ChatPanel(): React.ReactElement {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {runCheckpoint && runCheckpoint.count > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-amber-300 hover:text-amber-200"
+              onClick={() => void handleRestoreRunCheckpoint()}
+              disabled={isStreaming}
+              title={`Revert ${runCheckpoint.count} file(s) from last agent run`}
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+              <span className="text-[10px]">Revert run</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"

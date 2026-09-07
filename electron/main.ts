@@ -30,6 +30,7 @@ import {
 } from './services/mcp/mcp-config'
 import { ProjectMemoryService } from './services/project-memory/project-memory-service'
 import type { ProjectMemoryCategory, ProjectMemoryEntry } from './types'
+import { getWorkspaceState } from './services/workspace-state'
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
   const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
@@ -369,6 +370,9 @@ function registerIpc(): void {
         customSystemPrompt: context.customSystemPrompt ?? settings.customSystemPrompt,
         autoApproveWrites: context.autoApproveWrites ?? settings.autoApproveWrites,
         autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal,
+        agentAutoVerify: settings.agentAutoVerify !== false,
+        workspaceState:
+          mode !== 'ask' && cwd ? getWorkspaceState(cwd).formatted : undefined,
         projectMemory:
           mode === 'agent' && settings.projectMemoryEnabled !== false && cwd
             ? projectMemoryService.getSnapshot(cwd, {
@@ -393,6 +397,14 @@ function registerIpc(): void {
 
   ipcMain.handle('agent:abort', () => {
     agentService.abort()
+  })
+
+  ipcMain.handle('agent:getRunCheckpoint', () => {
+    return agentService.getRunCheckpointSummary()
+  })
+
+  ipcMain.handle('agent:restoreRunCheckpoint', async () => {
+    return agentService.restoreRunCheckpoint()
   })
 
   ipcMain.handle('chat:load', (_event, mode: string) => {

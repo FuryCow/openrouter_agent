@@ -45,5 +45,7 @@ export type {
   McpStatusSnapshot,
   McpTransportType,
   ProjectMemoryEntry,
-  ProjectMemoryCategory
+  ProjectMemoryCategory,
+  AgentRunStatus,
+  RunCheckpointSummary
 } from '../../electron/types'

@@ -6,6 +6,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useToastStore } from '../stores/toastStore'
 import { useAnalyticsStore } from '../stores/analyticsStore'
 import { useTokenUsageStore } from '../stores/tokenUsageStore'
+import { useAgentRunStore } from '../stores/agentRunStore'
 import { getChatModeConfig } from '../lib/chatModes'
 
 function buildImplementPlanPrompt(planContent: string, originalTask?: string): string {
@@ -87,6 +88,21 @@ export function useAgent(): {
             useChatStore.getState().setPendingApproval(event.approval)
           }
           break
+        case 'run_status':
+          if (event.runStatus) {
+            useAgentRunStore.getState().setRunStatus(event.runStatus)
+          }
+          break
+        case 'checkpoint_updated':
+          if (event.checkpoint) {
+            useAgentRunStore.getState().setCheckpoint(event.checkpoint)
+          }
+          break
+        case 'iteration_warning':
+          if (event.error) {
+            useToastStore.getState().addToast(event.error, 'info')
+          }
+          break
         case 'error': {
           const errorText = event.error || 'Request failed'
           const { activeTimeline } = useChatStore.getState()
@@ -138,6 +154,7 @@ export function useAgent(): {
     }
     clearStream()
     setStreaming(true)
+    useAgentRunStore.getState().setRunStatus('running')
 
     try {
       const openFiles = useFileStore.getState().getOpenFilesContext()

@@ -57,6 +57,8 @@ export interface ElectronAPI {
     abort: () => Promise<void>
     approve: (approvalId: string, approved: boolean) => Promise<void>
     setSessionAutoApprove: (toolName: string) => Promise<void>
+    getRunCheckpoint: () => Promise<import('./types').RunCheckpointSummary | null>
+    restoreRunCheckpoint: () => Promise<{ restored: number; deleted: number } | null>
     onEvent: (callback: (event: AgentEvent) => void) => () => void
   }
   chat: {
@@ -154,6 +156,8 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('agent:approve', approvalId, approved),
     setSessionAutoApprove: (toolName) =>
       ipcRenderer.invoke('agent:set-session-auto-approve', toolName),
+    getRunCheckpoint: () => ipcRenderer.invoke('agent:getRunCheckpoint'),
+    restoreRunCheckpoint: () => ipcRenderer.invoke('agent:restoreRunCheckpoint'),
     onEvent: (callback) => {
       const handler = (_event: Electron.IpcRendererEvent, data: AgentEvent) => callback(data)
       ipcRenderer.on('agent:event', handler)

@@ -173,6 +173,24 @@ const EDITING_WORKFLOW = `Editing workflow:
 - Keep multiple edits to the same file in order (first call before second)
 - After edits, one short summary to the user — do not re-read files you just wrote unless verification failed`
 
+const VERIFY_WORKFLOW = `Verification workflow (required after code edits):
+- After batch file edits, run relevant checks via run_terminal before finishing
+- Prefer read-only checks: npm test, npm run lint, npx tsc --noEmit, cargo test, go test ./...
+- Match checks to what you changed (.ts → tsc/test, .py → pytest, etc.)
+- If verification fails, fix the issue and re-run checks
+- Do not claim success without running at least one relevant check when you edited code`
+
+function formatWorkspaceStateSection(workspaceState?: string): string {
+  const body = workspaceState?.trim() || 'Workspace state unavailable.'
+  return `Workspace state:
+${body}`
+}
+
+function formatVerifySection(enabled: boolean | undefined): string {
+  if (enabled === false) return ''
+  return `\n${VERIFY_WORKFLOW}\n`
+}
+
 const PROJECT_MEMORY_GUIDELINES = `Guidelines for memory:
 - Prefer existing memory over re-discovering conventions
 - Use update_project_memory to persist important decisions, architecture notes, and recurring pitfalls
@@ -223,6 +241,8 @@ ${workspaceLine}
 Open files:
 ${openFilesList}
 
+${formatWorkspaceStateSection(context.workspaceState)}
+
 Code exploration workflow:
 1. codebase_search (mode hybrid) — find where logic lives; symbol for definitions; text for regex
 2. grep_workspace — regex search when you need exact patterns (CSS classes, config keys)
@@ -252,9 +272,11 @@ ${openFilesList}
 
 ${formatProjectMemorySection(context.projectMemory)}
 
+${formatWorkspaceStateSection(context.workspaceState)}
+
 ${EXPLORATION_WORKFLOW}
 
-${EDITING_WORKFLOW}
+${EDITING_WORKFLOW}${formatVerifySection(context.agentAutoVerify)}
 ${mcpSection ? `\n${mcpSection}\n` : ''}
 Guidelines:
 - Read target files (via read_files) before editing; search snippets are not enough for search_replace
