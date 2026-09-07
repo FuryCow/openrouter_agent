@@ -6,7 +6,6 @@ import {
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Button } from '../ui/button'
 import { FileIcon } from '../ui/FileIcon'
 import { ScrollArea } from '../ui/scroll-area'
 import { ExplorerContextMenu, type ContextMenuItem } from './ExplorerContextMenu'
@@ -14,6 +13,7 @@ import { NameInputDialog } from './NameInputDialog'
 import { useFileStore } from '@/stores/fileStore'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useToastStore } from '@/stores/toastStore'
+import { getFileName, cn } from '@/lib/utils'
 import type { DirEntry } from '@/types'
 
 function isValidEntryName(name: string): boolean {
@@ -396,18 +396,35 @@ export function FileExplorer(): React.ReactElement {
 
   return (
     <div className="flex h-full flex-col border-r border-white/5 bg-[#0d0d14]">
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-        <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Explorer
-        </span>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={refresh}>
-            <RefreshCw className="h-3 w-3" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleOpenFolder}>
-            <FolderOpen className="h-3 w-3" />
-          </Button>
-        </div>
+      <div className="border-b border-white/5 px-2 py-2">
+        <button
+          type="button"
+          onClick={handleOpenFolder}
+          className="w-full min-w-0 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-white/5"
+          title={workingDirectory || 'Open a project folder'}
+        >
+          <div className="flex items-center gap-1.5">
+            <FolderOpen
+              className={cn(
+                'h-3.5 w-3.5 shrink-0',
+                workingDirectory ? 'text-indigo-400' : 'text-indigo-400/40'
+              )}
+            />
+            <span
+              className={cn(
+                'truncate text-sm font-medium leading-tight',
+                workingDirectory ? 'text-zinc-100' : 'text-zinc-500'
+              )}
+            >
+              {workingDirectory ? getFileName(workingDirectory) : 'Open a project folder'}
+            </span>
+          </div>
+          {workingDirectory && (
+            <p className="mt-0.5 truncate pl-5 text-[10px] leading-tight text-zinc-600">
+              {workingDirectory}
+            </p>
+          )}
+        </button>
       </div>
 
       <div className="min-h-0 flex-1" onContextMenu={handleBackgroundContextMenu}>

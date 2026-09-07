@@ -32,6 +32,13 @@ export class RunCheckpoint {
     }
   }
 
+  /** Returns pre-mutation content when captured; '' for new files; undefined if not tracked. */
+  getBeforeContent(filePath: string): string | undefined {
+    const entry = this.snapshots.get(filePath)
+    if (!entry) return undefined
+    return entry.kind === 'new' ? '' : entry.content
+  }
+
   async restore(fs: FileSystemService): Promise<{ restored: number; deleted: number }> {
     let restored = 0
     let deleted = 0

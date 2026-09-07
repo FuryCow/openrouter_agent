@@ -43,10 +43,10 @@ export async function openFileInEditor(path: string, options?: OpenFileOptions):
     openFile(resolved, content)
   }
 
-  if (options?.scrollToLine) {
+  if (options?.scrollToLine || (options?.highlightRanges && options.highlightRanges.length > 0)) {
     requestEditorReveal({
       path: existing?.path ?? resolved,
-      scrollToLine: options.scrollToLine,
+      scrollToLine: options.scrollToLine ?? options.highlightRanges?.[0]?.startLine ?? 1,
       highlightRanges: options.highlightRanges ?? []
     })
   }

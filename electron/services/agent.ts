@@ -34,6 +34,7 @@ import type { McpManager } from './mcp/mcp-manager'
 import { parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
 import type { ProjectMemoryService } from './project-memory/project-memory-service'
 import type { ProjectMemoryCategory } from './project-memory/project-memory-types'
+import { suggestMemoryFromRun } from './project-memory/run-memory-suggest'
 import { RunCheckpoint } from './run-checkpoint'
 import {
   buildRetryExhaustedError,
@@ -634,6 +635,19 @@ export class AgentService {
             runAnalytics: run
           }
         })
+
+        if (mode === 'agent' && context.projectMemory !== undefined) {
+          const entries = suggestMemoryFromRun(timeline, finalContent)
+          if (entries.length > 0) {
+            emit({
+              type: 'memory_suggest',
+              memorySuggest: {
+                id: `memory-suggest-${Date.now()}`,
+                entries
+              }
+            })
+          }
+        }
         break
       }
 
@@ -984,34 +998,48 @@ export class AgentService {
       return null
     }
 
-    const args = JSON.parse(call.function.arguments || '{}') as Record<string, string>
+    const args = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>
     const relativePath = String(args.path ?? '').trim()
     if (!relativePath) return null
 
     const path = this.resolvePath(relativePath, context.workingDirectory)
+    const beforeContent = this.runCheckpoint.getBeforeContent(path)
 
     try {
       if (call.function.name === 'write_file') {
-        let current = ''
-        try {
-          current = await this.fs.readFile(path)
-        } catch {
-          current = ''
-        }
         const next = String(args.content ?? '')
+        let current = beforeContent
+        if (current === undefined) {
+          try {
+            current = await this.fs.readFile(path)
+          } catch {
+            current = ''
+          }
+        }
         return { path: relativePath, fileDiff: formatFileChangeDiff(current, next) }
       }
 
-      const current = await this.fs.readFile(path)
-      const next = current.replace(String(args.old_string ?? ''), String(args.new_string ?? ''))
+      const oldString = String(args.old_string ?? '')
+      const newString = String(args.new_string ?? '')
+      const replaceAll = args.replace_all === 'true' || args.replace_all === true
+
+      let current = beforeContent
+      if (current === undefined) {
+        current = await this.fs.readFile(path)
+      }
+
+      const next = replaceAll
+        ? current.split(oldString).join(newString)
+        : current.replace(oldString, newString)
+
       return { path: relativePath, fileDiff: formatFileChangeDiff(current, next) }
     } catch {
       if (call.function.name === 'search_replace') {
         const fileDiff = buildFallbackFileDiffPreview(
           '',
           '',
-          args.old_string,
-          args.new_string
+          String(args.old_string ?? ''),
+          String(args.new_string ?? '')
         )
         return fileDiff.lines.length > 0 ? { path: relativePath, fileDiff } : null
       }

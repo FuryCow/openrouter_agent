@@ -17,7 +17,9 @@ import { useFileStore } from './stores/fileStore'
 import { useToastStore } from './stores/toastStore'
 import { ToolAnalyticsPanel } from './components/debug/ToolAnalyticsPanel'
 import { ApprovalDialog } from './components/chat/ApprovalDialog'
+import { MemorySuggestDialog } from './components/chat/MemorySuggestDialog'
 import { useChatPersistence } from './hooks/useChatPersistence'
+import { initAgentEvents } from './lib/agentEvents'
 import { useIndexStore } from './stores/indexStore'
 import { Toaster } from './components/ui/toaster'
 import { QuickOpenModal } from './components/layout/QuickOpenModal'
@@ -59,6 +61,10 @@ export default function App(): React.ReactElement {
   }, [loadSettings])
 
   useChatPersistence()
+
+  useEffect(() => {
+    return initAgentEvents()
+  }, [])
 
   useEffect(() => {
     return useIndexStore.getState().subscribe()
@@ -159,6 +165,7 @@ export default function App(): React.ReactElement {
       <Toaster />
       <ToolAnalyticsPanel />
       <ApprovalDialog />
+      <MemorySuggestDialog />
       <QuickOpenModal />
       <ShortcutsModal />
     </div>

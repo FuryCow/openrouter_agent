@@ -374,9 +374,12 @@ function registerIpc(): void {
         workspaceState:
           mode !== 'ask' && cwd ? getWorkspaceState(cwd).formatted : undefined,
         projectMemory:
-          mode === 'agent' && settings.projectMemoryEnabled !== false && cwd
+          settings.projectMemoryEnabled !== false &&
+          cwd &&
+          (mode === 'agent' || mode === 'planner')
             ? projectMemoryService.getSnapshot(cwd, {
-                includeDocs: settings.projectMemoryAutoLoadDocs !== false
+                includeDocs: settings.projectMemoryAutoLoadDocs !== false,
+                includeCursorRules: settings.projectMemoryAutoLoadDocs !== false
               })
             : undefined
       },
@@ -407,13 +410,23 @@ function registerIpc(): void {
     return agentService.restoreRunCheckpoint()
   })
 
-  ipcMain.handle('chat:load', (_event, mode: string) => {
-    return loadChatMessages(mode as import('./types').ChatMode)
+  ipcMain.handle('chat:load', (_event, mode: string, workspacePath?: string | null) => {
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    return loadChatMessages(mode as import('./types').ChatMode, workspace)
   })
 
-  ipcMain.handle('chat:save', async (_event, mode: string, messages: import('./types').ChatMessage[]) => {
-    await saveChatMessages(mode as import('./types').ChatMode, messages)
-  })
+  ipcMain.handle(
+    'chat:save',
+    async (
+      _event,
+      mode: string,
+      messages: import('./types').ChatMessage[],
+      workspacePath?: string | null
+    ) => {
+      const workspace = workspacePath?.trim() || getCurrentWorkspace()
+      await saveChatMessages(mode as import('./types').ChatMode, messages, workspace)
+    }
+  )
 
   ipcMain.handle('memory:getSnapshot', (_event, workspacePath?: string) => {
     const workspace = workspacePath?.trim() || getCurrentWorkspace()
@@ -421,7 +434,8 @@ function registerIpc(): void {
     const settings = sanitizeSettings(store.get('settings'))
     if (settings.projectMemoryEnabled === false) return ''
     return projectMemoryService.getSnapshot(workspace, {
-      includeDocs: settings.projectMemoryAutoLoadDocs !== false
+      includeDocs: settings.projectMemoryAutoLoadDocs !== false,
+      includeCursorRules: settings.projectMemoryAutoLoadDocs !== false
     })
   })
 

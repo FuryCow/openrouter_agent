@@ -22,6 +22,7 @@ export interface ProjectMemoryFile {
 
 export interface ProjectMemorySnapshotOptions {
   includeDocs?: boolean
+  includeCursorRules?: boolean
   tokenBudget?: number
 }
 

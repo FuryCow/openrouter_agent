@@ -7,8 +7,8 @@ export type DiffLine = {
   newLine?: number
 }
 
-const DIFF_CONTEXT_LINES = 3
-const MAX_DIFF_LINES = 20
+const DIFF_CONTEXT_LINES = 4
+const MAX_DIFF_LINES = 24
 
 function isDiffChangeLine(line: string): boolean {
   return line.startsWith('+ ') || line.startsWith('- ')

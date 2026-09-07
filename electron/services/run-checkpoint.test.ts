@@ -27,4 +27,22 @@ describe('RunCheckpoint', () => {
     expect(readFileSync(existing, 'utf8')).toBe('original')
     expect(existsSync(created)).toBe(false)
   })
+
+  it('returns pre-mutation content from checkpoint', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'run-cp-before-'))
+    const existing = join(dir, 'a.txt')
+    const created = join(dir, 'b.txt')
+    writeFileSync(existing, 'before')
+
+    const fs = new FileSystemService()
+    const checkpoint = new RunCheckpoint()
+
+    await checkpoint.captureBeforeMutation(fs, existing)
+    await checkpoint.captureBeforeMutation(fs, created)
+    await fs.writeFile(existing, 'after')
+
+    expect(checkpoint.getBeforeContent(existing)).toBe('before')
+    expect(checkpoint.getBeforeContent(created)).toBe('')
+    expect(checkpoint.getBeforeContent(join(dir, 'missing.txt'))).toBeUndefined()
+  })
 })

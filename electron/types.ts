@@ -288,6 +288,16 @@ export interface AgentRunAnalytics {
   }
 }
 
+export interface MemorySuggestEntry {
+  content: string
+  category: ProjectMemoryCategory
+}
+
+export interface MemorySuggestRequest {
+  id: string
+  entries: MemorySuggestEntry[]
+}
+
 export interface ToolApprovalRequest {
   id: string
   toolCallId: string
@@ -327,12 +337,14 @@ export interface AgentEvent {
     | 'run_status'
     | 'iteration_warning'
     | 'checkpoint_updated'
+    | 'memory_suggest'
   content?: string
   toolCall?: ToolCallInfo
   message?: ChatMessage
   error?: string
   analytics?: AgentRunAnalytics
   approval?: ToolApprovalRequest
+  memorySuggest?: MemorySuggestRequest
   runStatus?: AgentRunStatus
   iterationsRemaining?: number
   checkpoint?: RunCheckpointSummary

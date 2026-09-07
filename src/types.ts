@@ -31,6 +31,8 @@ export type {
   ToolValidationIssue,
   ApiChatMessage,
   ToolApprovalRequest,
+  MemorySuggestRequest,
+  MemorySuggestEntry,
   DiffHighlightRange,
   DiffDisplayLine,
   FileDiffPreview,

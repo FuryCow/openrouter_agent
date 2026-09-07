@@ -12,7 +12,8 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'grep_workspace',
   'codebase_search',
   'get_open_files',
-  'web_search'
+  'web_search',
+  'read_project_memory'
 ])
 
 export function getToolsForMode(mode: ChatMode, allTools: ToolDefinition[]): ToolDefinition[] {
@@ -204,6 +205,14 @@ ${body}
 ${PROJECT_MEMORY_GUIDELINES}`
 }
 
+function formatProjectMemorySectionReadOnly(projectMemory?: string): string {
+  const body = projectMemory?.trim() || 'No project memory yet.'
+  return `Project memory (workspace-specific; read-only in planner mode):
+${body}
+
+Use this context when drafting plans — do not contradict established conventions.`
+}
+
 export function buildSystemPrompt(
   context: AgentContext,
   mcpServers: Array<{ id: string; name: string; toolCount: number }> = []
@@ -242,6 +251,8 @@ Open files:
 ${openFilesList}
 
 ${formatWorkspaceStateSection(context.workspaceState)}
+
+${formatProjectMemorySectionReadOnly(context.projectMemory)}
 
 Code exploration workflow:
 1. codebase_search (mode hybrid) — find where logic lives; symbol for definitions; text for regex

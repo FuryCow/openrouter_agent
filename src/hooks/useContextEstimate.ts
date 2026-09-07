@@ -6,7 +6,7 @@ import { useFileStore } from '@/stores/fileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 
 const SYSTEM_PROMPT_OVERHEAD = 1200
-const STREAM_SAMPLE_MS = 500
+const STREAM_SAMPLE_MS = 2000
 
 export interface ContextEstimate {
   estimatedContext: number

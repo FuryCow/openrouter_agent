@@ -18,8 +18,9 @@ export interface FileDiffPreview {
 
 type RawDiffLine = Exclude<DiffDisplayLine, { type: 'sep' }>
 
-const DIFF_CONTEXT_LINES = 3
-const MAX_DIFF_LINES = 20
+const DIFF_CONTEXT_LINES = 4
+const MAX_DIFF_LINES = 24
+const MAX_DIFF_HUNKS = 2
 
 function computeLineDiff(oldLines: string[], newLines: string[]): RawDiffLine[] {
   const m = oldLines.length
@@ -67,13 +68,33 @@ function trimDiffLines(
     .filter((index) => index >= 0)
 
   if (changeIndices.length === 0) {
-    return lines
+    return lines.slice(0, maxLines)
+  }
+
+  const mergeGap = contextLines * 2 + 1
+  const hunks: Array<{ start: number; end: number }> = []
+  for (const index of changeIndices) {
+    const last = hunks[hunks.length - 1]
+    if (last && index - last.end <= mergeGap) {
+      last.end = index
+    } else {
+      hunks.push({ start: index, end: index })
+    }
   }
 
   const keep = new Set<number>()
-  for (const index of changeIndices) {
-    const start = Math.max(0, index - contextLines)
-    const end = Math.min(lines.length - 1, index + contextLines)
+  const visibleHunks = hunks.slice(0, MAX_DIFF_HUNKS)
+  const hiddenHunks = hunks.length - visibleHunks.length
+
+  for (const hunk of visibleHunks) {
+    let start = Math.max(0, hunk.start - contextLines)
+    let end = Math.min(lines.length - 1, hunk.end + contextLines)
+
+    if (end - start + 1 > maxLines) {
+      start = Math.max(0, hunk.start - contextLines)
+      end = Math.min(lines.length - 1, start + maxLines - 1)
+    }
+
     for (let i = start; i <= end; i++) keep.add(i)
   }
 
@@ -87,6 +108,12 @@ function trimDiffLines(
     }
     result.push(lines[index])
     prev = index
+  }
+
+  if (hiddenHunks > 0) {
+    if (result.length > 0 && result[result.length - 1].type !== 'sep') {
+      result.push({ type: 'sep', content: '···' })
+    }
   }
 
   if (result.length > maxLines) {

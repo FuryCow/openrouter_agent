@@ -24,7 +24,7 @@ export function upsertTimelineTool(
     return [...timeline, { id: toolCall.id, type: 'tool', toolCall }]
   }
 
-  const next = [...timeline]
+  const next = timeline.slice()
   next[index] = { id: toolCall.id, type: 'tool', toolCall }
   return next
 }
@@ -98,4 +98,45 @@ export function mergeTimelineFromMessage(
   if (message?.timeline?.length) return message.timeline
   if (activeTimeline.length > 0) return activeTimeline
   return resolveMessageTimeline(message ?? {})
+}
+
+export type TimelineToolItem = Extract<TimelineItem, { type: 'tool' }>
+export type TimelineReasoningItem = Extract<TimelineItem, { type: 'reasoning' }>
+export type TimelineTextItem = Extract<TimelineItem, { type: 'text' }>
+
+export type TimelineSegment =
+  | { kind: 'reasoning'; item: TimelineReasoningItem }
+  | { kind: 'text'; item: TimelineTextItem }
+  | { kind: 'tools'; id: string; items: TimelineToolItem[] }
+
+export function segmentTimeline(timeline: TimelineItem[]): TimelineSegment[] {
+  const segments: TimelineSegment[] = []
+  let toolBuffer: TimelineToolItem[] = []
+
+  const flushTools = (): void => {
+    if (toolBuffer.length === 0) return
+    segments.push({
+      kind: 'tools',
+      id: `tools-${toolBuffer[0].id}-${toolBuffer[toolBuffer.length - 1].id}`,
+      items: toolBuffer
+    })
+    toolBuffer = []
+  }
+
+  for (const item of timeline) {
+    if (item.type === 'tool') {
+      toolBuffer.push(item)
+      continue
+    }
+
+    flushTools()
+    if (item.type === 'reasoning') {
+      segments.push({ kind: 'reasoning', item })
+    } else if (item.type === 'text') {
+      segments.push({ kind: 'text', item })
+    }
+  }
+
+  flushTools()
+  return segments
 }

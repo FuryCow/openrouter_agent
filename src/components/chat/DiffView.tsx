@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { parseDiffText } from '@/lib/parseDiff'
+import { trimDiffDisplayLines } from '@/lib/trimDiffDisplayLines'
 import type { DiffDisplayLine, FileDiffPreview } from '@/types'
 
 const lineStyles: Record<string, string> = {
@@ -29,8 +30,8 @@ function formatLineNumber(value?: number): string {
 }
 
 function resolveLines(fileDiff?: FileDiffPreview, diff?: string): DiffDisplayLine[] {
-  if (fileDiff?.lines?.length) return fileDiff.lines
-  if (diff) return parseDiffText(diff)
+  if (fileDiff?.lines?.length) return trimDiffDisplayLines(fileDiff.lines)
+  if (diff) return trimDiffDisplayLines(parseDiffText(diff))
   return []
 }
 

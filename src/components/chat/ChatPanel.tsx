@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } fr
 import { Send, Square, Trash2, Bot, RotateCcw, Paperclip, Undo2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '../ui/button'
-import { MessageBubble } from './MessageBubble'
+import { MessageBubble, MemoMessageBubble } from './MessageBubble'
 import { ChatModeSelector } from './ChatModeSelector'
 import { useChatStore } from '@/stores/chatStore'
 import { useAgent } from '@/hooks/useAgent'
@@ -19,6 +19,38 @@ import { TokenUsageRing } from './TokenUsageRing'
 import { useUiStore } from '@/stores/uiStore'
 import { useAgentRunStore } from '@/stores/agentRunStore'
 
+function StreamingMessageBubble(): React.ReactElement {
+  const activeTimeline = useChatStore((s) => s.activeTimeline)
+  return <MessageBubble role="assistant" timeline={activeTimeline} isStreaming />
+}
+
+function ChatAutoScroll({
+  bottomRef,
+  stickToBottomRef,
+  wasStreamingRef,
+  messageCount
+}: {
+  bottomRef: React.RefObject<HTMLDivElement | null>
+  stickToBottomRef: React.MutableRefObject<boolean>
+  wasStreamingRef: React.MutableRefObject<boolean>
+  messageCount: number
+}): null {
+  const activeTimeline = useChatStore((s) => s.activeTimeline)
+  const isStreaming = useChatStore((s) => s.isStreaming)
+
+  useEffect(() => {
+    if (isStreaming && !wasStreamingRef.current) stickToBottomRef.current = true
+    wasStreamingRef.current = isStreaming
+    if (stickToBottomRef.current) {
+      scheduleInAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ block: 'end' })
+      })
+    }
+  }, [messageCount, activeTimeline, isStreaming, bottomRef, stickToBottomRef, wasStreamingRef])
+
+  return null
+}
+
 export function ChatPanel(): React.ReactElement {
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<string[]>([])
@@ -32,15 +64,12 @@ export function ChatPanel(): React.ReactElement {
   const MAX_INPUT_ROWS = 10
   const stickToBottomRef = useRef(true)
   const wasStreamingRef = useRef(false)
-  const {
-    messages,
-    chatMode,
-    setChatMode,
-    isStreaming,
-    activeTimeline,
-    updateUserMessage,
-    truncateAfterMessage
-  } = useChatStore()
+  const messages = useChatStore((s) => s.messages)
+  const chatMode = useChatStore((s) => s.chatMode)
+  const setChatMode = useChatStore((s) => s.setChatMode)
+  const isStreaming = useChatStore((s) => s.isStreaming)
+  const updateUserMessage = useChatStore((s) => s.updateUserMessage)
+  const truncateAfterMessage = useChatStore((s) => s.truncateAfterMessage)
   const { sendMessage, implementPlan, abort, retryLast } = useAgent()
   const clearMessages = useChatStore((s) => s.clearMessages)
   const settings = useSettingsStore((s) => s.settings)
@@ -62,13 +91,6 @@ export function ChatPanel(): React.ReactElement {
 
   const selectedModel = models.find((m) => m.id === settings.model)
   const visionSupported = selectedModel?.supportsVision ?? false
-
-  const scrollToBottom = useCallback((force = false) => {
-    if (!force && !stickToBottomRef.current) return
-    scheduleInAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ block: 'end' })
-    })
-  }, [])
 
   const resizeInput = useCallback(() => {
     const el = inputRef.current
@@ -118,12 +140,6 @@ export function ChatPanel(): React.ReactElement {
     container.addEventListener('scroll', onScroll, { passive: true })
     return () => container.removeEventListener('scroll', onScroll)
   }, [])
-
-  useLayoutEffect(() => {
-    if (isStreaming && !wasStreamingRef.current) stickToBottomRef.current = true
-    wasStreamingRef.current = isStreaming
-    if (stickToBottomRef.current) scrollToBottom(true)
-  }, [visibleMessages, activeTimeline, isStreaming, scrollToBottom])
 
   const addImageFiles = (files: FileList | File[]): void => {
     const list = Array.from(files).filter((f) => f.type.startsWith('image/'))
@@ -358,7 +374,7 @@ export function ChatPanel(): React.ReactElement {
           )}
 
           {visibleMessages.map((msg) => (
-            <MessageBubble
+            <MemoMessageBubble
               key={msg.id}
               role={msg.role as 'user' | 'assistant'}
               timeline={msg.timeline}
@@ -399,10 +415,14 @@ export function ChatPanel(): React.ReactElement {
             />
           ))}
 
-          {isStreaming && (
-            <MessageBubble role="assistant" timeline={activeTimeline} isStreaming />
-          )}
+          {isStreaming && <StreamingMessageBubble />}
 
+          <ChatAutoScroll
+            bottomRef={bottomRef}
+            stickToBottomRef={stickToBottomRef}
+            wasStreamingRef={wasStreamingRef}
+            messageCount={visibleMessages.length}
+          />
           <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
         </div>
       </div>

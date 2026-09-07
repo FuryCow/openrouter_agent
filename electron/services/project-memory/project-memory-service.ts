@@ -93,14 +93,15 @@ export class ProjectMemoryService {
   getSnapshot(workspacePath: string, options: ProjectMemorySnapshotOptions = {}): string {
     const hash = hashWorkspacePath(workspacePath)
     const includeDocs = options.includeDocs !== false
-    const cacheKey = `${hash}:${includeDocs ? 'docs' : 'nodocs'}`
+    const includeCursorRules = options.includeCursorRules !== false
+    const cacheKey = `${hash}:${includeDocs ? 'docs' : 'nodocs'}:${includeCursorRules ? 'cursor' : 'nocursor'}`
     const cached = this.cache.get(cacheKey)
     if (cached !== undefined) return cached
 
     const parts: string[] = []
 
     if (includeDocs) {
-      const docs = loadWorkspaceDocs(workspacePath)
+      const docs = loadWorkspaceDocs(workspacePath, { includeCursorRules })
       if (docs.length > 0) {
         parts.push('## Workspace docs')
         for (const doc of docs) {

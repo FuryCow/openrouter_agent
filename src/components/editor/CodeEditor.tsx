@@ -7,6 +7,7 @@ import { FileIcon } from '@/components/ui/FileIcon'
 import { getFileName, getRelativePath, truncateRelativePath, isMarkdownPath, cn } from '@/lib/utils'
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview'
 import { MarkdownViewToggle } from '@/components/editor/MarkdownViewToggle'
+import { EditorEmptyState } from '@/components/editor/EditorEmptyState'
 import {
   ExplorerContextMenu,
   type ContextMenuItem
@@ -349,13 +350,7 @@ export function CodeEditor(): React.ReactElement {
           />
           )
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <div className="mb-4 text-6xl opacity-10">{'</>'}</div>
-              <p className="text-sm text-zinc-500">Open a file from the explorer</p>
-              <p className="mt-1 text-xs text-zinc-600">Ctrl+S to save</p>
-            </div>
-          </div>
+          <EditorEmptyState />
         )}
       </div>
 

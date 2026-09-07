@@ -57,9 +57,9 @@ body {
 }
 
 .tool-scroll {
-  max-height: calc(0.625rem * 1.5 * 10);
+  max-height: 16rem;
   overflow-y: auto;
-  overscroll-behavior-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 .monaco-editor .monaco-hover a {

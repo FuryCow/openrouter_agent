@@ -62,8 +62,12 @@ export interface ElectronAPI {
     onEvent: (callback: (event: AgentEvent) => void) => () => void
   }
   chat: {
-    load: (mode: string) => Promise<import('./types').ChatMessage[]>
-    save: (mode: string, messages: import('./types').ChatMessage[]) => Promise<void>
+    load: (mode: string, workspacePath?: string | null) => Promise<import('./types').ChatMessage[]>
+    save: (
+      mode: string,
+      messages: import('./types').ChatMessage[],
+      workspacePath?: string | null
+    ) => Promise<void>
   }
   analytics: {
     getRuns: (limit?: number) => Promise<AgentRunAnalytics[]>
@@ -165,8 +169,9 @@ const api: ElectronAPI = {
     }
   },
   chat: {
-    load: (mode) => ipcRenderer.invoke('chat:load', mode),
-    save: (mode, messages) => ipcRenderer.invoke('chat:save', mode, messages)
+    load: (mode, workspacePath) => ipcRenderer.invoke('chat:load', mode, workspacePath),
+    save: (mode, messages, workspacePath) =>
+      ipcRenderer.invoke('chat:save', mode, messages, workspacePath)
   },
   analytics: {
     getRuns: (limit) => ipcRenderer.invoke('analytics:get-runs', limit),

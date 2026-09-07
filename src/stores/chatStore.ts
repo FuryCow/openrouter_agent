@@ -6,7 +6,9 @@ import type {
   ChatMode,
   AgentRunAnalytics,
   ApiChatMessage,
-  ToolApprovalRequest
+  ToolApprovalRequest,
+  MemorySuggestRequest,
+  MemorySuggestEntry
 } from '../types'
 import {
   appendTimelineChunk,
@@ -17,6 +19,7 @@ import {
 import { useTokenUsageStore } from './tokenUsageStore'
 
 let streamBuffer = { text: '', reasoning: '' }
+const toolProgressBuffer = new Map<string, ToolCallInfo>()
 let flushRaf: number | null = null
 
 interface ChatState {
@@ -25,8 +28,10 @@ interface ChatState {
   isStreaming: boolean
   activeTimeline: TimelineItem[]
   pendingApproval: ToolApprovalRequest | null
+  pendingMemorySuggest: MemorySuggestRequest | null
   setChatMode: (mode: ChatMode) => void
   loadMessages: (mode: ChatMode, messages: ChatMessage[]) => void
+  setAllMessages: (messages: ChatMessage[]) => void
   getMessagesForMode: () => ChatMessage[]
   addUserMessage: (content: string, mode?: ChatMode, images?: string[]) => void
   appendStream: (chunk: string) => void
@@ -48,6 +53,7 @@ interface ChatState {
   updateUserMessage: (messageId: string, content: string) => void
   clearMessages: () => void
   setPendingApproval: (approval: ToolApprovalRequest | null) => void
+  setPendingMemorySuggest: (suggest: MemorySuggestRequest | null) => void
 }
 
 function scheduleStreamFlush(
@@ -58,12 +64,17 @@ function scheduleStreamFlush(
     flushRaf = null
     const { text, reasoning } = streamBuffer
     streamBuffer = { text: '', reasoning: '' }
-    if (!text && !reasoning) return
+    const pendingTools = [...toolProgressBuffer.values()]
+    toolProgressBuffer.clear()
+    if (!text && !reasoning && pendingTools.length === 0) return
 
     set((s) => {
       let timeline = s.activeTimeline
       if (text) timeline = appendTimelineChunk(timeline, 'text', text)
       if (reasoning) timeline = appendTimelineChunk(timeline, 'reasoning', reasoning)
+      for (const toolCall of pendingTools) {
+        timeline = upsertTimelineTool(timeline, toolCall)
+      }
       return { activeTimeline: timeline }
     })
   })
@@ -75,15 +86,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isStreaming: false,
   activeTimeline: [],
   pendingApproval: null,
+  pendingMemorySuggest: null,
 
   setChatMode: (mode) => set({ chatMode: mode }),
   setPendingApproval: (approval) => set({ pendingApproval: approval }),
+  setPendingMemorySuggest: (suggest) => set({ pendingMemorySuggest: suggest }),
 
   loadMessages: (mode, messages) => {
     const { messages: all } = get()
     const other = all.filter((m) => m.mode !== mode)
     set({ messages: [...other, ...messages] })
   },
+
+  setAllMessages: (messages) => set({ messages }),
 
   getMessagesForMode: () => {
     const { messages, chatMode } = get()
@@ -121,18 +136,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     const { text, reasoning } = streamBuffer
     streamBuffer = { text: '', reasoning: '' }
-    if (!text && !reasoning) return
+    const pendingTools = [...toolProgressBuffer.values()]
+    toolProgressBuffer.clear()
+    if (!text && !reasoning && pendingTools.length === 0) return
 
     set((s) => {
       let timeline = s.activeTimeline
       if (text) timeline = appendTimelineChunk(timeline, 'text', text)
       if (reasoning) timeline = appendTimelineChunk(timeline, 'reasoning', reasoning)
+      for (const toolCall of pendingTools) {
+        timeline = upsertTimelineTool(timeline, toolCall)
+      }
       return { activeTimeline: timeline }
     })
   },
 
   clearStream: () => {
     streamBuffer = { text: '', reasoning: '' }
+    toolProgressBuffer.clear()
     if (flushRaf !== null) {
       cancelAnimationFrame(flushRaf)
       flushRaf = null
@@ -149,10 +170,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }))
   },
 
-  updateToolCall: (toolCall) =>
-    set((s) => ({
-      activeTimeline: upsertTimelineTool(s.activeTimeline, toolCall)
-    })),
+  updateToolCall: (toolCall) => {
+    toolProgressBuffer.set(toolCall.id, toolCall)
+    scheduleStreamFlush(set)
+  },
 
   finalizeAssistantMessage: (content, timeline, isError, runAnalytics, interrupted, apiMessages) => {
     get().flushStreamBuffer()

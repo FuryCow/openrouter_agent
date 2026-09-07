@@ -1,11 +1,8 @@
-import { useEffect } from 'react'
 import type { ChatMode } from '../types'
 import { useChatStore } from '../stores/chatStore'
 import { useFileStore } from '../stores/fileStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useToastStore } from '../stores/toastStore'
-import { useAnalyticsStore } from '../stores/analyticsStore'
-import { useTokenUsageStore } from '../stores/tokenUsageStore'
 import { useAgentRunStore } from '../stores/agentRunStore'
 import { getChatModeConfig } from '../lib/chatModes'
 
@@ -30,107 +27,11 @@ export function useAgent(): {
   abort: () => void
   retryLast: () => Promise<void>
 } {
-  const {
-    chatMode,
-    messages,
-    setChatMode,
-    addUserMessage,
-    appendStream,
-    appendReasoning,
-    clearStream,
-    setStreaming,
-    addToolCall,
-    updateToolCall,
-    finalizeAssistantMessage,
-    truncateAfterMessage
-  } = useChatStore()
-
-  useEffect(() => {
-    const unsubscribe = window.api.agent.onEvent((event) => {
-      switch (event.type) {
-        case 'stream':
-          if (event.content) appendStream(event.content)
-          break
-        case 'reasoning_stream':
-          if (event.content) appendReasoning(event.content)
-          break
-        case 'tool_start':
-          if (event.toolCall) addToolCall(event.toolCall)
-          break
-        case 'tool_progress':
-          if (event.toolCall) updateToolCall(event.toolCall)
-          break
-        case 'tool_done':
-          if (event.toolCall) updateToolCall(event.toolCall)
-          break
-        case 'done':
-          finalizeAssistantMessage(
-            event.message?.content || '',
-            event.message?.timeline,
-            event.message?.isError ?? false,
-            event.message?.runAnalytics,
-            event.message?.interrupted,
-            event.message?.apiMessages
-          )
-          setStreaming(false)
-          if (event.message?.isError && event.message?.content) {
-            useToastStore.getState().addToast(event.message.content, 'error')
-          }
-          break
-        case 'run_analytics':
-          if (event.analytics) {
-            useAnalyticsStore.getState().addRun(event.analytics)
-            useTokenUsageStore.getState().addUsage(event.analytics.tokenUsage)
-          }
-          break
-        case 'approval_request':
-          if (event.approval) {
-            useChatStore.getState().setPendingApproval(event.approval)
-          }
-          break
-        case 'run_status':
-          if (event.runStatus) {
-            useAgentRunStore.getState().setRunStatus(event.runStatus)
-          }
-          break
-        case 'checkpoint_updated':
-          if (event.checkpoint) {
-            useAgentRunStore.getState().setCheckpoint(event.checkpoint)
-          }
-          break
-        case 'iteration_warning':
-          if (event.error) {
-            useToastStore.getState().addToast(event.error, 'info')
-          }
-          break
-        case 'error': {
-          const errorText = event.error || 'Request failed'
-          const { activeTimeline } = useChatStore.getState()
-          finalizeAssistantMessage(
-            errorText,
-            activeTimeline.length > 0 ? [...activeTimeline] : undefined,
-            true
-          )
-          useToastStore.getState().addToast(errorText, 'error')
-          setStreaming(false)
-          break
-        }
-      }
-    })
-    return unsubscribe
-  }, [
-    appendStream,
-    appendReasoning,
-    addToolCall,
-    updateToolCall,
-    finalizeAssistantMessage,
-    setStreaming
-  ])
-
   const sendMessage = async (
     message: string,
     options?: { mode?: ChatMode; images?: string[]; skipUserMessage?: boolean }
   ): Promise<void> => {
+    const { chatMode, addUserMessage, clearStream, setStreaming } = useChatStore.getState()
     const mode = options?.mode ?? chatMode
     const modeConfig = getChatModeConfig(mode)
     const workingDirectory = useFileStore.getState().workingDirectory || ''
@@ -190,6 +91,7 @@ export function useAgent(): {
   const implementPlan = async (planContent: string): Promise<void> => {
     if (useChatStore.getState().isStreaming) return
 
+    const { messages, setChatMode } = useChatStore.getState()
     const plannerMessages = messages.filter((m) => m.mode === 'planner')
     const originalTask = [...plannerMessages]
       .reverse()
@@ -204,8 +106,8 @@ export function useAgent(): {
 
   const abort = (): void => {
     window.api.agent.abort()
+    const { setStreaming, finalizeAssistantMessage, activeTimeline } = useChatStore.getState()
     setStreaming(false)
-    const { activeTimeline } = useChatStore.getState()
     finalizeAssistantMessage(
       '⚠️ Run aborted.',
       activeTimeline.length > 0 ? [...activeTimeline] : undefined,
@@ -216,6 +118,7 @@ export function useAgent(): {
   }
 
   const retryLast = async (): Promise<void> => {
+    const { chatMode, messages, truncateAfterMessage } = useChatStore.getState()
     const mode = chatMode
     const modeMessages = messages.filter((m) => m.mode === mode || !m.mode)
     const lastUser = [...modeMessages].reverse().find((m) => m.role === 'user')

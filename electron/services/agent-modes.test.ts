@@ -97,7 +97,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('update_project_memory')
   })
 
-  it('does not expose memory tools to planner', () => {
+  it('exposes read_project_memory to planner but not update_project_memory', () => {
     const plannerTools = getToolsForMode('planner', [
       ...ALL_TOOLS,
       {
@@ -118,9 +118,21 @@ describe('buildSystemPrompt', () => {
       }
     ]).map((tool) => tool.function.name)
 
-    expect(plannerTools).not.toContain('read_project_memory')
+    expect(plannerTools).toContain('read_project_memory')
     expect(plannerTools).not.toContain('update_project_memory')
+    expect(isToolAllowedInMode('read_project_memory', 'planner')).toBe(true)
     expect(isToolAllowedInMode('update_project_memory', 'planner')).toBe(false)
+  })
+
+  it('includes read-only project memory section for planner when provided', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      mode: 'planner',
+      projectMemory: '## Dynamic memory\n- Use SQLite for indexing'
+    })
+    expect(prompt).toContain('Project memory (workspace-specific; read-only in planner mode)')
+    expect(prompt).toContain('Use SQLite for indexing')
+    expect(prompt).not.toContain('update_project_memory')
   })
 
   it('includes batch read guidance for planner', () => {

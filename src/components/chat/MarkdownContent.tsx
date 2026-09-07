@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
@@ -19,7 +20,7 @@ const markdownComponents: Components = {
   )
 }
 
-export function MarkdownContent({
+export const MarkdownContent = memo(function MarkdownContent({
   content,
   className,
   isError,
@@ -44,4 +45,4 @@ export function MarkdownContent({
       </ReactMarkdown>
     </div>
   )
-}
+})
