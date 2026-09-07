@@ -1,12 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, afterEach } from 'vitest'
 import { resolveStdioCommand } from './mcp-stdio'
 
 describe('mcp-stdio', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('appends .cmd for npx on Windows', () => {
-    const original = process.platform
-    Object.defineProperty(process, 'platform', { value: 'win32' })
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     expect(resolveStdioCommand('npx')).toBe('npx.cmd')
     expect(resolveStdioCommand('C:\\tools\\node.exe')).toBe('C:\\tools\\node.exe')
-    Object.defineProperty(process, 'platform', { value: original })
+  })
+
+  it('leaves command unchanged on non-Windows', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+    expect(resolveStdioCommand('npx')).toBe('npx')
   })
 })
