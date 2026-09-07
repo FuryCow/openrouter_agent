@@ -83,7 +83,6 @@ export class FileSystemService {
     const result: DirEntry[] = []
 
     for (const name of entries) {
-      if (name.startsWith('.')) continue
       const fullPath = join(dirPath, name)
       try {
         const info = await stat(fullPath)

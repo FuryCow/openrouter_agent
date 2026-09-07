@@ -173,6 +173,19 @@ const EDITING_WORKFLOW = `Editing workflow:
 - Keep multiple edits to the same file in order (first call before second)
 - After edits, one short summary to the user — do not re-read files you just wrote unless verification failed`
 
+const PROJECT_MEMORY_GUIDELINES = `Guidelines for memory:
+- Prefer existing memory over re-discovering conventions
+- Use update_project_memory to persist important decisions, architecture notes, and recurring pitfalls
+- Do not store secrets, API keys, or tokens in memory`
+
+function formatProjectMemorySection(projectMemory?: string): string {
+  const body = projectMemory?.trim() || 'No project memory yet.'
+  return `Project memory (workspace-specific; treat as authoritative context):
+${body}
+
+${PROJECT_MEMORY_GUIDELINES}`
+}
+
 export function buildSystemPrompt(
   context: AgentContext,
   mcpServers: Array<{ id: string; name: string; toolCount: number }> = []
@@ -236,6 +249,8 @@ You have tools for reading/writing files, searching the codebase, running termin
 ${workspaceLine}
 Open files:
 ${openFilesList}
+
+${formatProjectMemorySection(context.projectMemory)}
 
 ${EXPLORATION_WORKFLOW}
 

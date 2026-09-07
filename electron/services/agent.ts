@@ -32,6 +32,8 @@ import {
 } from './tool-analytics'
 import type { McpManager } from './mcp/mcp-manager'
 import { parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
+import type { ProjectMemoryService } from './project-memory/project-memory-service'
+import type { ProjectMemoryCategory } from './project-memory/project-memory-types'
 
 const TOOLS: ToolDefinition[] = [
   {
@@ -212,10 +214,60 @@ const TOOLS: ToolDefinition[] = [
       description: 'Get the list of currently open files in the editor with their contents',
       parameters: { type: 'object', properties: {} }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'read_project_memory',
+      description:
+        'Read dynamic project memory entries and workspace docs summary for the current workspace',
+      parameters: {
+        type: 'object',
+        properties: {
+          category: {
+            type: 'string',
+            enum: ['architecture', 'decision', 'bug', 'convention', 'note'],
+            description: 'Optional category filter'
+          },
+          query: { type: 'string', description: 'Optional substring filter on entry content' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_project_memory',
+      description:
+        'Append, update, or delete dynamic project memory entries (does not edit AGENTS.md)',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['append', 'update', 'delete'],
+            description: 'Memory operation'
+          },
+          content: { type: 'string', description: 'Entry content (required for append/update)' },
+          id: { type: 'string', description: 'Entry id (required for update/delete)' },
+          category: {
+            type: 'string',
+            enum: ['architecture', 'decision', 'bug', 'convention', 'note'],
+            description: 'Category for append/update'
+          }
+        },
+        required: ['action']
+      }
+    }
   }
 ]
 
-const MUTATING_TOOLS = new Set(['write_file', 'search_replace', 'run_terminal'])
+const MUTATING_TOOLS = new Set([
+  'write_file',
+  'search_replace',
+  'run_terminal',
+  'update_project_memory'
+])
 const MAX_READ_FILES = 10
 const MAX_CHARS_PER_FILE = 50_000
 const MAX_TOTAL_READ_FILES_CHARS = 150_000
@@ -233,7 +285,8 @@ export class AgentService {
     private terminal: TerminalService,
     private webSearch: WebSearchService,
     private indexer: CodebaseIndexer,
-    private mcpManager: McpManager
+    private mcpManager: McpManager,
+    private projectMemory: ProjectMemoryService
   ) {}
 
   get isRunning(): boolean {
@@ -581,7 +634,9 @@ export class AgentService {
 
     if (call.function.name === 'run_terminal' && autoTerminal) return true
     if (
-      (call.function.name === 'write_file' || call.function.name === 'search_replace') &&
+      (call.function.name === 'write_file' ||
+        call.function.name === 'search_replace' ||
+        call.function.name === 'update_project_memory') &&
       autoWrites
     ) {
       return true
@@ -599,6 +654,8 @@ export class AgentService {
         preview = `Patch ${args.path ?? ''}`
       } else if (call.function.name === 'run_terminal') {
         preview = `Run: ${args.command ?? ''}`
+      } else if (call.function.name === 'update_project_memory') {
+        preview = `Update project memory (${args.action ?? ''})\n${JSON.stringify(args, null, 2)}`
       }
     } else if (needsMcpApproval) {
       const parsed = parseMcpQualifiedToolName(call.function.name)
@@ -769,6 +826,34 @@ export class AgentService {
         return context.openFiles
           .map((f) => `=== ${f.path} ===\n${f.content.slice(0, 10000)}`)
           .join('\n\n')
+      }
+      case 'read_project_memory': {
+        if (!cwd) return 'Error: No working directory set'
+        return this.projectMemory.read(cwd, {
+          category: args.category ? (String(args.category) as ProjectMemoryCategory) : undefined,
+          query: args.query ? String(args.query) : undefined
+        })
+      }
+      case 'update_project_memory': {
+        if (!cwd) return 'Error: No working directory set'
+        try {
+          const action = String(args.action ?? '') as 'append' | 'update' | 'delete'
+          const entry = this.projectMemory.update(cwd, {
+            action,
+            content: args.content ? String(args.content) : undefined,
+            id: args.id ? String(args.id) : undefined,
+            category: args.category
+              ? (String(args.category) as ProjectMemoryCategory)
+              : undefined,
+            source: 'agent'
+          })
+          if (action === 'delete') {
+            return `Deleted memory entry ${String(args.id ?? '')}`
+          }
+          return `Saved memory entry ${entry?.id ?? ''} (${entry?.category ?? 'note'})`
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`
+        }
       }
       default:
         return `Unknown tool: ${call.function.name}`

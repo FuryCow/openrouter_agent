@@ -43,5 +43,7 @@ export type {
   McpServerConfig,
   McpServerStatus,
   McpStatusSnapshot,
-  McpTransportType
+  McpTransportType,
+  ProjectMemoryEntry,
+  ProjectMemoryCategory
 } from '../../electron/types'

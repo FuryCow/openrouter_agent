@@ -16,7 +16,9 @@ const TOOLS_KNOWN: Record<string, true> = {
   codebase_search: true,
   run_terminal: true,
   web_search: true,
-  get_open_files: true
+  get_open_files: true,
+  read_project_memory: true,
+  update_project_memory: true
 }
 
 const REQUIRED_ARGS: Record<string, string[]> = {
@@ -30,7 +32,9 @@ const REQUIRED_ARGS: Record<string, string[]> = {
   codebase_search: ['query'],
   run_terminal: ['command'],
   web_search: ['query'],
-  get_open_files: []
+  get_open_files: [],
+  read_project_memory: [],
+  update_project_memory: ['action']
 }
 
 export type ToolCallOutcome = 'success' | 'error' | 'invalid_args'
@@ -68,7 +72,7 @@ export function validateToolArguments(
   if (
     mode === 'planner' &&
     !isMcpQualifiedToolName(toolName) &&
-    ['write_file', 'search_replace', 'run_terminal'].includes(toolName)
+    ['write_file', 'search_replace', 'run_terminal', 'update_project_memory'].includes(toolName)
   ) {
     issues.push('tool_not_allowed_in_mode')
   }

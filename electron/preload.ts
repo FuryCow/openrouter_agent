@@ -12,7 +12,9 @@ import type {
   CodebaseSearchRequest,
   CodebaseSearchHit,
   McpServerConfig,
-  McpStatusSnapshot
+  McpStatusSnapshot,
+  ProjectMemoryEntry,
+  ProjectMemoryCategory
 } from './types'
 
 export interface ElectronAPI {
@@ -85,6 +87,18 @@ export interface ElectronAPI {
     testServer: (config: McpServerConfig) => Promise<{ ok: boolean; toolCount: number; error?: string }>
     reconnect: () => Promise<McpStatusSnapshot>
     onStatusChanged: (callback: (status: McpStatusSnapshot) => void) => () => void
+  }
+  memory: {
+    getSnapshot: (workspacePath?: string) => Promise<string>
+    listEntries: (workspacePath?: string) => Promise<ProjectMemoryEntry[]>
+    saveEntries: (
+      entries: ProjectMemoryEntry[],
+      workspacePath?: string
+    ) => Promise<ProjectMemoryEntry[]>
+    remember: (
+      input: { content: string; category?: ProjectMemoryCategory; source?: 'user' | 'remember' },
+      workspacePath?: string
+    ) => Promise<ProjectMemoryEntry>
   }
 }
 
@@ -191,6 +205,13 @@ const api: ElectronAPI = {
       ipcRenderer.on('mcp:status-changed', handler)
       return () => ipcRenderer.removeListener('mcp:status-changed', handler)
     }
+  },
+  memory: {
+    getSnapshot: (workspacePath) => ipcRenderer.invoke('memory:getSnapshot', workspacePath),
+    listEntries: (workspacePath) => ipcRenderer.invoke('memory:listEntries', workspacePath),
+    saveEntries: (entries, workspacePath) =>
+      ipcRenderer.invoke('memory:saveEntries', entries, workspacePath),
+    remember: (input, workspacePath) => ipcRenderer.invoke('memory:remember', input, workspacePath)
   }
 }
 

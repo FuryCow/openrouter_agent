@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { AppSettings, ModelInfo } from '../types'
 import { useFileStore } from './fileStore'
 import { isStaleModelCatalog } from '../lib/models'
+import type { SettingsSection } from '../lib/settingsSections'
 
 interface SettingsState {
   settings: AppSettings
@@ -9,11 +10,11 @@ interface SettingsState {
   modelsLoading: boolean
   modelsError: string | null
   settingsOpen: boolean
-  settingsFocusSection: 'general' | 'mcp' | null
+  settingsFocusSection: SettingsSection | null
   terminalOpen: boolean
   setSettings: (settings: AppSettings) => void
   setModels: (models: ModelInfo[]) => void
-  setSettingsOpen: (open: boolean, focusSection?: 'general' | 'mcp') => void
+  setSettingsOpen: (open: boolean, focusSection?: SettingsSection) => void
   setTerminalOpen: (open: boolean) => void
   loadSettings: () => Promise<void>
   loadModels: () => Promise<void>

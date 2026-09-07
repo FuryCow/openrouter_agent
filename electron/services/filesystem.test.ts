@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm, writeFile } from 'fs/promises'
+import { mkdtemp, mkdir, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { FileSystemService } from './filesystem'
@@ -44,6 +44,17 @@ describe('FileSystemService', () => {
       const file = join(dir, 'd.txt')
       await writeFile(file, 'same', 'utf-8')
       await expect(fs.searchReplace(file, 'same', 'same')).rejects.toThrow(/identical/)
+    })
+  })
+
+  describe('listDir', () => {
+    it('includes dot-prefixed files and folders', async () => {
+      await writeFile(join(dir, '.env'), 'SECRET=1', 'utf-8')
+      await mkdir(join(dir, '.openrouter'))
+      await writeFile(join(dir, 'visible.txt'), 'ok', 'utf-8')
+
+      const entries = await fs.listDir(dir)
+      expect(entries.map((entry) => entry.name).sort()).toEqual(['.env', '.openrouter', 'visible.txt'])
     })
   })
 

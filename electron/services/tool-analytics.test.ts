@@ -59,6 +59,30 @@ describe('validateToolArguments', () => {
     const result = validateToolArguments('read_files', JSON.stringify({ paths: ['a.ts'] }), 'ask')
     expect(result.ok).toBe(false)
   })
+
+  it('accepts read_project_memory without required args', () => {
+    const result = validateToolArguments('read_project_memory', JSON.stringify({}), 'agent')
+    expect(result.ok).toBe(true)
+  })
+
+  it('accepts update_project_memory append', () => {
+    const result = validateToolArguments(
+      'update_project_memory',
+      JSON.stringify({ action: 'append', content: 'Use Vitest' }),
+      'agent'
+    )
+    expect(result.ok).toBe(true)
+  })
+
+  it('blocks update_project_memory in planner mode', () => {
+    const result = validateToolArguments(
+      'update_project_memory',
+      JSON.stringify({ action: 'append', content: 'note' }),
+      'planner'
+    )
+    expect(result.ok).toBe(false)
+    expect(result.issues).toContain('tool_not_allowed_in_mode')
+  })
 })
 
 describe('classifyToolResult', () => {

@@ -2,6 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { Button } from '../ui/button'
 import { Switch } from '../ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '../ui/select'
 import { useMcp } from '@/hooks/useMcp'
 import type { AppSettings, McpServerConfig, McpTransportType } from '@/types'
 import { cn } from '@/lib/utils'
@@ -15,11 +22,11 @@ function serverConfigsEqual(a: McpServerConfig[], b: McpServerConfig[] | undefin
   return JSON.stringify(toCursorMcpJson(a)) === JSON.stringify(toCursorMcpJson(b ?? []))
 }
 
-const TRANSPORT_LABELS: Record<McpTransportType, string> = {
-  stdio: 'stdio',
-  'streamable-http': 'HTTP',
-  sse: 'SSE'
-}
+const TRANSPORT_OPTIONS: Array<{ value: McpTransportType; label: string }> = [
+  { value: 'stdio', label: 'stdio' },
+  { value: 'streamable-http', label: 'streamable-http' },
+  { value: 'sse', label: 'sse' }
+]
 
 const STATUS_COLORS: Record<string, string> = {
   connected: 'text-emerald-400',
@@ -43,16 +50,36 @@ function emptyServer(): McpServerConfig {
   }
 }
 
+function formatEnvLines(env: Record<string, string> | undefined): string {
+  return Object.entries(env ?? {})
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n')
+}
+
+function parseEnvLines(text: string): Record<string, string> {
+  const env: Record<string, string> = {}
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    env[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim()
+  }
+  return env
+}
+
 interface McpSettingsPanelProps {
   settings: AppSettings
   onSettingsChange: (settings: AppSettings) => void
   initialTab?: McpTab
+  embedded?: boolean
 }
 
 export function McpSettingsPanel({
   settings,
   onSettingsChange,
-  initialTab
+  initialTab,
+  embedded = false
 }: McpSettingsPanelProps): React.ReactElement {
   const [tab, setTab] = useState<McpTab>(initialTab ?? 'servers')
   const [servers, setServers] = useState<McpServerConfig[]>(settings.mcpServers ?? [])
@@ -169,18 +196,22 @@ export function McpSettingsPanel({
 
   const statusById = new Map(status.servers.map((s) => [s.id, s]))
 
+  const Wrapper = embedded ? 'div' : 'section'
+
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">MCP Servers</h3>
-        <div className="flex gap-1">
+    <Wrapper className="space-y-3">
+      <div className={cn('flex items-center justify-between gap-2', embedded && 'flex-wrap')}>
+        {!embedded && (
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">MCP Servers</h3>
+        )}
+        <div className={cn('flex gap-1', embedded && 'w-full')}>
           {(['servers', 'json', 'policies'] as McpTab[]).map((value) => (
             <button
               key={value}
               type="button"
               onClick={() => setTab(value)}
               className={cn(
-                'rounded px-2 py-1 text-xs capitalize transition-colors',
+                'rounded-lg px-2.5 py-1.5 text-xs capitalize transition-colors',
                 tab === value
                   ? 'bg-indigo-500/20 text-indigo-300'
                   : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300'
@@ -278,7 +309,8 @@ export function McpSettingsPanel({
                         {live?.status ?? (isDirty ? 'unsaved' : 'not connected')}
                       </span>
                       <span className="text-xs text-zinc-500">
-                        {TRANSPORT_LABELS[server.transport]} · {live?.toolCount ?? 0} tools
+                        {TRANSPORT_OPTIONS.find((t) => t.value === server.transport)?.label ?? server.transport} ·{' '}
+                        {live?.toolCount ?? 0} tools
                       </span>
                       <Switch
                         checked={server.enabled}
@@ -293,17 +325,23 @@ export function McpSettingsPanel({
                         placeholder="id"
                         className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-300"
                       />
-                      <select
+                      <Select
                         value={server.transport}
-                        onChange={(e) =>
-                          updateServer(server.id, { transport: e.target.value as McpTransportType })
+                        onValueChange={(value) =>
+                          updateServer(server.id, { transport: value as McpTransportType })
                         }
-                        className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-300"
                       >
-                        <option value="stdio">stdio</option>
-                        <option value="streamable-http">streamable-http</option>
-                        <option value="sse">sse</option>
-                      </select>
+                        <SelectTrigger className="h-8 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TRANSPORT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {server.transport === 'stdio' ? (
@@ -324,6 +362,15 @@ export function McpSettingsPanel({
                           placeholder="args (space-separated)"
                           className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-300"
                         />
+                        <textarea
+                          value={formatEnvLines(server.env)}
+                          onChange={(e) =>
+                            updateServer(server.id, { env: parseEnvLines(e.target.value) })
+                          }
+                          rows={2}
+                          placeholder={'env (one per line)\nGITHUB_PERSONAL_ACCESS_TOKEN=ghp_...'}
+                          className="rounded border border-white/10 bg-white/5 px-2 py-1 font-mono text-xs text-zinc-300"
+                        />
                       </div>
                     ) : (
                       <input
@@ -334,7 +381,13 @@ export function McpSettingsPanel({
                       />
                     )}
 
-                    {live?.lastError && <p className="text-xs text-red-400">{live.lastError}</p>}
+                    {live?.status === 'error' && live?.lastError && (
+                      <p className="text-xs text-red-400">{live.lastError}</p>
+                    )}
+
+                    {live?.status === 'connected' && (
+                      <p className="text-xs text-emerald-400/80">Connection OK</p>
+                    )}
 
                     {testFeedback[server.id] && (
                       <p
@@ -455,6 +508,6 @@ export function McpSettingsPanel({
           </Button>
         </div>
       )}
-    </section>
+    </Wrapper>
   )
 }

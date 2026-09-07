@@ -56,6 +56,7 @@ export function computeContextEstimate(input: {
   activeTimeline: TimelineItem[]
   isStreaming: boolean
   customSystemPrompt: string
+  projectMemoryTokens?: number
   tabs: Array<{ content: string }>
   contextLimit: number
 }): ContextEstimate {
@@ -63,6 +64,10 @@ export function computeContextEstimate(input: {
 
   let estimatedContext =
     SYSTEM_PROMPT_OVERHEAD + estimateTokens(input.customSystemPrompt ?? '')
+
+  if (input.chatMode === 'agent') {
+    estimatedContext += input.projectMemoryTokens ?? 0
+  }
 
   for (const message of modeMessages) {
     estimatedContext += estimateMessageTokens(message)
@@ -110,6 +115,7 @@ export function readContextEstimateFromStores(): ContextEstimate {
     activeTimeline: chat.activeTimeline,
     isStreaming: chat.isStreaming,
     customSystemPrompt: settings.settings.customSystemPrompt ?? '',
+    projectMemoryTokens: 0,
     tabs,
     contextLimit
   })
@@ -120,15 +126,36 @@ export function useContextEstimate(): ContextEstimate {
   const chatMode = useChatStore((s) => s.chatMode)
   const isStreaming = useChatStore((s) => s.isStreaming)
   const customSystemPrompt = useSettingsStore((s) => s.settings.customSystemPrompt ?? '')
+  const projectMemoryEnabled = useSettingsStore((s) => s.settings.projectMemoryEnabled !== false)
   const modelId = useSettingsStore((s) => s.settings.model)
   const models = useSettingsStore((s) => s.models)
   const tabs = useFileStore((s) => s.tabs)
+  const workingDirectory = useFileStore((s) => s.workingDirectory)
 
   const contextLimit = models.find((m) => m.id === modelId)?.contextLength ?? 128_000
 
+  const [projectMemoryTokens, setProjectMemoryTokens] = useState(0)
+
+  useEffect(() => {
+    if (chatMode !== 'agent' || !projectMemoryEnabled || !workingDirectory) {
+      setProjectMemoryTokens(0)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void window.api.memory.getSnapshot(workingDirectory).then((snapshot) => {
+        setProjectMemoryTokens(estimateTokens(snapshot))
+      }).catch(() => {
+        setProjectMemoryTokens(0)
+      })
+    }, 300)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [chatMode, projectMemoryEnabled, workingDirectory])
+
   const stableKey = useMemo(
-    () => ({ messages, chatMode, customSystemPrompt, tabs, contextLimit }),
-    [messages, chatMode, customSystemPrompt, tabs, contextLimit]
+    () => ({ messages, chatMode, customSystemPrompt, projectMemoryTokens, tabs, contextLimit }),
+    [messages, chatMode, customSystemPrompt, projectMemoryTokens, tabs, contextLimit]
   )
 
   const [estimate, setEstimate] = useState<ContextEstimate>(() => readContextEstimateFromStores())

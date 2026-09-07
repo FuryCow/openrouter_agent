@@ -28,6 +28,8 @@ import {
   parseCursorMcpJson,
   validateMcpServerConfigs
 } from './services/mcp/mcp-config'
+import { ProjectMemoryService } from './services/project-memory/project-memory-service'
+import type { ProjectMemoryCategory, ProjectMemoryEntry } from './types'
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
   const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
@@ -64,13 +66,15 @@ const mcpManager = new McpManager(
   () => sanitizeSettings(store.get('settings')),
   (status) => sendToRenderer('mcp:status-changed', status)
 )
+const projectMemoryService = new ProjectMemoryService(app.getPath('userData'))
 let agentService = new AgentService(
   openRouterClient,
   fsService,
   terminalService,
   webSearchService,
   codebaseIndexer,
-  mcpManager
+  mcpManager,
+  projectMemoryService
 )
 webSearchService.configure(store.get('settings'))
 
@@ -167,6 +171,7 @@ function setWorkspaceWatch(dir: string): void {
   setTimeout(() => {
     try {
       workspaceWatcher.watch(dir, (changedPaths) => {
+        projectMemoryService.invalidateByChangedPaths(dir, changedPaths)
         sendToRenderer('fs:changed')
         sendToRenderer('index:files-changed', changedPaths)
         codebaseIndexer.queueChangedPaths(changedPaths)
@@ -184,8 +189,13 @@ function recreateAgentService(): void {
     terminalService,
     webSearchService,
     codebaseIndexer,
-    mcpManager
+    mcpManager,
+    projectMemoryService
   )
+}
+
+function getCurrentWorkspace(): string {
+  return sanitizeSettings(store.get('settings')).workingDirectory ?? ''
 }
 
 function shutdownApp(): void {
@@ -358,7 +368,13 @@ function registerIpc(): void {
         maxTokens: context.maxTokens,
         customSystemPrompt: context.customSystemPrompt ?? settings.customSystemPrompt,
         autoApproveWrites: context.autoApproveWrites ?? settings.autoApproveWrites,
-        autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal
+        autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal,
+        projectMemory:
+          mode === 'agent' && settings.projectMemoryEnabled !== false && cwd
+            ? projectMemoryService.getSnapshot(cwd, {
+                includeDocs: settings.projectMemoryAutoLoadDocs !== false
+              })
+            : undefined
       },
       (event) => {
         sendToRenderer('agent:event', event)
@@ -386,6 +402,54 @@ function registerIpc(): void {
   ipcMain.handle('chat:save', async (_event, mode: string, messages: import('./types').ChatMessage[]) => {
     await saveChatMessages(mode as import('./types').ChatMode, messages)
   })
+
+  ipcMain.handle('memory:getSnapshot', (_event, workspacePath?: string) => {
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    if (!workspace) return ''
+    const settings = sanitizeSettings(store.get('settings'))
+    if (settings.projectMemoryEnabled === false) return ''
+    return projectMemoryService.getSnapshot(workspace, {
+      includeDocs: settings.projectMemoryAutoLoadDocs !== false
+    })
+  })
+
+  ipcMain.handle('memory:listEntries', (_event, workspacePath?: string) => {
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    if (!workspace) return [] as ProjectMemoryEntry[]
+    return projectMemoryService.listEntries(workspace)
+  })
+
+  ipcMain.handle(
+    'memory:saveEntries',
+    (_event, entries: ProjectMemoryEntry[], workspacePath?: string) => {
+      const workspace = workspacePath?.trim() || getCurrentWorkspace()
+      if (!workspace) throw new Error('No workspace open')
+      return projectMemoryService.saveEntries(workspace, entries)
+    }
+  )
+
+  ipcMain.handle(
+    'memory:remember',
+    (
+      _event,
+      input: { content: string; category?: ProjectMemoryCategory; source?: 'user' | 'remember' },
+      workspacePath?: string
+    ) => {
+      const workspace = workspacePath?.trim() || getCurrentWorkspace()
+      if (!workspace) throw new Error('No workspace open')
+      const settings = sanitizeSettings(store.get('settings'))
+      if (settings.projectMemoryEnabled === false) {
+        throw new Error('Project memory is disabled in settings')
+      }
+      const content = input.content?.trim()
+      if (!content) throw new Error('Content is required')
+      return projectMemoryService.remember(workspace, {
+        content,
+        category: input.category ?? 'note',
+        source: input.source ?? 'remember'
+      })
+    }
+  )
 
   ipcMain.handle('analytics:get-runs', (_event, limit?: number) => {
     return getRecentAnalyticsRuns(limit ?? 20)

@@ -7,7 +7,9 @@ import { ChatModeSelector } from './ChatModeSelector'
 import { useChatStore } from '@/stores/chatStore'
 import { useAgent } from '@/hooks/useAgent'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useFileStore } from '@/stores/fileStore'
 import { useToastStore } from '@/stores/toastStore'
+import { getMessageRememberContent } from '@/lib/messageRemember'
 import { getChatModeConfig } from '@/lib/chatModes'
 import { scheduleInAnimationFrame } from '@/lib/animation-frame'
 import { cn } from '@/lib/utils'
@@ -41,6 +43,7 @@ export function ChatPanel(): React.ReactElement {
   const { sendMessage, implementPlan, abort, retryLast } = useAgent()
   const clearMessages = useChatStore((s) => s.clearMessages)
   const settings = useSettingsStore((s) => s.settings)
+  const workingDirectory = useFileStore((s) => s.workingDirectory)
   const models = useSettingsStore((s) => s.models)
   const setSettingsOpen = useSettingsStore((s) => s.setSettingsOpen)
   const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen)
@@ -212,6 +215,39 @@ export function ChatPanel(): React.ReactElement {
     useToastStore.getState().addToast('Copied to clipboard', 'success')
   }
 
+  const rememberMessage = async (message: (typeof visibleMessages)[number]): Promise<void> => {
+    if (settings.projectMemoryEnabled === false) {
+      useToastStore.getState().addToast('Project memory is disabled in settings', 'error')
+      return
+    }
+    if (!workingDirectory) {
+      useToastStore.getState().addToast('Open a workspace to save project memory', 'error')
+      return
+    }
+
+    const content = getMessageRememberContent(message)
+    if (!content) {
+      useToastStore.getState().addToast('Nothing to remember in this message', 'error')
+      return
+    }
+
+    try {
+      await window.api.memory.remember({ content, category: 'note', source: 'remember' }, workingDirectory)
+      useToastStore.getState().addToast('Added to project memory', 'success')
+    } catch (err) {
+      useToastStore.getState().addToast(
+        err instanceof Error ? err.message : 'Failed to save project memory',
+        'error'
+      )
+    }
+  }
+
+  const canRemember =
+    chatMode === 'agent' &&
+    settings.projectMemoryEnabled !== false &&
+    Boolean(workingDirectory) &&
+    !isStreaming
+
   return (
     <div
       className="flex h-full flex-col border-l border-white/5 bg-[#0d0d14]"
@@ -295,6 +331,11 @@ export function ChatPanel(): React.ReactElement {
               }
               onRetry={
                 msg.role === 'assistant' && !isStreaming ? () => retryLast() : undefined
+              }
+              onRemember={
+                canRemember && msg.role === 'assistant'
+                  ? () => void rememberMessage(msg)
+                  : undefined
               }
               onEdit={
                 msg.role === 'user' && !isStreaming

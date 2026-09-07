@@ -54,6 +54,25 @@ export interface AppSettings {
   mcpServers?: McpServerConfig[]
   mcpImportPaths?: string[]
   mcpRequireApproval?: boolean
+  projectMemoryEnabled?: boolean
+  projectMemoryAutoLoadDocs?: boolean
+}
+
+export type ProjectMemoryCategory =
+  | 'architecture'
+  | 'decision'
+  | 'bug'
+  | 'convention'
+  | 'note'
+
+export type ProjectMemorySource = 'agent' | 'user' | 'remember'
+
+export interface ProjectMemoryEntry {
+  id: string
+  category: ProjectMemoryCategory
+  content: string
+  source: ProjectMemorySource
+  createdAt: string
 }
 
 export interface DirEntry {
@@ -137,6 +156,7 @@ export interface AgentContext {
   customSystemPrompt?: string
   autoApproveWrites?: boolean
   autoApproveTerminal?: boolean
+  projectMemory?: string
 }
 
 export interface DiffHighlightRange {

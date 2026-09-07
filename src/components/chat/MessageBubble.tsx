@@ -10,7 +10,8 @@ import {
   Play,
   Copy,
   RotateCcw,
-  Pencil
+  Pencil,
+  Bookmark
 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
@@ -35,24 +36,19 @@ const toolIcons: Record<string, string> = {
   codebase_search: '🧭',
   run_terminal: '💻',
   web_search: '🌐',
-  get_open_files: '📋'
+  get_open_files: '📋',
+  read_project_memory: '🧠',
+  update_project_memory: '📝'
 }
 
 export function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }): React.ReactElement {
-  const [expanded, setExpanded] = useState(toolCall.status === 'running')
+  const [expanded, setExpanded] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
   const isFileChange = FILE_CHANGE_TOOLS.has(toolCall.name)
   const filePath =
     toolCall.filePath ?? (isFileChange ? parseToolFilePath(toolCall.name, toolCall.arguments) : undefined)
   const showDiff = isFileChange && Boolean(toolCall.fileDiff || toolCall.diff)
-
-  useEffect(() => {
-    if (toolCall.status === 'running') {
-      setExpanded(true)
-      stickToBottomRef.current = true
-    }
-  }, [toolCall.status, toolCall.arguments])
 
   useEffect(() => {
     const body = bodyRef.current
@@ -344,7 +340,8 @@ export function MessageBubble({
   onImplementPlan,
   onCopy,
   onRetry,
-  onEdit
+  onEdit,
+  onRemember
 }: {
   role: 'user' | 'assistant'
   timeline?: TimelineItem[]
@@ -360,6 +357,7 @@ export function MessageBubble({
   onCopy?: () => void
   onRetry?: () => void
   onEdit?: () => void
+  onRemember?: () => void
 }): React.ReactElement | null {
   const isUser = role === 'user'
   const resolvedTimeline = isUser
@@ -415,6 +413,9 @@ export function MessageBubble({
       : []),
     ...(onRetry
       ? [{ label: 'Retry', icon: <RotateCcw className="h-3 w-3" />, onClick: onRetry }]
+      : []),
+    ...(onRemember
+      ? [{ label: 'Remember', icon: <Bookmark className="h-3 w-3" />, onClick: onRemember }]
       : [])
   ]
 

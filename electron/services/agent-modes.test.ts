@@ -87,6 +87,42 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Do NOT use run_terminal for grep')
   })
 
+  it('includes project memory section for agent when provided', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      projectMemory: '## Dynamic memory\n- Use SQLite for indexing'
+    })
+    expect(prompt).toContain('Project memory (workspace-specific')
+    expect(prompt).toContain('Use SQLite for indexing')
+    expect(prompt).toContain('update_project_memory')
+  })
+
+  it('does not expose memory tools to planner', () => {
+    const plannerTools = getToolsForMode('planner', [
+      ...ALL_TOOLS,
+      {
+        type: 'function',
+        function: {
+          name: 'read_project_memory',
+          description: '',
+          parameters: { type: 'object', properties: {} }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'update_project_memory',
+          description: '',
+          parameters: { type: 'object', properties: {} }
+        }
+      }
+    ]).map((tool) => tool.function.name)
+
+    expect(plannerTools).not.toContain('read_project_memory')
+    expect(plannerTools).not.toContain('update_project_memory')
+    expect(isToolAllowedInMode('update_project_memory', 'planner')).toBe(false)
+  })
+
   it('includes batch read guidance for planner', () => {
     const prompt = buildSystemPrompt({ ...baseContext, mode: 'planner' })
     expect(prompt).toContain('read_files')

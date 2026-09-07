@@ -60,6 +60,10 @@ export class McpManager {
   }
 
   getStatus(): McpStatusSnapshot {
+    for (const runtime of this.servers.values()) {
+      this.normalizeRuntimeStatus(runtime)
+    }
+
     const servers = [...this.servers.values()].map((runtime) => ({
       id: runtime.config.id,
       name: runtime.config.name ?? runtime.config.id,
@@ -67,7 +71,10 @@ export class McpManager {
       transport: runtime.session.connectedTransport ?? runtime.config.transport,
       status: runtime.config.enabled ? runtime.status : ('disabled' as const),
       toolCount: runtime.tools.length,
-      lastError: runtime.lastError
+      lastError:
+        runtime.config.enabled && runtime.status === 'error'
+          ? runtime.lastError
+          : undefined
     }))
 
     const enabledCount = servers.filter((s) => s.enabled).length
@@ -152,6 +159,18 @@ export class McpManager {
     }
   }
 
+  /** Heal stale error state left by older builds after a successful tool listing. */
+  private normalizeRuntimeStatus(runtime: ServerRuntime): void {
+    if (
+      runtime.status === 'error' &&
+      runtime.tools.length > 0 &&
+      runtime.session.connectedTransport
+    ) {
+      runtime.status = 'connected'
+      runtime.lastError = undefined
+    }
+  }
+
   isMcpTool(name: string): boolean {
     return isMcpQualifiedToolName(name)
   }
@@ -221,19 +240,58 @@ export class McpManager {
       return `Error: Invalid MCP tool name: ${qualifiedName}`
     }
 
-    const runtime = this.servers.get(parsed.serverId)
+    this.syncRuntimeConfigsFromSettings()
+
+    let runtime = this.servers.get(parsed.serverId)
+    if (!runtime) {
+      return `Error: MCP server "${parsed.serverId}" is not configured. Add it in Settings → MCP and click Test & save.`
+    }
+
+    if (runtime.status !== 'connected' && runtime.config.enabled) {
+      await this.connectServer(parsed.serverId)
+      runtime = this.servers.get(parsed.serverId)
+    }
+
     if (!runtime || runtime.status !== 'connected') {
-      return `Error: MCP server "${parsed.serverId}" is not connected`
+      const status = runtime?.status ?? 'missing'
+      const detail = runtime?.lastError ? ` ${runtime.lastError}` : ''
+      return (
+        `Error: MCP server "${parsed.serverId}" is not connected (status: ${status}).${detail} ` +
+        `Open Settings → MCP → Reconnect all, or abort the agent run and save MCP settings again.`
+      )
     }
 
     try {
       return await runtime.session.callTool(parsed.toolName, args)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      runtime.status = 'error'
-      runtime.lastError = message
-      this.emitStatus()
       return `Error: ${message}`
+    }
+  }
+
+  /** Keep in-memory server entries aligned with persisted settings (e.g. after save while agent runs). */
+  private syncRuntimeConfigsFromSettings(): void {
+    const configs = this.getSettings().mcpServers ?? []
+    const seen = new Set<string>()
+
+    for (const config of configs) {
+      seen.add(config.id)
+      const existing = this.servers.get(config.id)
+      if (existing) {
+        existing.config = config
+        continue
+      }
+      this.servers.set(config.id, {
+        config,
+        session: new McpClientSession(),
+        status: config.enabled ? 'error' : 'disabled',
+        tools: [],
+        lastError: config.enabled ? 'Not connected yet — use Reconnect all in Settings' : undefined
+      })
+    }
+
+    for (const id of [...this.servers.keys()]) {
+      if (!seen.has(id)) this.servers.delete(id)
     }
   }
 
