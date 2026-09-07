@@ -26,6 +26,11 @@ describe('mcp-stdio', () => {
       })
     ).toBe('F:/pets/gmail_mcp')
     expect(
+      inferStdioCwd({
+        args: ['/home/user/project/dist/index.js']
+      })
+    ).toBe('/home/user/project')
+    expect(
       normalizeStdioConfig({
         command: 'node',
         args: ['F:/pets/gmail_mcp/dist/index.js']

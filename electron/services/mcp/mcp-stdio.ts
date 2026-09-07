@@ -4,6 +4,21 @@ import { dirname, isAbsolute } from 'node:path'
 const WINDOWS_CMD_COMMANDS = new Set(['npx', 'npm'])
 
 const SCRIPT_ARG = /\.(js|cjs|mjs|ts|tsx)$/i
+const WIN_DRIVE_PATH = /^[A-Za-z]:[/\\]/
+
+function isAbsoluteScriptPath(filePath: string): boolean {
+  return isAbsolute(filePath) || WIN_DRIVE_PATH.test(filePath)
+}
+
+function scriptDirname(filePath: string): string {
+  if (WIN_DRIVE_PATH.test(filePath)) {
+    const normalized = filePath.replace(/\\/g, '/')
+    const parts = normalized.split('/')
+    parts.pop()
+    return parts.join('/')
+  }
+  return dirname(filePath)
+}
 
 /** cross-spawn usually resolves .cmd, but Electron on Windows often needs explicit .cmd for npx/npm. */
 export function resolveStdioCommand(command: string): string {
@@ -20,10 +35,10 @@ export function inferStdioCwd(config: { args?: string[]; cwd?: string }): string
   if (config.cwd?.trim()) return config.cwd
   for (const arg of config.args ?? []) {
     const trimmed = arg?.trim()
-    if (!trimmed || !isAbsolute(trimmed) || !SCRIPT_ARG.test(trimmed)) continue
-    const scriptDir = dirname(trimmed)
+    if (!trimmed || !isAbsoluteScriptPath(trimmed) || !SCRIPT_ARG.test(trimmed)) continue
+    const scriptDir = scriptDirname(trimmed)
     const base = scriptDir.replace(/\\/g, '/').split('/').pop()
-    if (base === 'dist') return dirname(scriptDir)
+    if (base === 'dist') return scriptDirname(scriptDir)
     return scriptDir
   }
   return undefined
