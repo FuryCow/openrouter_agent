@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 
@@ -6,7 +7,7 @@ export function NameInputDialog({
   open,
   title,
   defaultValue,
-  confirmLabel = 'OK',
+  confirmLabel,
   onConfirm,
   onOpenChange
 }: {
@@ -17,7 +18,9 @@ export function NameInputDialog({
   onConfirm: (value: string) => void
   onOpenChange: (open: boolean) => void
 }): React.ReactElement {
+  const { t } = useTranslation('common')
   const [value, setValue] = useState(defaultValue)
+  const resolvedConfirmLabel = confirmLabel ?? t('actions.ok')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -57,10 +60,10 @@ export function NameInputDialog({
         />
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            Отмена
+            {t('actions.cancel')}
           </Button>
           <Button size="sm" onClick={submit} disabled={!value.trim()}>
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </Button>
         </div>
       </DialogContent>

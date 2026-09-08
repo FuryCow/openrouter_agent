@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   CheckCircle2,
   XCircle,
@@ -20,6 +21,7 @@ import { DiffView } from './DiffView'
 import { parseToolFilePath } from '@/lib/parseDiff'
 import { FilePathLink } from './FilePathLink'
 import { ToolCallDetailView } from './ToolCallDetailView'
+import { ChatImagePreview } from './ChatImagePreview'
 import { ThinkingIcon, ToolTypeIcon } from './ToolTypeIcon'
 
 const FILE_CHANGE_TOOLS = new Set(['write_file', 'search_replace'])
@@ -106,8 +108,9 @@ const ToolCallCardHeader = memo(function ToolCallCardHeader({
   expanded: boolean
   onToggle: () => void
 }): React.ReactElement {
+  const { t } = useTranslation('chat')
   const filePath = resolveToolFilePath(toolCall)
-  const toolName = toolCall.name === 'preparing' ? 'Подготовка tool call…' : toolCall.name
+  const toolName = toolCall.name === 'preparing' ? t('tool.preparing') : toolCall.name
 
   return (
     <button
@@ -115,7 +118,7 @@ const ToolCallCardHeader = memo(function ToolCallCardHeader({
       onClick={onToggle}
       className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.03]"
       aria-expanded={expanded}
-      aria-label={expanded ? 'Collapse tool details' : 'Expand tool details'}
+      aria-label={expanded ? t('tool.collapseDetails') : t('tool.expandDetails')}
     >
       <ToolTypeIcon toolName={toolCall.name} />
       <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-sm">
@@ -225,6 +228,7 @@ const ThinkingBlockHeader = memo(function ThinkingBlockHeader({
   expanded: boolean
   onToggle: () => void
 }): React.ReactElement {
+  const { t: tc } = useTranslation('common')
   return (
     <button
       type="button"
@@ -232,7 +236,7 @@ const ThinkingBlockHeader = memo(function ThinkingBlockHeader({
       className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-violet-500/[0.06] transition-colors"
     >
       <ThinkingIcon />
-      <span className="text-sm font-medium text-violet-300">Thinking</span>
+      <span className="text-sm font-medium text-violet-300">{tc('status.thinking')}</span>
       {isStreaming && <Loader2 className="h-4 w-4 animate-spin text-violet-400" />}
       <div className="ml-auto">
         <ExpandChevron expanded={expanded} />
@@ -358,6 +362,7 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
   isActive: boolean
   onToggle: () => void
 }): React.ReactElement {
+  const { t } = useTranslation('chat')
   const isRunning = tools.some((item) => item.toolCall.status === 'running')
   const showSpinner = isRunning || isActive
   const sharedToolName = tools.every((item) => item.toolCall.name === tools[0].toolCall.name)
@@ -366,7 +371,7 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
   const title =
     sharedToolName && sharedToolName !== 'preparing'
       ? sharedToolName
-      : `${tools.length} tools`
+      : t('tool.groupCount', { count: tools.length })
 
   return (
     <button
@@ -374,7 +379,7 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
       onClick={onToggle}
       className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.03]"
       aria-expanded={expanded}
-      aria-label={expanded ? 'Collapse tools' : 'Expand tools'}
+      aria-label={expanded ? t('tool.collapseTools') : t('tool.expandTools')}
     >
       {sharedToolName ? (
         <ToolTypeIcon toolName={sharedToolName} />
@@ -434,10 +439,11 @@ function TimelineDot({ className }: { className: string }): React.ReactElement {
 }
 
 function StreamingPlaceholder(): React.ReactElement {
+  const { t } = useTranslation('chat')
   return (
     <span className="inline-flex items-center gap-2 text-xs text-zinc-500">
       <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400/70" />
-      Запрос к модели…
+      {t('message.streaming')}
     </span>
   )
 }
@@ -580,6 +586,8 @@ export function MessageBubble({
   onEdit?: () => void
   onRemember?: () => void
 }): React.ReactElement | null {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
   const isUser = role === 'user'
   const resolvedTimeline = isUser
     ? []
@@ -596,7 +604,7 @@ export function MessageBubble({
 
   if (isUser) {
     const userActions = onEdit
-      ? [{ label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: onEdit }]
+      ? [{ label: tc('actions.edit'), icon: <Pencil className="h-3 w-3" />, onClick: onEdit }]
       : []
 
     return (
@@ -611,11 +619,12 @@ export function MessageBubble({
             {images && images.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {images.map((src) => (
-                  <img
+                  <ChatImagePreview
                     key={src.slice(0, 32)}
                     src={src}
-                    alt="attachment"
-                    className="max-h-32 rounded-md border border-white/20"
+                    alt={t('message.attachmentAlt')}
+                    className="border-white/20 hover:ring-white/20"
+                    thumbnailClassName="max-h-32 max-w-full object-contain"
                   />
                 ))}
               </div>
@@ -630,13 +639,13 @@ export function MessageBubble({
 
   const assistantActions = [
     ...(onCopy
-      ? [{ label: 'Copy', icon: <Copy className="h-3 w-3" />, onClick: onCopy }]
+      ? [{ label: tc('actions.copy'), icon: <Copy className="h-3 w-3" />, onClick: onCopy }]
       : []),
     ...(onRetry
-      ? [{ label: 'Retry', icon: <RotateCcw className="h-3 w-3" />, onClick: onRetry }]
+      ? [{ label: tc('actions.retry'), icon: <RotateCcw className="h-3 w-3" />, onClick: onRetry }]
       : []),
     ...(onRemember
-      ? [{ label: 'Remember', icon: <Bookmark className="h-3 w-3" />, onClick: onRemember }]
+      ? [{ label: tc('actions.remember'), icon: <Bookmark className="h-3 w-3" />, onClick: onRemember }]
       : [])
   ]
 
@@ -658,7 +667,7 @@ export function MessageBubble({
         >
           {interrupted && (
             <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-amber-400/80">
-              Interrupted
+              {tc('status.interrupted')}
             </div>
           )}
           {hasTimeline ? (
@@ -679,7 +688,7 @@ export function MessageBubble({
               onClick={onImplementPlan}
             >
               <Play className="h-3.5 w-3.5" />
-              Реализовать согласно плану
+              {t('message.implementPlan')}
             </Button>
           </div>
         )}

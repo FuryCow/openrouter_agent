@@ -57,6 +57,7 @@ export interface AppSettings {
   projectMemoryEnabled?: boolean
   projectMemoryAutoLoadDocs?: boolean
   agentAutoVerify?: boolean
+  locale?: 'en'
 }
 
 export type ProjectMemoryCategory =
@@ -100,6 +101,7 @@ export type IndexPhase =
 
 export interface IndexProgress {
   phase: IndexPhase
+  phaseCode?: string
   filesDone: number
   filesTotal: number
   message?: string
@@ -356,6 +358,8 @@ export interface AgentEvent {
   toolCall?: ToolCallInfo
   message?: ChatMessage
   error?: string
+  errorCode?: string
+  errorParams?: Record<string, string>
   analytics?: AgentRunAnalytics
   approval?: ToolApprovalRequest
   memorySuggest?: MemorySuggestRequest

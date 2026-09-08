@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { McpServerConfig, McpStatusSnapshot } from '@/types'
 
 export function useMcp(): {
@@ -22,6 +23,7 @@ export function useMcp(): {
   const [config, setConfig] = useState<McpServerConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useTranslation('settings')
 
   const refresh = useCallback(async (): Promise<void> => {
     setLoading(true)
@@ -34,11 +36,11 @@ export function useMcp(): {
       setStatus(nextStatus)
       setConfig(nextConfig)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load MCP status')
+      setError(err instanceof Error ? err.message : t('mcp.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void refresh()

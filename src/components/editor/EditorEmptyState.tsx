@@ -1,4 +1,5 @@
 import { FolderOpen, FileSearch, FolderTree, Keyboard, Sparkles } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useUiStore } from '@/stores/uiStore'
@@ -71,6 +72,8 @@ function EmptyStateShell({
 }
 
 export function EditorEmptyState(): React.ReactElement {
+  const { t } = useTranslation('layout')
+  const { t: tCommon } = useTranslation('common')
   const { workingDirectory, openFolderPicker } = useWorkspace()
   const setQuickOpenOpen = useUiStore((s) => s.setQuickOpenOpen)
   const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen)
@@ -78,8 +81,8 @@ export function EditorEmptyState(): React.ReactElement {
   if (!workingDirectory) {
     return (
       <EmptyStateShell
-        title="Откройте проект"
-        description="Редактор и агент работают с файлами внутри workspace. Сначала выберите папку проекта."
+        title={t('editor.empty.noProject.title')}
+        description={t('editor.empty.noProject.description')}
       >
         <Button
           type="button"
@@ -87,11 +90,11 @@ export function EditorEmptyState(): React.ReactElement {
           onClick={() => void openFolderPicker()}
         >
           <FolderOpen className="h-4 w-4" />
-          Открыть папку
+          {t('editor.empty.noProject.openFolder')}
         </Button>
 
         <div className="mt-4 space-y-2 border-t border-white/5 pt-4">
-          <ShortcutHint keys="Ctrl+L" label="Настройки и API-ключ" />
+          <ShortcutHint keys="Ctrl+L" label={t('editor.empty.noProject.settingsHint')} />
         </div>
       </EmptyStateShell>
     )
@@ -101,27 +104,29 @@ export function EditorEmptyState(): React.ReactElement {
 
   return (
     <EmptyStateShell
-      title="Файл не выбран"
-      description="Откройте файл из дерева слева или через быстрый поиск. Пути из чата тоже кликабельны."
+      title={t('editor.empty.noFile.title')}
+      description={t('editor.empty.noFile.description')}
     >
       <div className="space-y-2">
         <ShortcutHint
           keys="Ctrl+P"
-          label="Быстро открыть файл"
+          label={t('editor.empty.quickOpen')}
           onClick={() => setQuickOpenOpen(true)}
         />
         <div className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
           <FolderTree className="h-4 w-4 shrink-0 text-sky-400/80" />
-          <span className="text-xs text-zinc-400">Выберите файл в Explorer слева</span>
+          <span className="text-xs text-zinc-400">{t('editor.empty.pickFromExplorer')}</span>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
           <FileSearch className="h-4 w-4 shrink-0 text-violet-400/80" />
-          <span className="text-xs text-zinc-400">Клик по пути в diff или tool call откроет файл здесь</span>
+          <span className="text-xs text-zinc-400">{t('editor.empty.clickPathHint')}</span>
         </div>
       </div>
 
       <div className="mt-4 rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-600">Workspace</div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+          {tCommon('labels.workspace')}
+        </div>
         <div className="mt-1 truncate text-sm font-medium text-zinc-200">{workspaceName}</div>
         <div className="mt-0.5 truncate font-mono text-[11px] text-zinc-600">{workingDirectory}</div>
       </div>
@@ -136,12 +141,12 @@ export function EditorEmptyState(): React.ReactElement {
           )}
         >
           <Keyboard className="h-3.5 w-3.5" />
-          Все shortcuts
+          {t('editor.empty.allShortcuts')}
           <kbd className="rounded border border-white/10 bg-black/30 px-1 font-mono text-[10px]">Ctrl+/</kbd>
         </button>
         <div className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-zinc-600">
           <kbd className="rounded border border-white/10 bg-black/30 px-1 font-mono text-[10px]">Ctrl+S</kbd>
-          сохранить
+          {t('editor.empty.save')}
         </div>
       </div>
     </EmptyStateShell>

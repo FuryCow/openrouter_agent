@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AppError, AppErrorCode } from '../../lib/app-errors'
 import {
   detectTransport,
   mergeMcpServerConfigs,
@@ -68,6 +69,6 @@ describe('mcp-config', () => {
 
     expect(
       validateMcpServerConfigs([{ id: 'bad', enabled: true, transport: 'stdio' }])
-    ).toContain('command is required')
+    ).toEqual(new AppError(AppErrorCode.MCP_COMMAND_REQUIRED, { id: 'bad' }))
   })
 })

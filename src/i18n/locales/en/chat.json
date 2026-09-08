@@ -1,0 +1,135 @@
+{
+  "title": "Chat",
+  "messageCount": "{{count}} msgs",
+  "revertRun": "Revert run",
+  "revertRunTitle": "Revert {{count}} file(s) from last agent run",
+  "retryLast": "Retry last",
+  "attachImage": "Attach image",
+  "visionNotSupported": "Vision not supported by current model",
+  "editMessagePlaceholder": "Edit message…",
+  "shortcutSend": "Enter — send",
+  "shortcutNewLine": "Shift+Enter — new line",
+  "shortcutAllKeys": "Ctrl+/ — all shortcuts",
+  "clearConfirm": {
+    "title": "Clear chat?",
+    "description": "Delete all {{count}} messages in «{{mode}}» mode? Session token counter will also reset.",
+    "confirm": "Clear"
+  },
+  "toast": {
+    "onlyImages": "Only image files can be attached",
+    "noVision": "Current model does not support vision",
+    "nothingToRevert": "Nothing to revert from the last run",
+    "revertedFiles": "Reverted {{count}} file change(s) from last agent run",
+    "revertFailed": "Failed to revert changes",
+    "memoryDisabled": "Project memory is disabled in settings",
+    "openWorkspaceForMemory": "Open a workspace to save project memory",
+    "nothingToRemember": "Nothing to remember in this message",
+    "memorySaveFailed": "Failed to save project memory"
+  },
+  "onboarding": {
+    "title": "Quick start",
+    "allDone": "All set — you can send a task to the agent.",
+    "incomplete": "Complete the steps below to get started.",
+    "apiKey": {
+      "title": "OpenRouter API key",
+      "description": "Required for model requests",
+      "action": "Open settings"
+    },
+    "folder": {
+      "title": "Project folder",
+      "description": "Agent and planner work with files in the workspace",
+      "action": "Open folder"
+    },
+    "model": {
+      "title": "Model",
+      "description": "Choose a model with tool calling in the title bar",
+      "action": "Settings"
+    }
+  },
+  "modeSelector": {
+    "title": "Chat mode"
+  },
+  "modes": {
+    "agent": {
+      "label": "Agent",
+      "description": "Reads, writes files, runs commands, and uses tools",
+      "placeholder": "Ask the agent to do something in the project..."
+    },
+    "ask": {
+      "label": "ASK",
+      "description": "Answers questions without changing the project",
+      "placeholder": "Ask a question about code, tech, or a task..."
+    },
+    "planner": {
+      "label": "Planner",
+      "description": "Explores the project and builds a plan without editing files",
+      "placeholder": "Describe a task — get a step-by-step plan..."
+    }
+  },
+  "message": {
+    "streaming": "Requesting model…",
+    "implementPlan": "Implement according to plan",
+    "attachmentAlt": "attachment"
+  },
+  "imagePreview": {
+    "view": "View image",
+    "title": "Image preview"
+  },
+  "tool": {
+    "preparing": "Preparing tool call…",
+    "preparingArgs": "Preparing arguments…",
+    "groupCount": "{{count}} tools",
+    "expandDetails": "Expand tool details",
+    "collapseDetails": "Collapse tool details",
+    "expandTools": "Expand tools",
+    "collapseTools": "Collapse tools",
+    "replaceAll": "Replace all occurrences",
+    "matches": "Matches ({{count}})",
+    "hits": "Hits ({{count}})",
+    "entries": "Entries ({{count}})",
+    "results": "Results ({{count}})"
+  },
+  "approval": {
+    "title": "Approval: {{toolName}}",
+    "alwaysAllowSession": "Always allow (session)"
+  },
+  "memorySuggest": {
+    "title": "Save to project memory?",
+    "description": "Suggested from the last agent run. Select entries to remember for future sessions.",
+    "saveSelected": "Save selected",
+    "saveFailed": "Failed to save memory"
+  },
+  "memory": {
+    "category": {
+      "architecture": "Architecture",
+      "decision": "Decision",
+      "bug": "Bug",
+      "convention": "Convention",
+      "note": "Note"
+    }
+  },
+  "tokens": {
+    "title": "Token usage",
+    "contextEstimate": "Chat context (estimate)",
+    "session": "Session (since launch)",
+    "total": "Total",
+    "input": "Input",
+    "output": "Output",
+    "resetSession": "Reset session",
+    "ariaLabel": "Tokens: context {{contextPercent}}%, session {{sessionTotal}}"
+  },
+  "filePath": {
+    "openInEditor": "Open in editor at change location"
+  },
+  "agent": {
+    "aborted": "⚠️ Run aborted.",
+    "implementingPlan": "Agent mode — implementing plan",
+    "implementPlanPrompt": {
+      "taskLine": "Original user task:\n{{task}}\n\n",
+      "body": "Implement according to the plan below. Execute steps in order, use tools, and do not deviate from the plan unless necessary.\n\n---\n\n{{plan}}"
+    }
+  },
+  "persistence": {
+    "switched": "Chat switched to {{name}}"
+  }
+}

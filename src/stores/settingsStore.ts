@@ -3,6 +3,8 @@ import type { AppSettings, ModelInfo } from '../types'
 import { useFileStore } from './fileStore'
 import { isStaleModelCatalog } from '../lib/models'
 import type { SettingsSection } from '../lib/settingsSections'
+import { setAppLocale } from '../i18n'
+import { getT } from '../i18n/t'
 
 interface SettingsState {
   settings: AppSettings
@@ -24,7 +26,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: {
     apiKey: '',
     model: 'anthropic/claude-sonnet-4',
-    workingDirectory: ''
+    workingDirectory: '',
+    locale: 'en'
   },
   models: [],
   modelsLoading: false,
@@ -40,6 +43,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setTerminalOpen: (open) => set({ terminalOpen: open }),
 
   loadModels: async () => {
+    const t = getT('settings')
     set({ modelsLoading: true, modelsError: null })
     try {
       const models = await window.api.models.list()
@@ -49,7 +53,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set({
           models: [],
           modelsLoading: false,
-          modelsError: 'Could not load models from OpenRouter. Check your connection and try Refresh.'
+          modelsError: t('models.loadFailed')
         })
         return
       }
@@ -58,8 +62,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set({
           models,
           modelsLoading: false,
-          modelsError:
-            'Loaded outdated model list (50 without prices). Close the app completely and run start.bat again.'
+          modelsError: t('models.staleCatalog')
         })
         return
       }
@@ -76,13 +79,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     } catch (err) {
       set({
         modelsLoading: false,
-        modelsError: err instanceof Error ? err.message : 'Failed to load models'
+        modelsError: err instanceof Error ? err.message : t('models.failed')
       })
     }
   },
 
   loadSettings: async () => {
     const settings = await window.api.settings.get()
+    await setAppLocale(settings.locale ?? 'en')
     set({ settings })
     useFileStore.getState().setWorkingDirectory(settings.workingDirectory || null)
     await get().loadModels()

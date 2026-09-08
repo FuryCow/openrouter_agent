@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AppError, AppErrorCode } from '../lib/app-errors'
 import { isPathInside, assertSafeTerminalCommand, isCodeSearchShellCommand } from './workspace-safety'
 
 describe('isPathInside', () => {
@@ -43,6 +44,12 @@ describe('isCodeSearchShellCommand', () => {
 
 describe('assertSafeTerminalCommand', () => {
   it('blocks code search via shell', () => {
-    expect(() => assertSafeTerminalCommand('grep -r foo .')).toThrow(/grep_workspace/)
+    expect(() => assertSafeTerminalCommand('grep -r foo .')).toThrow(AppError)
+    try {
+      assertSafeTerminalCommand('grep -r foo .')
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError)
+      expect((err as AppError).code).toBe(AppErrorCode.TERMINAL_SHELL_SEARCH_BLOCKED)
+    }
   })
 })

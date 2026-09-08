@@ -31,6 +31,7 @@ import {
 import { ProjectMemoryService } from './services/project-memory/project-memory-service'
 import type { ProjectMemoryCategory, ProjectMemoryEntry } from './types'
 import { getWorkspaceState } from './services/workspace-state'
+import { AppError, AppErrorCode, getAppErrorPayload } from './lib/app-errors'
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
   const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
@@ -42,6 +43,9 @@ function sanitizeSettings(settings: AppSettings): AppSettings {
   if (normalized.workingDirectory && isInsideAgentApp(normalized.workingDirectory)) {
     normalized = { ...normalized, workingDirectory: '' }
   }
+  if (!normalized.locale) {
+    normalized = { ...normalized, locale: 'en' }
+  }
   return normalized
 }
 
@@ -50,7 +54,8 @@ const store = new Store<{ settings: AppSettings }>({
     settings: {
       apiKey: '',
       model: 'anthropic/claude-sonnet-4',
-      workingDirectory: ''
+      workingDirectory: '',
+      locale: 'en'
     }
   }
 })
@@ -219,7 +224,7 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => sanitizeSettings(store.get('settings')))
   ipcMain.handle('settings:save', async (_event, settings: AppSettings) => {
     if (agentService.isRunning) {
-      throw new Error('Cannot save settings while agent is running. Abort the current run first.')
+      throw new AppError(AppErrorCode.SETTINGS_SAVE_WHILE_RUNNING)
     }
     const normalized = sanitizeSettings({
       ...settings,
@@ -252,7 +257,7 @@ function registerIpc(): void {
 
   ipcMain.handle('fs:set-workspace', (_event, workspacePath: string) => {
     if (!workspacePath || typeof workspacePath !== 'string') {
-      throw new Error('Workspace path is required')
+      throw new AppError(AppErrorCode.WORKSPACE_PATH_REQUIRED)
     }
     return applyWorkspaceSelection(workspacePath).workingDirectory
   })
@@ -328,7 +333,7 @@ function registerIpc(): void {
     if (agentService.isRunning) {
       sendToRenderer('agent:event', {
         type: 'error',
-        error: 'Agent is already running. Wait or abort the current run.'
+        ...getAppErrorPayload(new AppError(AppErrorCode.AGENT_ALREADY_RUNNING))
       })
       return
     }
@@ -341,7 +346,7 @@ function registerIpc(): void {
     if (modeRequiresWorkspace(mode) && !cwd) {
       sendToRenderer('agent:event', {
         type: 'error',
-        error: 'No workspace folder open. Open a project folder in Explorer (not the agent app folder).'
+        ...getAppErrorPayload(new AppError(AppErrorCode.AGENT_NO_WORKSPACE))
       })
       return
     }
@@ -352,7 +357,7 @@ function registerIpc(): void {
       } catch (err) {
         sendToRenderer('agent:event', {
           type: 'error',
-          error: err instanceof Error ? err.message : String(err)
+          ...getAppErrorPayload(err)
         })
         return
       }
@@ -449,7 +454,7 @@ function registerIpc(): void {
     'memory:saveEntries',
     (_event, entries: ProjectMemoryEntry[], workspacePath?: string) => {
       const workspace = workspacePath?.trim() || getCurrentWorkspace()
-      if (!workspace) throw new Error('No workspace open')
+      if (!workspace) throw new AppError(AppErrorCode.MEMORY_NO_WORKSPACE)
       return projectMemoryService.saveEntries(workspace, entries)
     }
   )
@@ -462,13 +467,13 @@ function registerIpc(): void {
       workspacePath?: string
     ) => {
       const workspace = workspacePath?.trim() || getCurrentWorkspace()
-      if (!workspace) throw new Error('No workspace open')
+      if (!workspace) throw new AppError(AppErrorCode.MEMORY_NO_WORKSPACE)
       const settings = sanitizeSettings(store.get('settings'))
       if (settings.projectMemoryEnabled === false) {
-        throw new Error('Project memory is disabled in settings')
+        throw new AppError(AppErrorCode.MEMORY_DISABLED)
       }
       const content = input.content?.trim()
-      if (!content) throw new Error('Content is required')
+      if (!content) throw new AppError(AppErrorCode.MEMORY_CONTENT_REQUIRED)
       return projectMemoryService.remember(workspace, {
         content,
         category: input.category ?? 'note',
@@ -503,7 +508,7 @@ function registerIpc(): void {
       mcpManager.queueReconnectAfterRun()
     }
     const error = validateMcpServerConfigs(servers)
-    if (error) throw new Error(error)
+    if (error) throw error
 
     const settings = sanitizeSettings(store.get('settings'))
     const next = { ...settings, mcpServers: servers }
@@ -536,7 +541,7 @@ function registerIpc(): void {
   ipcMain.handle('mcp:importDefaultCursor', () => {
     const defaultPath = getDefaultCursorMcpPath()
     if (!existsSync(defaultPath)) {
-      throw new Error(`Cursor MCP config not found at ${defaultPath}`)
+      throw new AppError(AppErrorCode.MCP_CURSOR_CONFIG_NOT_FOUND, { path: defaultPath })
     }
     const raw = readFileSync(defaultPath, 'utf-8')
     const imported = parseCursorMcpJson(JSON.parse(raw))

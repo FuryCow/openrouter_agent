@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { PasswordInput } from '../ui/password-input'
@@ -16,16 +17,12 @@ import { McpSettingsPanel } from './McpSettingsPanel'
 import { ProjectMemorySettings } from './ProjectMemorySettings'
 import {
   getSettingsSection,
-  SETTINGS_SECTIONS,
+  getSettingsSections,
   type SettingsSection
 } from '@/lib/settingsSections'
 import { cn } from '@/lib/utils'
 
-const SEARCH_PROVIDERS: Array<{ value: AppSettings['searchProvider']; label: string }> = [
-  { value: 'duckduckgo', label: 'DuckDuckGo (no key)' },
-  { value: 'tavily', label: 'Tavily' },
-  { value: 'brave', label: 'Brave Search' }
-]
+const SEARCH_PROVIDER_VALUES: AppSettings['searchProvider'][] = ['duckduckgo', 'tavily', 'brave']
 
 function SettingsSwitchRow({
   title,
@@ -85,6 +82,8 @@ function syncFormFromSettings(
 }
 
 export function SettingsModal(): React.ReactElement {
+  const { t } = useTranslation('settings')
+  const { t: tCommon } = useTranslation('common')
   const { settings, settingsOpen, settingsFocusSection, setSettingsOpen, setSettings, loadModels } =
     useSettingsStore()
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
@@ -168,15 +167,22 @@ export function SettingsModal(): React.ReactElement {
       await loadModels()
       setSettingsOpen(false)
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save settings')
+      setSaveError(err instanceof Error ? err.message : t('saveFailed'))
     } finally {
       setSaving(false)
     }
   }
 
   const providerLabel =
-    SEARCH_PROVIDERS.find((p) => p.value === searchProvider)?.label ?? 'Select provider'
-  const sectionMeta = getSettingsSection(activeSection)
+    searchProvider === 'duckduckgo'
+      ? t('search.duckduckgo')
+      : searchProvider === 'tavily'
+        ? t('search.tavily')
+        : searchProvider === 'brave'
+          ? t('search.brave')
+          : t('search.selectProvider')
+  const sectionMeta = getSettingsSection(activeSection, t)
+  const settingsSections = getSettingsSections(t)
 
   const renderSectionContent = (): React.ReactElement => {
     switch (activeSection) {
@@ -185,12 +191,12 @@ export function SettingsModal(): React.ReactElement {
           <div className="space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-zinc-400">
-                OpenRouter API Key
+                {t('general.apiKey')}
               </label>
-              <PasswordInput value={apiKey} onChange={setApiKey} placeholder="sk-or-..." />
+              <PasswordInput value={apiKey} onChange={setApiKey} placeholder={t('general.apiKeyPlaceholder')} />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Temperature</label>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-400">{t('general.temperature')}</label>
               <input
                 type="number"
                 min="0"
@@ -200,7 +206,7 @@ export function SettingsModal(): React.ReactElement {
                 onChange={(e) => setTemperature(e.target.value)}
                 className="w-full max-w-xs rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200"
               />
-              <p className="mt-1 text-[11px] text-zinc-500">Default creativity for new chat runs.</p>
+              <p className="mt-1 text-[11px] text-zinc-500">{t('general.temperatureHint')}</p>
             </div>
           </div>
         )
@@ -210,13 +216,13 @@ export function SettingsModal(): React.ReactElement {
           <div className="space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-zinc-400">
-                Custom system prompt
+                {t('agent.customPrompt')}
               </label>
               <textarea
                 value={customSystemPrompt}
                 onChange={(e) => setCustomSystemPrompt(e.target.value)}
                 rows={4}
-                placeholder="Optional extra instructions prepended to agent system prompt"
+                placeholder={t('agent.customPromptPlaceholder')}
                 className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200"
               />
             </div>
@@ -227,8 +233,8 @@ export function SettingsModal(): React.ReactElement {
               onAutoLoadDocsChange={setProjectMemoryAutoLoadDocs}
             />
             <SettingsSwitchRow
-              title="Verify after edits"
-              description="Agent runs tests/lint/tsc after code changes (via run_terminal)"
+              title={t('agent.verifyAfterEdits.title')}
+              description={t('agent.verifyAfterEdits.description')}
               checked={agentAutoVerify}
               onCheckedChange={setAgentAutoVerify}
             />
@@ -239,14 +245,14 @@ export function SettingsModal(): React.ReactElement {
         return (
           <div className="space-y-2">
             <SettingsSwitchRow
-              title="Auto-approve file writes"
-              description="write_file / search_replace / update_project_memory"
+              title={t('safety.autoApproveWrites.title')}
+              description={t('safety.autoApproveWrites.description')}
               checked={autoApproveWrites}
               onCheckedChange={setAutoApproveWrites}
             />
             <SettingsSwitchRow
-              title="Auto-approve terminal"
-              description="run_terminal commands"
+              title={t('safety.autoApproveTerminal.title')}
+              description={t('safety.autoApproveTerminal.description')}
               checked={autoApproveTerminal}
               onCheckedChange={setAutoApproveTerminal}
             />
@@ -257,18 +263,22 @@ export function SettingsModal(): React.ReactElement {
         return (
           <div className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Provider</label>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-400">{t('search.provider')}</label>
               <Select
                 value={searchProvider}
                 onValueChange={(v) => setSearchProvider(v as AppSettings['searchProvider'])}
               >
                 <SelectTrigger className="h-10 w-full max-w-md text-sm">
-                  <SelectValue placeholder="Select provider">{providerLabel}</SelectValue>
+                  <SelectValue placeholder={t('search.selectProvider')}>{providerLabel}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {SEARCH_PROVIDERS.map((provider) => (
-                    <SelectItem key={provider.value} value={provider.value!} className="py-2 text-sm">
-                      {provider.label}
+                  {SEARCH_PROVIDER_VALUES.map((provider) => (
+                    <SelectItem key={provider} value={provider!} className="py-2 text-sm">
+                      {provider === 'duckduckgo'
+                        ? t('search.duckduckgo')
+                        : provider === 'tavily'
+                          ? t('search.tavily')
+                          : t('search.brave')}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -276,11 +286,11 @@ export function SettingsModal(): React.ReactElement {
             </div>
             {searchProvider !== 'duckduckgo' && (
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-400">Search API key</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">{t('search.apiKey')}</label>
                 <PasswordInput
                   value={searchApiKey}
                   onChange={setSearchApiKey}
-                  placeholder="API key"
+                  placeholder={t('search.apiKeyPlaceholder')}
                 />
               </div>
             )}
@@ -291,19 +301,19 @@ export function SettingsModal(): React.ReactElement {
         return (
           <div className="space-y-4">
             <SettingsSwitchRow
-              title="Index on folder open"
-              description="Background FTS + symbols + embeddings"
+              title={t('index.onOpen.title')}
+              description={t('index.onOpen.description')}
               checked={indexOnOpen}
               onCheckedChange={setIndexOnOpen}
             />
             <SettingsSwitchRow
-              title="Semantic search"
-              description="Local MiniLM embeddings (offline)"
+              title={t('index.semantic.title')}
+              description={t('index.semantic.description')}
               checked={semanticSearchEnabled}
               onCheckedChange={setSemanticSearchEnabled}
             />
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Max file size (KB)</label>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-400">{t('index.maxFileSize')}</label>
               <input
                 type="number"
                 min="64"
@@ -314,7 +324,7 @@ export function SettingsModal(): React.ReactElement {
               />
             </div>
             <Button type="button" variant="secondary" onClick={() => void window.api.index.rebuild()}>
-              Rebuild index
+              {t('index.rebuild')}
             </Button>
           </div>
         )
@@ -338,12 +348,12 @@ export function SettingsModal(): React.ReactElement {
     <Dialog open={settingsOpen} onOpenChange={handleOpen}>
       <DialogContent className="flex h-[85vh] max-h-[85vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-white/5 px-6 py-4">
-          <DialogTitle>Settings</DialogTitle>
+          <DialogTitle>{t('title')}</DialogTitle>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <nav className="flex w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/5 bg-black/20 p-3">
-            {SETTINGS_SECTIONS.map((section) => {
+            {settingsSections.map((section) => {
               const Icon = section.icon
               const isActive = activeSection === section.id
               return (
@@ -379,10 +389,10 @@ export function SettingsModal(): React.ReactElement {
           <div>{saveError && <p className="text-xs text-red-400">{saveError}</p>}</div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
-              Cancel
+              {tCommon('actions.cancel')}
             </Button>
             <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? tCommon('actions.saving') : tCommon('actions.save')}
             </Button>
           </div>
         </div>

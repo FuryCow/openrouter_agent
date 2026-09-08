@@ -1,16 +1,18 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react'
-import { Send, Square, Trash2, Bot, RotateCcw, Paperclip, Undo2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Send, Square, Trash2, RotateCcw, Paperclip, Undo2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '../ui/button'
 import { MessageBubble, MemoMessageBubble } from './MessageBubble'
-import { ChatModeSelector } from './ChatModeSelector'
+import { ChatModeSelector, ChatModeDescription } from './ChatModeSelector'
+import { ChatImagePreview } from './ChatImagePreview'
 import { useChatStore } from '@/stores/chatStore'
 import { useAgent } from '@/hooks/useAgent'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useFileStore } from '@/stores/fileStore'
 import { useToastStore } from '@/stores/toastStore'
 import { getMessageRememberContent } from '@/lib/messageRemember'
-import { getChatModeConfig } from '@/lib/chatModes'
+import { useChatModes } from '@/hooks/useChatModes'
 import { scheduleInAnimationFrame } from '@/lib/animation-frame'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -52,6 +54,9 @@ function ChatAutoScroll({
 }
 
 export function ChatPanel(): React.ReactElement {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
+  const { getModeConfig } = useChatModes()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<string[]>([])
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
@@ -83,7 +88,8 @@ export function ChatPanel(): React.ReactElement {
   const runCheckpoint = useAgentRunStore((s) => s.checkpoint)
   const clearRunCheckpoint = useAgentRunStore((s) => s.clearCheckpoint)
 
-  const modeConfig = getChatModeConfig(chatMode)
+  const modeConfig = getModeConfig(chatMode)
+  const ModeIcon = modeConfig.icon
   const visibleMessages = useMemo(
     () => messages.filter((m) => m.mode === chatMode || !m.mode),
     [messages, chatMode]
@@ -144,11 +150,11 @@ export function ChatPanel(): React.ReactElement {
   const addImageFiles = (files: FileList | File[]): void => {
     const list = Array.from(files).filter((f) => f.type.startsWith('image/'))
     if (list.length === 0) {
-      useToastStore.getState().addToast('Only image files can be attached', 'error')
+      useToastStore.getState().addToast(t('toast.onlyImages'), 'error')
       return
     }
     if (!visionSupported) {
-      useToastStore.getState().addToast('Current model does not support vision', 'error')
+      useToastStore.getState().addToast(t('toast.noVision'), 'error')
       return
     }
     list.forEach((file) => {
@@ -164,7 +170,7 @@ export function ChatPanel(): React.ReactElement {
 
   const handleAttachClick = (): void => {
     if (!visionSupported) {
-      useToastStore.getState().addToast('Current model does not support vision', 'error')
+      useToastStore.getState().addToast(t('toast.noVision'), 'error')
       return
     }
     fileInputRef.current?.click()
@@ -238,18 +244,18 @@ export function ChatPanel(): React.ReactElement {
     try {
       const result = await window.api.agent.restoreRunCheckpoint()
       if (!result) {
-        useToastStore.getState().addToast('Nothing to revert from the last run', 'info')
+        useToastStore.getState().addToast(t('toast.nothingToRevert'), 'info')
         return
       }
       clearRunCheckpoint()
       await useFileStore.getState().reloadCleanTabsFromDisk()
       useToastStore.getState().addToast(
-        `Reverted ${result.restored + result.deleted} file change(s) from last agent run`,
+        t('toast.revertedFiles', { count: result.restored + result.deleted }),
         'success'
       )
     } catch (err) {
       useToastStore.getState().addToast(
-        err instanceof Error ? err.message : 'Failed to revert changes',
+        err instanceof Error ? err.message : t('toast.revertFailed'),
         'error'
       )
     }
@@ -266,31 +272,31 @@ export function ChatPanel(): React.ReactElement {
 
   const copyMessage = async (text: string): Promise<void> => {
     await navigator.clipboard.writeText(text)
-    useToastStore.getState().addToast('Copied to clipboard', 'success')
+    useToastStore.getState().addToast(tc('toast.copiedToClipboard'), 'success')
   }
 
   const rememberMessage = async (message: (typeof visibleMessages)[number]): Promise<void> => {
     if (settings.projectMemoryEnabled === false) {
-      useToastStore.getState().addToast('Project memory is disabled in settings', 'error')
+      useToastStore.getState().addToast(t('toast.memoryDisabled'), 'error')
       return
     }
     if (!workingDirectory) {
-      useToastStore.getState().addToast('Open a workspace to save project memory', 'error')
+      useToastStore.getState().addToast(t('toast.openWorkspaceForMemory'), 'error')
       return
     }
 
     const content = getMessageRememberContent(message)
     if (!content) {
-      useToastStore.getState().addToast('Nothing to remember in this message', 'error')
+      useToastStore.getState().addToast(t('toast.nothingToRemember'), 'error')
       return
     }
 
     try {
       await window.api.memory.remember({ content, category: 'note', source: 'remember' }, workingDirectory)
-      useToastStore.getState().addToast('Added to project memory', 'success')
+      useToastStore.getState().addToast(tc('toast.addedToMemory'), 'success')
     } catch (err) {
       useToastStore.getState().addToast(
-        err instanceof Error ? err.message : 'Failed to save project memory',
+        err instanceof Error ? err.message : t('toast.memorySaveFailed'),
         'error'
       )
     }
@@ -313,12 +319,17 @@ export function ChatPanel(): React.ReactElement {
     >
       <div className="flex items-center justify-between border-b border-white/5 px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500/20 to-violet-500/20">
-            <Bot className="h-4 w-4 text-indigo-400" />
+          <div
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-inset',
+              modeConfig.theme.iconBg
+            )}
+          >
+            <ModeIcon className={cn('h-4 w-4', modeConfig.theme.icon)} />
           </div>
           <div>
-            <span className="text-sm font-medium text-zinc-200">Chat</span>
-            <span className="ml-2 text-[10px] text-zinc-600">{visibleMessages.length} msgs</span>
+            <span className="text-sm font-medium text-zinc-200">{modeConfig.label}</span>
+            <span className="ml-2 text-[10px] text-zinc-600">{t('messageCount', { count: visibleMessages.length })}</span>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -329,10 +340,10 @@ export function ChatPanel(): React.ReactElement {
               className="h-7 gap-1 px-2 text-amber-300 hover:text-amber-200"
               onClick={() => void handleRestoreRunCheckpoint()}
               disabled={isStreaming}
-              title={`Revert ${runCheckpoint.count} file(s) from last agent run`}
+              title={t('revertRunTitle', { count: runCheckpoint.count })}
             >
               <Undo2 className="h-3.5 w-3.5" />
-              <span className="text-[10px]">Revert run</span>
+              <span className="text-[10px]">{t('revertRun')}</span>
             </Button>
           )}
           <Button
@@ -341,7 +352,7 @@ export function ChatPanel(): React.ReactElement {
             className="h-7 w-7"
             onClick={() => retryLast()}
             disabled={isStreaming}
-            title="Retry last"
+            title={t('retryLast')}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
@@ -428,33 +439,46 @@ export function ChatPanel(): React.ReactElement {
       </div>
 
       <div className="border-t border-white/5 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <ChatModeSelector mode={chatMode} onModeChange={setChatMode} disabled={isStreaming} />
-        </div>
-
-        {attachments.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {attachments.map((src, i) => (
-              <div key={i} className="relative">
-                <img src={src} alt="" className="h-14 w-14 rounded-md object-cover border border-white/10" />
-                <button
-                  type="button"
-                  className="absolute -right-1 -top-1 rounded-full bg-zinc-800 px-1 text-[10px] text-zinc-300"
-                  onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         <div
           className={cn(
-            'relative flex gap-1 rounded-xl border border-white/10 bg-white/[0.02] p-1.5 focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20 transition-all',
-            inputIsMultiline ? 'items-end' : 'items-center'
+            'overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] transition-all',
+            'focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20'
           )}
         >
+          <div className="flex items-center gap-2 border-b border-white/5 bg-white/[0.02] px-2 py-1.5">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <ChatModeSelector mode={chatMode} onModeChange={setChatMode} disabled={isStreaming} />
+              <ChatModeDescription mode={chatMode} />
+            </div>
+            <TokenUsageRing compact />
+          </div>
+
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 border-b border-white/5 px-2 py-2">
+              {attachments.map((src, i) => (
+                <div key={i} className="relative">
+                  <ChatImagePreview
+                    src={src}
+                    thumbnailClassName="h-14 w-14 object-cover"
+                  />
+                  <button
+                    type="button"
+                    className="absolute -right-1 -top-1 z-10 rounded-full bg-zinc-800 px-1 text-[10px] text-zinc-300"
+                    onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div
+            className={cn(
+              'relative flex gap-1 p-1.5',
+              inputIsMultiline ? 'items-end' : 'items-center'
+            )}
+          >
           <input
             ref={fileInputRef}
             type="file"
@@ -470,7 +494,7 @@ export function ChatPanel(): React.ReactElement {
             className="size-9 shrink-0 text-zinc-500 hover:text-zinc-300"
             onClick={handleAttachClick}
             disabled={isStreaming}
-            title={visionSupported ? 'Attach image' : 'Vision not supported by current model'}
+            title={visionSupported ? t('attachImage') : t('visionNotSupported')}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -480,11 +504,10 @@ export function ChatPanel(): React.ReactElement {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={editingMessageId ? 'Edit message…' : modeConfig.placeholder}
+            placeholder={editingMessageId ? t('editMessagePlaceholder') : modeConfig.placeholder}
             rows={1}
             className="flex-1 resize-none overflow-hidden bg-transparent px-1 py-2 text-sm leading-5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
           />
-          <TokenUsageRing />
           {isStreaming ? (
             <Button variant="destructive" size="icon" className="size-9 shrink-0" onClick={abort}>
               <Square className="h-4 w-4" />
@@ -499,6 +522,7 @@ export function ChatPanel(): React.ReactElement {
               <Send className="h-4 w-4" />
             </Button>
           )}
+          </div>
         </div>
         <p className="mt-2 px-1 text-[10px] text-zinc-600">
           <button
@@ -506,7 +530,7 @@ export function ChatPanel(): React.ReactElement {
             className="hover:text-zinc-400 underline-offset-2 hover:underline"
             onClick={() => setShortcutsOpen(true)}
           >
-            Enter — отправить
+            {t('shortcutSend')}
           </button>
           {' · '}
           <button
@@ -514,7 +538,7 @@ export function ChatPanel(): React.ReactElement {
             className="hover:text-zinc-400 underline-offset-2 hover:underline"
             onClick={() => setShortcutsOpen(true)}
           >
-            Shift+Enter — новая строка
+            {t('shortcutNewLine')}
           </button>
           {' · '}
           <button
@@ -522,7 +546,7 @@ export function ChatPanel(): React.ReactElement {
             className="hover:text-zinc-400 underline-offset-2 hover:underline"
             onClick={() => setShortcutsOpen(true)}
           >
-            Ctrl+/ — все клавиши
+            {t('shortcutAllKeys')}
           </button>
         </p>
       </div>
@@ -530,9 +554,9 @@ export function ChatPanel(): React.ReactElement {
       <ConfirmDialog
         open={clearConfirmOpen}
         onOpenChange={setClearConfirmOpen}
-        title="Очистить чат?"
-        description={`Удалить все ${visibleMessages.length} сообщений в режиме «${modeConfig.label}»? Счётчик токенов сессии тоже сбросится.`}
-        confirmLabel="Очистить"
+        title={t('clearConfirm.title')}
+        description={t('clearConfirm.description', { count: visibleMessages.length, mode: modeConfig.label })}
+        confirmLabel={t('clearConfirm.confirm')}
         destructive
         onConfirm={confirmClear}
       />

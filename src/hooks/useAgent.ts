@@ -6,17 +6,15 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useToastStore } from '../stores/toastStore'
 import { useAgentRunStore } from '../stores/agentRunStore'
 import { getChatModeConfig } from '../lib/chatModes'
+import { getT } from '../i18n/t'
 
 function buildImplementPlanPrompt(planContent: string, originalTask?: string): string {
+  const t = getT('chat')
   const taskLine = originalTask
-    ? `Исходная задача пользователя:\n${originalTask}\n\n`
+    ? t('agent.implementPlanPrompt.taskLine', { task: originalTask })
     : ''
 
-  return `${taskLine}Реализуй согласно плану ниже. Выполняй шаги по порядку, используй инструменты, не отклоняйся от плана без необходимости.
-
----
-
-${planContent}`
+  return `${taskLine}${t('agent.implementPlanPrompt.body', { plan: planContent })}`
 }
 
 export function useAgent(): {
@@ -42,9 +40,11 @@ export function useAgent(): {
       approvedPlan?: ApprovedPlan
     }
   ): Promise<void> => {
+    const tChat = getT('chat')
+    const tErrors = getT('errors')
     const { chatMode, addUserMessage, clearStream, setStreaming } = useChatStore.getState()
     const mode = options?.mode ?? chatMode
-    const modeConfig = getChatModeConfig(mode)
+    const modeConfig = getChatModeConfig(mode, tChat)
     const workingDirectory = useFileStore.getState().workingDirectory || ''
     const settings = useSettingsStore.getState().settings
 
@@ -54,10 +54,7 @@ export function useAgent(): {
     }
 
     if (modeConfig.requiresWorkspace && !workingDirectory) {
-      useToastStore.getState().addToast(
-        'Open a project folder in Explorer first (not the agent app folder).',
-        'error'
-      )
+      useToastStore.getState().addToast(tErrors('agent.noWorkspace'), 'error')
       return
     }
 
@@ -95,7 +92,7 @@ export function useAgent(): {
       })
     } catch (err) {
       setStreaming(false)
-      const errorText = err instanceof Error ? err.message : 'Failed to send message'
+      const errorText = err instanceof Error ? err.message : tErrors('agent.sendFailed')
       useToastStore.getState().addToast(errorText, 'error')
     }
   }
@@ -103,6 +100,7 @@ export function useAgent(): {
   const implementPlan = async (planContent: string): Promise<void> => {
     if (useChatStore.getState().isStreaming) return
 
+    const tChat = getT('chat')
     const { messages, setChatMode } = useChatStore.getState()
     const plannerMessages = messages.filter((m) => m.mode === 'planner')
     const originalTask = [...plannerMessages]
@@ -110,7 +108,7 @@ export function useAgent(): {
       .find((m) => m.role === 'user')?.content
 
     setChatMode('agent')
-    useToastStore.getState().addToast('Режим Агента — реализация плана', 'info')
+    useToastStore.getState().addToast(tChat('agent.implementingPlan'), 'info')
 
     const approvedPlan = parsePlannerPlan(planContent)
     const prompt = buildImplementPlanPrompt(planContent, originalTask)
@@ -119,10 +117,11 @@ export function useAgent(): {
 
   const abort = (): void => {
     window.api.agent.abort()
+    const tChat = getT('chat')
     const { setStreaming, finalizeAssistantMessage, activeTimeline } = useChatStore.getState()
     setStreaming(false)
     finalizeAssistantMessage(
-      '⚠️ Run aborted.',
+      tChat('agent.aborted'),
       activeTimeline.length > 0 ? [...activeTimeline] : undefined,
       true,
       undefined,

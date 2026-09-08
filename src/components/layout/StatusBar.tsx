@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 import { EditorStatusInfo } from './EditorStatusInfo'
 import { Terminal as TerminalIcon, BarChart3, Database, Plug } from 'lucide-react'
@@ -7,10 +9,33 @@ import { useIndexStore } from '@/stores/indexStore'
 import { useMcp } from '@/hooks/useMcp'
 import { getModelPriceLabel } from '@/lib/models'
 import { cn } from '@/lib/utils'
+import type { IndexStatus } from '@/types'
 
-function formatMcpLabel(status: ReturnType<typeof useMcp>['status']): string {
-  if (status.enabledCount === 0) return 'MCP · none'
-  return `MCP · ${status.connectedCount}/${status.enabledCount} · ${status.totalTools} tools`
+const INDEX_PHASE_CODE_TO_KEY: Record<string, string> = {
+  'index.scanning': 'scanning',
+  'index.indexingFiles': 'indexingFiles',
+  'index.embedding': 'embedding'
+}
+
+function resolveIndexPhaseLabel(
+  progress: NonNullable<IndexStatus['progress']>,
+  tTools: TFunction<'tools'>
+): string | null {
+  const key = progress.phaseCode ? INDEX_PHASE_CODE_TO_KEY[progress.phaseCode] : null
+  if (!key) return null
+  return tTools(`index.${key}`)
+}
+
+function formatMcpLabel(
+  status: ReturnType<typeof useMcp>['status'],
+  t: TFunction<'layout'>
+): string {
+  if (status.enabledCount === 0) return t('status.mcp.none')
+  return t('status.mcp.summary', {
+    connected: status.connectedCount,
+    enabled: status.enabledCount,
+    tools: status.totalTools
+  })
 }
 
 function mcpStatusColor(status: ReturnType<typeof useMcp>['status']): string {
@@ -19,23 +44,32 @@ function mcpStatusColor(status: ReturnType<typeof useMcp>['status']): string {
   if (status.connectedCount > 0) return 'text-amber-400'
   return 'text-red-400'
 }
-function formatIndexLabel(status: ReturnType<typeof useIndexStore.getState>['status']): string {
-  if (!status.workspacePath) return 'Index idle'
+
+function formatIndexLabel(
+  status: ReturnType<typeof useIndexStore.getState>['status'],
+  t: TFunction<'layout'>,
+  tTools: TFunction<'tools'>
+): string {
+  if (!status.workspacePath) return t('status.index.idle')
   if (status.state === 'building' && status.progress) {
+    const phaseLabel = resolveIndexPhaseLabel(status.progress, tTools)
     const pct =
       status.progress.filesTotal > 0
         ? Math.round((status.progress.filesDone / status.progress.filesTotal) * 100)
         : 0
-    return `Indexing ${pct}%`
+    if (phaseLabel) return `${phaseLabel} ${pct}%`
+    return t('status.index.building', { percent: pct })
   }
-  if (status.state === 'error') return 'Index error'
+  if (status.state === 'error') return t('status.index.error')
   if (status.state === 'ready') {
-    return `Index ready · ${status.filesIndexed} files`
+    return t('status.index.ready', { count: status.filesIndexed })
   }
-  return 'Index…'
+  return t('status.index.pending')
 }
 
 export function StatusBar(): React.ReactElement {
+  const { t } = useTranslation('layout')
+  const { t: tTools } = useTranslation('tools')
   const settings = useSettingsStore((s) => s.settings)
   const modelCount = useSettingsStore((s) => s.models.length)
   const currentModel = useSettingsStore((s) => s.models.find((m) => m.id === s.settings.model))
@@ -48,11 +82,11 @@ export function StatusBar(): React.ReactElement {
   const setSettingsOpen = useSettingsStore((s) => s.setSettingsOpen)
   const { status: mcpStatus } = useMcp()
 
-  const indexLabel = formatIndexLabel(indexStatus)
-  const mcpLabel = formatMcpLabel(mcpStatus)
+  const indexLabel = formatIndexLabel(indexStatus, t, tTools)
+  const mcpLabel = formatMcpLabel(mcpStatus, t)
   const mcpTooltip =
     mcpStatus.servers.length === 0
-      ? 'Configure MCP servers'
+      ? t('status.mcp.configure')
       : mcpStatus.servers
           .map((s) => `${s.name}: ${s.status}${s.lastError ? ` — ${s.lastError}` : ''}`)
           .join('\n')
@@ -86,8 +120,8 @@ export function StatusBar(): React.ReactElement {
             indexStatus.error
               ? indexStatus.error
               : indexStatus.lastBuiltAt
-                ? `Last built: ${indexStatus.lastBuiltAt}`
-                : 'Rebuild codebase index'
+                ? t('status.index.lastBuilt', { date: indexStatus.lastBuiltAt })
+                : t('status.index.rebuildTooltip')
           }
         >
           <Database className="h-3.5 w-3.5" />
@@ -97,10 +131,10 @@ export function StatusBar(): React.ReactElement {
           type="button"
           onClick={() => setAnalyticsOpen(true)}
           className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-white/5 hover:text-zinc-300"
-          title="Tool call analytics"
+          title={t('status.toolsTooltip')}
         >
           <BarChart3 className="h-3.5 w-3.5" />
-          Tools
+          {t('status.tools')}
           {lastRun && (
             <span className="font-mono text-emerald-400/80">
               {lastRun.summary.success}/{lastRun.summary.totalTools}
@@ -114,10 +148,10 @@ export function StatusBar(): React.ReactElement {
             'flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-white/5 hover:text-zinc-300',
             terminalOpen && 'bg-indigo-500/10 text-indigo-400'
           )}
-          title="Toggle terminal (Ctrl+`)"
+          title={t('status.terminalTooltip')}
         >
           <TerminalIcon className="h-3.5 w-3.5" />
-          Terminal
+          {t('status.terminal')}
         </button>
       </div>
 
@@ -126,8 +160,8 @@ export function StatusBar(): React.ReactElement {
       </div>
 
       <div className="flex shrink-0 items-center gap-3 text-sm">
-        <span>{settings.apiKey ? 'API connected' : 'No API key'}</span>
-        <span className="text-zinc-600">{modelCount} models</span>
+        <span>{settings.apiKey ? t('status.apiConnected') : t('status.noApiKey')}</span>
+        <span className="text-zinc-600">{t('status.modelCount', { count: modelCount })}</span>
         <span className="font-medium text-indigo-400">{settings.model.split('/').pop()}</span>
         {currentModel && (
           <span className="font-mono text-emerald-500/80">{getModelPriceLabel(currentModel)}</span>

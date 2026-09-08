@@ -10,6 +10,7 @@ export type IndexPhase =
 
 export interface IndexProgress {
   phase: IndexPhase
+  phaseCode?: string
   filesDone: number
   filesTotal: number
   message?: string

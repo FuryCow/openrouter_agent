@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { ToolCallInfo } from '@/types'
 import {
@@ -7,6 +8,7 @@ import {
   type ToolArgsView,
   type ToolResultView
 } from '@/lib/toolCallDisplay'
+import { localizeMetaLabel, localizeToolResultView } from '@/lib/toolCallDisplayI18n'
 import { FilePathLink } from './FilePathLink'
 
 function ToolSection({
@@ -26,7 +28,13 @@ function ToolSection({
   )
 }
 
-function ToolMetaChips({ items }: { items: Array<{ label: string; value: string }> }): React.ReactElement {
+function ToolMetaChips({
+  items,
+  labelNs
+}: {
+  items: Array<{ label: string; value: string }>
+  labelNs: (label: string) => string
+}): React.ReactElement {
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((item) => (
@@ -34,7 +42,7 @@ function ToolMetaChips({ items }: { items: Array<{ label: string; value: string 
           key={`${item.label}-${item.value}`}
           className="rounded bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-zinc-400"
         >
-          <span className="text-zinc-500">{item.label}</span>{' '}
+          <span className="text-zinc-500">{labelNs(item.label)}</span>{' '}
           <span className="font-mono text-zinc-300">{item.value}</span>
         </span>
       ))}
@@ -68,12 +76,14 @@ function ToolTextBlock({
 }
 
 function ToolArgsPreview({ view }: { view: ToolArgsView }): React.ReactElement | null {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
   switch (view.kind) {
     case 'empty':
       return null
     case 'paths':
       return (
-        <ToolSection label="Files">
+        <ToolSection label={tc('labels.files')}>
           <div className="flex flex-wrap gap-x-2 gap-y-1">
             {view.paths.map((path) => (
               <FilePathLink key={path} path={path} className="text-xs" />
@@ -83,20 +93,20 @@ function ToolArgsPreview({ view }: { view: ToolArgsView }): React.ReactElement |
       )
     case 'file-path':
       return (
-        <ToolSection label="File">
+        <ToolSection label={tc('labels.file')}>
           <FilePathLink path={view.path} className="text-xs" />
         </ToolSection>
       )
     case 'search-replace':
       return (
         <div className="space-y-2">
-          <ToolSection label="File">
+          <ToolSection label={tc('labels.file')}>
             <FilePathLink path={view.path} className="text-xs" />
           </ToolSection>
           {view.replaceAll && (
-            <div className="text-[10px] text-amber-300/80">Replace all occurrences</div>
+            <div className="text-[10px] text-amber-300/80">{t('tool.replaceAll')}</div>
           )}
-          <ToolSection label="Change">
+          <ToolSection label={tc('labels.change')}>
             <div className="overflow-hidden rounded-md border border-white/5 bg-black/25 font-mono text-xs">
               {view.oldString && (
                 <div className="border-b border-white/5 bg-red-500/10 px-2.5 py-1.5 text-red-100 whitespace-pre-wrap break-words">
@@ -115,27 +125,29 @@ function ToolArgsPreview({ view }: { view: ToolArgsView }): React.ReactElement |
     case 'query':
       return (
         <div className="space-y-2">
-          <ToolSection label="Query">
+          <ToolSection label={tc('labels.query')}>
             <ToolTextBlock text={view.query} mono />
           </ToolSection>
-          {view.meta.length > 0 && <ToolMetaChips items={view.meta} />}
+          {view.meta.length > 0 && (
+            <ToolMetaChips items={view.meta} labelNs={(label) => localizeMetaLabel(label, tc)} />
+          )}
         </div>
       )
     case 'command':
       return (
-        <ToolSection label="Command">
+        <ToolSection label={tc('labels.command')}>
           <ToolTextBlock text={view.command} />
         </ToolSection>
       )
     case 'memory-read': {
       const items = [
-        ...(view.category ? [{ label: 'category', value: view.category }] : []),
-        ...(view.query ? [{ label: 'query', value: view.query }] : [])
+        ...(view.category ? [{ label: tc('meta.category'), value: view.category }] : []),
+        ...(view.query ? [{ label: tc('meta.query'), value: view.query }] : [])
       ]
       if (items.length === 0) return null
       return (
-        <ToolSection label="Filter">
-          <ToolMetaChips items={items} />
+        <ToolSection label={tc('labels.filter')}>
+          <ToolMetaChips items={items} labelNs={(label) => label} />
         </ToolSection>
       )
     }
@@ -144,13 +156,14 @@ function ToolArgsPreview({ view }: { view: ToolArgsView }): React.ReactElement |
         <div className="space-y-2">
           <ToolMetaChips
             items={[
-              { label: 'action', value: view.action },
-              ...(view.category ? [{ label: 'category', value: view.category }] : []),
-              ...(view.id ? [{ label: 'id', value: view.id }] : [])
+              { label: tc('meta.action'), value: view.action },
+              ...(view.category ? [{ label: tc('meta.category'), value: view.category }] : []),
+              ...(view.id ? [{ label: tc('meta.id'), value: view.id }] : [])
             ]}
+            labelNs={(label) => label}
           />
           {view.content && (
-            <ToolSection label="Content">
+            <ToolSection label={tc('labels.content')}>
               <ToolTextBlock text={view.content} mono={false} />
             </ToolSection>
           )}
@@ -158,7 +171,7 @@ function ToolArgsPreview({ view }: { view: ToolArgsView }): React.ReactElement |
       )
     case 'generic':
       return (
-        <ToolSection label="Input">
+        <ToolSection label={tc('labels.input')}>
           <div className="space-y-1.5">
             {view.fields.map((field) => (
               <div key={field.key} className="rounded-md bg-black/25 px-2.5 py-1.5">
@@ -175,26 +188,30 @@ function ToolArgsPreview({ view }: { view: ToolArgsView }): React.ReactElement |
 }
 
 function ToolResultPreview({ view }: { view: ToolResultView }): React.ReactElement | null {
-  switch (view.kind) {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
+  const { t: tt } = useTranslation('tools')
+  const localized = localizeToolResultView(view, tt)
+  switch (localized.kind) {
     case 'empty':
       return null
     case 'message':
       return (
-        <ToolSection label="Result">
-          <ToolTextBlock text={view.text} tone={view.tone} mono={false} />
+        <ToolSection label={tc('labels.result')}>
+          <ToolTextBlock text={localized.text} tone={localized.tone} mono={false} />
         </ToolSection>
       )
     case 'text':
       return (
-        <ToolSection label="Output">
-          <ToolTextBlock text={view.text} tone={view.tone} />
+        <ToolSection label={tc('labels.output')}>
+          <ToolTextBlock text={localized.text} tone={localized.tone} />
         </ToolSection>
       )
     case 'file-sections':
       return (
-        <ToolSection label="Output">
+        <ToolSection label={tc('labels.output')}>
           <div className="space-y-2">
-            {view.sections.map((section) => (
+            {localized.sections.map((section) => (
               <div key={section.path} className="overflow-hidden rounded-md border border-white/5">
                 <div className="border-b border-white/5 bg-white/[0.03] px-2.5 py-1.5">
                   <FilePathLink path={section.path} className="text-xs" />
@@ -214,9 +231,9 @@ function ToolResultPreview({ view }: { view: ToolResultView }): React.ReactEleme
       )
     case 'grep-hits':
       return (
-        <ToolSection label={`Matches (${view.hits.length})`}>
+        <ToolSection label={t('tool.matches', { count: localized.hits.length })}>
           <div className="space-y-1">
-            {view.hits.map((hit, index) => (
+            {localized.hits.map((hit, index) => (
               <div
                 key={`${hit.file}-${hit.line}-${index}`}
                 className="rounded-md bg-black/25 px-2.5 py-1.5 text-xs"
@@ -235,9 +252,9 @@ function ToolResultPreview({ view }: { view: ToolResultView }): React.ReactEleme
       )
     case 'search-hits':
       return (
-        <ToolSection label={`Hits (${view.hits.length})`}>
+        <ToolSection label={t('tool.hits', { count: localized.hits.length })}>
           <div className="space-y-1">
-            {view.hits.map((hit, index) => (
+            {localized.hits.map((hit, index) => (
               <div
                 key={`${hit.path}-${hit.startLine}-${index}`}
                 className="rounded-md bg-black/25 px-2.5 py-1.5 text-xs"
@@ -262,15 +279,15 @@ function ToolResultPreview({ view }: { view: ToolResultView }): React.ReactEleme
       )
     case 'dir-list':
       return (
-        <ToolSection label={`Entries (${view.entries.length})`}>
+        <ToolSection label={t('tool.entries', { count: localized.entries.length })}>
           <div className="rounded-md bg-black/25 px-2.5 py-2">
-            {view.entries.map((entry) => (
+            {localized.entries.map((entry) => (
               <div
                 key={entry.name}
                 className="flex items-center gap-2 py-0.5 font-mono text-xs text-zinc-400"
               >
                 <span className={entry.isDirectory ? 'text-sky-400' : 'text-zinc-500'}>
-                  {entry.isDirectory ? 'dir' : 'file'}
+                  {entry.isDirectory ? tc('labels.dir') : tc('labels.fileType')}
                 </span>
                 <span>{entry.name}</span>
               </div>
@@ -280,9 +297,9 @@ function ToolResultPreview({ view }: { view: ToolResultView }): React.ReactEleme
       )
     case 'web-results':
       return (
-        <ToolSection label={`Results (${view.items.length})`}>
+        <ToolSection label={t('tool.results', { count: localized.items.length })}>
           <div className="space-y-2">
-            {view.items.map((item) => (
+            {localized.items.map((item) => (
               <div key={item.url} className="rounded-md bg-black/25 px-2.5 py-2 text-xs">
                 <div className="font-medium text-zinc-200">{item.title}</div>
                 <a
@@ -312,6 +329,7 @@ export function ToolCallDetailView({
   toolCall: ToolCallInfo
   showDiff: boolean
 }): React.ReactElement {
+  const { t } = useTranslation('chat')
   let argsView = buildToolArgsView(toolCall.name, toolCall.arguments)
   if (showDiff && argsView.kind === 'search-replace') {
     argsView = { kind: 'file-path', path: argsView.path }
@@ -323,7 +341,7 @@ export function ToolCallDetailView({
   return (
     <div className="space-y-3">
       {isRunning && !toolCall.arguments.trim() && (
-        <div className="text-xs text-zinc-500">Подготовка аргументов…</div>
+        <div className="text-xs text-zinc-500">{t('tool.preparingArgs')}</div>
       )}
 
       <ToolArgsPreview view={argsView} />

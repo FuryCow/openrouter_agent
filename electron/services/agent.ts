@@ -14,9 +14,9 @@ import {
 import {
   assertAllowedWorkspace,
   assertPathNotInAgentApp,
-  assertSafeTerminalCommand,
-  AGENT_APP_WORKSPACE_ERROR
+  assertSafeTerminalCommand
 } from './workspace-safety'
+import { AppError, AppErrorCode, getAppErrorPayload } from '../lib/app-errors'
 import {
   buildSystemPrompt,
   getMaxIterations,
@@ -400,14 +400,17 @@ export class AgentService {
     const mode: ChatMode = context.mode ?? 'agent'
 
     if (this.running) {
-      emit({ type: 'error', error: 'Agent is already running. Wait or abort the current run.' })
+      emit({
+        type: 'error',
+        ...getAppErrorPayload(new AppError(AppErrorCode.AGENT_ALREADY_RUNNING))
+      })
       return
     }
 
     if (!this.openRouter.hasApiKey()) {
       emit({
         type: 'error',
-        error: 'OpenRouter API key is not set. Open Settings and add your key.'
+        ...getAppErrorPayload(new AppError(AppErrorCode.OPENROUTER_API_KEY_MISSING))
       })
       return
     }
@@ -415,7 +418,7 @@ export class AgentService {
     if (modeRequiresWorkspace(mode) && !context.workingDirectory) {
       emit({
         type: 'error',
-        error: 'No workspace folder open. Open a project folder in Explorer (not the agent app folder).'
+        ...getAppErrorPayload(new AppError(AppErrorCode.AGENT_NO_WORKSPACE))
       })
       return
     }
@@ -426,7 +429,7 @@ export class AgentService {
       } catch (err) {
         emit({
           type: 'error',
-          error: err instanceof Error ? err.message : AGENT_APP_WORKSPACE_ERROR
+          ...getAppErrorPayload(err)
         })
         return
       }
@@ -716,7 +719,8 @@ export class AgentService {
       }
     } catch (err) {
       if (!signal.aborted) {
-        const message = err instanceof Error ? err.message : String(err)
+        const payload = getAppErrorPayload(err)
+        const message = payload.error ?? payload.errorCode ?? 'Request failed'
         if (!analyticsClosed) await finishRun('error', iterations, message)
         this.emitRunStatus(emit, 'error')
         if (this.runCheckpoint.hasChanges()) {
@@ -728,7 +732,7 @@ export class AgentService {
         } else {
           emit({
             type: 'error',
-            error: message
+            ...payload
           })
         }
       } else if (!analyticsClosed) {

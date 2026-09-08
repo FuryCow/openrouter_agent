@@ -1,0 +1,23 @@
+{
+  "openProjectFolder": "Open a project folder",
+  "notAgentFolder": "Not the agent app folder",
+  "newFile": "New file",
+  "newFolder": "New folder",
+  "copyPath": "Copy path",
+  "revealInExplorer": "Reveal in file explorer",
+  "rename": "Rename",
+  "save": "Save",
+  "defaultFileName": "untitled.txt",
+  "defaultFolderName": "new-folder",
+  "invalidFileName": "Invalid file name",
+  "invalidFolderName": "Invalid folder name",
+  "invalidName": "Invalid name",
+  "createFileFailed": "Failed to create file",
+  "createFolderFailed": "Failed to create folder",
+  "renameFailed": "Failed to rename",
+  "revealFailed": "Failed to open file explorer",
+  "deleteFailed": "Failed to delete",
+  "deleteConfirm": "Delete \"{{name}}\"?{{folderSuffix}}",
+  "deleteFolderSuffix": " The folder and all contents will be deleted.",
+  "workspaceNotAllowed": "Workspace folder is not allowed"
+}

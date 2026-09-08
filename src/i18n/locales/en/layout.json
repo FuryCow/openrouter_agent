@@ -1,0 +1,115 @@
+{
+  "appName": "OpenRouter Agent",
+  "titleBar": {
+    "settings": "Settings"
+  },
+  "workspace": {
+    "noFolder": "No folder open",
+    "openProjectTitle": "Open project folder",
+    "openAnother": "Open another folder…",
+    "recent": "Recent"
+  },
+  "quickOpen": {
+    "title": "Quick open file",
+    "placeholder": "Type a file name…",
+    "noWorkspacePlaceholder": "Open a project folder first",
+    "project": "Project: {{name}}",
+    "noFolder": "No project folder open",
+    "openFolder": "Open folder",
+    "loading": "Loading file list…",
+    "noResults": "No files found"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "sendMessage": "Send message in chat",
+    "newLine": "New line in input field",
+    "saveFile": "Save current file",
+    "quickOpen": "Quick open file",
+    "settings": "Settings",
+    "terminal": "Show / hide terminal",
+    "list": "Keyboard shortcuts list"
+  },
+  "editor": {
+    "empty": {
+      "noProject": {
+        "title": "Open a project",
+        "description": "The editor and agent work with files inside the workspace. Choose a project folder first.",
+        "openFolder": "Open folder",
+        "settingsHint": "Settings and API key"
+      },
+      "noFile": {
+        "title": "No file selected",
+        "description": "Open a file from the tree on the left or via quick search. Paths in chat are also clickable."
+      },
+      "quickOpen": "Quick open file",
+      "pickFromExplorer": "Pick a file in Explorer on the left",
+      "clickPathHint": "Click a path in a diff or tool call to open the file here",
+      "allShortcuts": "All shortcuts",
+      "save": "save"
+    },
+    "tabs": {
+      "close": "Close",
+      "closeLeft": "Close to the left",
+      "closeRight": "Close to the right",
+      "closeOthers": "Close others"
+    }
+  },
+  "status": {
+    "cursor": "Ln {{line}}, Col {{column}}",
+    "lines": "{{count}} lines",
+    "mcp": {
+      "none": "MCP · none",
+      "summary": "MCP · {{connected}}/{{enabled}} · {{tools}} tools",
+      "configure": "Configure MCP servers"
+    },
+    "index": {
+      "idle": "Index idle",
+      "building": "Indexing {{percent}}%",
+      "error": "Index error",
+      "ready": "Index ready · {{count}} files",
+      "pending": "Index…",
+      "rebuildTooltip": "Rebuild codebase index",
+      "lastBuilt": "Last built: {{date}}"
+    },
+    "tools": "Tools",
+    "toolsTooltip": "Tool call analytics",
+    "terminal": "Terminal",
+    "terminalTooltip": "Toggle terminal (Ctrl+`)",
+    "apiConnected": "API connected",
+    "noApiKey": "No API key",
+    "modelCount": "{{count}} models"
+  },
+  "terminal": {
+    "show": "Show terminal",
+    "showTooltip": "Show terminal (Ctrl+`)",
+    "hide": "Hide",
+    "hideTooltip": "Hide terminal (Ctrl+`)"
+  },
+  "models": {
+    "selectModel": "Select model",
+    "searchPlaceholder": "Search: z-ai, glm, claude, deepseek...",
+    "filter": {
+      "vision": "Vision",
+      "free": "Free"
+    },
+    "sort": {
+      "cheapest": "Cheapest",
+      "premium": "Premium",
+      "agentic": "Agentic",
+      "name": "A–Z"
+    },
+    "caption": "Agent models · price per 1M tokens (input · output)",
+    "count": "{{filtered}} / {{total}}",
+    "staleCatalog": "Outdated model catalog detected. Close the app and run start.bat again.",
+    "loading": "Loading models...",
+    "noMatch": "No models match filters",
+    "refreshList": "Refresh list",
+    "badge": {
+      "tools": "Tools",
+      "vision": "Vision",
+      "agentic": "Agentic {{score}}",
+      "context": "{{label}} ctx"
+    },
+    "providerGroup": "{{provider}} · {{count}}"
+  }
+}

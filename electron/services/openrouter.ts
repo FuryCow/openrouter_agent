@@ -1,4 +1,5 @@
 import type { AppSettings, ModelInfo, TokenUsage } from '../types'
+import { AppError, AppErrorCode } from '../lib/app-errors'
 import { fetchAgentVisionModels } from './models'
 import { apiFetch } from './http'
 
@@ -164,7 +165,7 @@ export class OpenRouterClient {
       }
     }
 
-    throw lastError ?? new Error('OpenRouter request failed')
+    throw lastError ?? new AppError(AppErrorCode.OPENROUTER_REQUEST_FAILED)
   }
 
   private async streamCompletionOnce(
@@ -184,7 +185,7 @@ export class OpenRouterClient {
       options
     const apiKey = this.settings.apiKey?.trim()
     if (!apiKey) {
-      throw new Error('OpenRouter API key is not set. Open Settings and add your key.')
+      throw new AppError(AppErrorCode.OPENROUTER_API_KEY_MISSING)
     }
 
     let response: Response
@@ -208,9 +209,8 @@ export class OpenRouterClient {
         signal
       })
     } catch (error) {
-      throw error instanceof Error
-        ? error
-        : new Error('Failed to connect to OpenRouter. Check your internet connection.')
+      if (error instanceof AppError) throw error
+      throw new AppError(AppErrorCode.OPENROUTER_CONNECTION_FAILED)
     }
 
     if (!response.ok) {
@@ -225,7 +225,7 @@ export class OpenRouterClient {
     }
 
     const reader = response.body?.getReader()
-    if (!reader) throw new Error('No response body from OpenRouter')
+    if (!reader) throw new AppError(AppErrorCode.OPENROUTER_NO_RESPONSE_BODY)
 
     const decoder = new TextDecoder()
     let buffer = ''

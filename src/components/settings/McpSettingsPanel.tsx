@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import Editor from '@monaco-editor/react'
 import { Button } from '../ui/button'
 import { Switch } from '../ui/switch'
@@ -37,10 +39,10 @@ const STATUS_COLORS: Record<string, string> = {
   'not connected': 'text-zinc-500'
 }
 
-function emptyServer(): McpServerConfig {
+function emptyServer(t: TFunction<'settings'>): McpServerConfig {
   return {
     id: `server-${Date.now()}`,
-    name: 'New Server',
+    name: t('mcp.newServer'),
     enabled: true,
     transport: 'stdio',
     command: 'npx',
@@ -68,6 +70,16 @@ function parseEnvLines(text: string): Record<string, string> {
   return env
 }
 
+function formatMcpStatus(
+  status: string | undefined,
+  isDirty: boolean,
+  t: TFunction<'settings'>
+): string {
+  if (status === 'not connected') return t('mcp.status.notConnected')
+  if (status && status in STATUS_COLORS) return t(`mcp.status.${status}` as 'mcp.status.connected')
+  return isDirty ? t('mcp.status.unsaved') : t('mcp.status.notConnected')
+}
+
 interface McpSettingsPanelProps {
   settings: AppSettings
   onSettingsChange: (settings: AppSettings) => void
@@ -81,6 +93,8 @@ export function McpSettingsPanel({
   initialTab,
   embedded = false
 }: McpSettingsPanelProps): React.ReactElement {
+  const { t } = useTranslation('settings')
+  const { t: tCommon } = useTranslation('common')
   const [tab, setTab] = useState<McpTab>(initialTab ?? 'servers')
   const [servers, setServers] = useState<McpServerConfig[]>(settings.mcpServers ?? [])
   const [jsonText, setJsonText] = useState('')
@@ -124,7 +138,7 @@ export function McpSettingsPanel({
       onSettingsChange({ ...settings, mcpServers: next })
       setServers(next)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save MCP config'
+      const message = err instanceof Error ? err.message : t('mcp.saveFailed')
       setActionError(message)
       throw err instanceof Error ? err : new Error(message)
     } finally {
@@ -147,7 +161,7 @@ export function McpSettingsPanel({
 
       const result = await testServer(server)
       if (!result.ok) {
-        const message = result.error ?? 'Test failed'
+        const message = result.error ?? t('mcp.testFailed')
         setTestFeedback((prev) => ({
           ...prev,
           [server.id]: { type: 'error', message }
@@ -160,11 +174,11 @@ export function McpSettingsPanel({
         ...prev,
         [server.id]: {
           type: 'success',
-          message: `Connected — ${result.toolCount} tools (saved)`
+          message: t('mcp.testSuccess', { count: result.toolCount })
         }
       }))
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Test failed'
+      const message = err instanceof Error ? err.message : t('mcp.testFailed')
       setTestFeedback((prev) => ({
         ...prev,
         [server.id]: { type: 'error', message }
@@ -178,11 +192,11 @@ export function McpSettingsPanel({
     setJsonError('')
     try {
       const parsed = JSON.parse(jsonText) as { mcpServers?: Record<string, unknown> }
-      if (!parsed.mcpServers) throw new Error('Missing mcpServers object')
+      if (!parsed.mcpServers) throw new Error(t('mcp.missingMcpServers'))
       const next = parseCursorMcpJson(parsed)
       await persistServers(next)
     } catch (err) {
-      setJsonError(err instanceof Error ? err.message : 'Invalid JSON')
+      setJsonError(err instanceof Error ? err.message : t('mcp.invalidJson'))
     }
   }
 
@@ -202,7 +216,7 @@ export function McpSettingsPanel({
     <Wrapper className="space-y-3">
       <div className={cn('flex items-center justify-between gap-2', embedded && 'flex-wrap')}>
         {!embedded && (
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">MCP Servers</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{t('mcp.title')}</h3>
         )}
         <div className={cn('flex gap-1', embedded && 'w-full')}>
           {(['servers', 'json', 'policies'] as McpTab[]).map((value) => (
@@ -217,7 +231,7 @@ export function McpSettingsPanel({
                   : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300'
               )}
             >
-              {value}
+              {t(`mcp.tabs.${value}`)}
             </button>
           ))}
         </div>
@@ -236,9 +250,9 @@ export function McpSettingsPanel({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => setServers((prev) => [...prev, emptyServer()])}
+              onClick={() => setServers((prev) => [...prev, emptyServer(t)])}
             >
-              Add server
+              {t('mcp.addServer')}
             </Button>
             <Button
               type="button"
@@ -249,11 +263,11 @@ export function McpSettingsPanel({
                 void importDefaultCursor()
                   .then(setServers)
                   .catch((err) => {
-                    setActionError(err instanceof Error ? err.message : 'Import failed')
+                    setActionError(err instanceof Error ? err.message : t('mcp.importFailed'))
                   })
               }
             >
-              Import Cursor
+              {t('mcp.importCursor')}
             </Button>
             <Button
               type="button"
@@ -266,30 +280,28 @@ export function McpSettingsPanel({
                     if (next) setServers(next)
                   })
                   .catch((err) => {
-                    setActionError(err instanceof Error ? err.message : 'Import failed')
+                    setActionError(err instanceof Error ? err.message : t('mcp.importFailed'))
                   })
               }
             >
-              Import file
+              {t('mcp.importFile')}
             </Button>
             <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void reconnect()}>
-              Reconnect all
+              {t('mcp.reconnectAll')}
             </Button>
             <Button type="button" size="sm" disabled={saving} onClick={() => void persistServers(servers)}>
-              {isDirty ? 'Save & connect' : 'Save'}
+              {isDirty ? t('mcp.saveAndConnect') : tCommon('actions.save')}
             </Button>
           </div>
 
           {isDirty && (
-            <p className="text-xs text-amber-400/90">
-              Unsaved changes — status bar updates after Save. Test will save automatically on success.
-            </p>
+            <p className="text-xs text-amber-400/90">{t('mcp.unsavedHint')}</p>
           )}
 
           {loading && servers.length === 0 ? (
-            <p className="text-xs text-zinc-500">Loading MCP servers…</p>
+            <p className="text-xs text-zinc-500">{t('mcp.loading')}</p>
           ) : servers.length === 0 ? (
-            <p className="text-xs text-zinc-500">No MCP servers configured.</p>
+            <p className="text-xs text-zinc-500">{t('mcp.empty')}</p>
           ) : (
             <div className="space-y-2">
               {servers.map((server) => {
@@ -306,11 +318,11 @@ export function McpSettingsPanel({
                         className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-zinc-200"
                       />
                       <span className={cn('text-xs', STATUS_COLORS[live?.status ?? 'disabled'])}>
-                        {live?.status ?? (isDirty ? 'unsaved' : 'not connected')}
+                        {formatMcpStatus(live?.status, isDirty, t)}
                       </span>
                       <span className="text-xs text-zinc-500">
-                        {TRANSPORT_OPTIONS.find((t) => t.value === server.transport)?.label ?? server.transport} ·{' '}
-                        {live?.toolCount ?? 0} tools
+                        {TRANSPORT_OPTIONS.find((opt) => opt.value === server.transport)?.label ?? server.transport} ·{' '}
+                        {t('mcp.toolCount', { count: live?.toolCount ?? 0 })}
                       </span>
                       <Switch
                         checked={server.enabled}
@@ -322,7 +334,7 @@ export function McpSettingsPanel({
                       <input
                         value={server.id}
                         onChange={(e) => updateServer(server.id, { id: e.target.value })}
-                        placeholder="id"
+                        placeholder={t('mcp.placeholders.id')}
                         className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-300"
                       />
                       <Select
@@ -349,7 +361,7 @@ export function McpSettingsPanel({
                         <input
                           value={server.command ?? ''}
                           onChange={(e) => updateServer(server.id, { command: e.target.value })}
-                          placeholder="command"
+                          placeholder={t('mcp.placeholders.command')}
                           className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-300"
                         />
                         <input
@@ -359,7 +371,7 @@ export function McpSettingsPanel({
                               args: e.target.value.split(' ').filter(Boolean)
                             })
                           }
-                          placeholder="args (space-separated)"
+                          placeholder={t('mcp.placeholders.args')}
                           className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-300"
                         />
                         <textarea
@@ -368,7 +380,7 @@ export function McpSettingsPanel({
                             updateServer(server.id, { env: parseEnvLines(e.target.value) })
                           }
                           rows={2}
-                          placeholder={'env (one per line)\nGITHUB_PERSONAL_ACCESS_TOKEN=ghp_...'}
+                          placeholder={t('mcp.placeholders.env')}
                           className="rounded border border-white/10 bg-white/5 px-2 py-1 font-mono text-xs text-zinc-300"
                         />
                       </div>
@@ -376,7 +388,7 @@ export function McpSettingsPanel({
                       <input
                         value={server.url ?? ''}
                         onChange={(e) => updateServer(server.id, { url: e.target.value })}
-                        placeholder="https://example.com/mcp"
+                        placeholder={t('mcp.placeholders.url')}
                         className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-300"
                       />
                     )}
@@ -386,7 +398,7 @@ export function McpSettingsPanel({
                     )}
 
                     {live?.status === 'connected' && (
-                      <p className="text-xs text-emerald-400/80">Connection OK</p>
+                      <p className="text-xs text-emerald-400/80">{t('mcp.connectionOk')}</p>
                     )}
 
                     {testFeedback[server.id] && (
@@ -410,7 +422,7 @@ export function McpSettingsPanel({
                         disabled={testingId === server.id || saving}
                         onClick={() => void handleTestServer(server)}
                       >
-                        {testingId === server.id ? 'Testing… (up to 2 min)' : 'Test & save'}
+                        {testingId === server.id ? t('mcp.testing') : t('mcp.testSave')}
                       </Button>
                       <Button
                         type="button"
@@ -418,7 +430,7 @@ export function McpSettingsPanel({
                         variant="outline"
                         onClick={() => removeServer(server.id)}
                       >
-                        Delete
+                        {tCommon('actions.delete')}
                       </Button>
                     </div>
                   </div>
@@ -449,7 +461,7 @@ export function McpSettingsPanel({
           {jsonError && <p className="text-xs text-red-400">{jsonError}</p>}
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" onClick={() => setJsonText(cursorJson)}>
-              Reset
+              {tCommon('actions.reset')}
             </Button>
             <Button
               type="button"
@@ -459,10 +471,10 @@ export function McpSettingsPanel({
                 void navigator.clipboard.writeText(cursorJson)
               }}
             >
-              Export copy
+              {t('mcp.exportCopy')}
             </Button>
             <Button type="button" size="sm" disabled={saving} onClick={() => void handleSaveJson()}>
-              Save JSON
+              {t('mcp.saveJson')}
             </Button>
           </div>
         </div>
@@ -472,10 +484,8 @@ export function McpSettingsPanel({
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-3">
             <div>
-              <p className="text-sm text-zinc-200">Require approval for MCP tools</p>
-              <p className="text-xs text-zinc-500">
-                Read-only MCP tools (get_, list_, search_, …) skip approval
-              </p>
+              <p className="text-sm text-zinc-200">{t('mcp.requireApproval.title')}</p>
+              <p className="text-xs text-zinc-500">{t('mcp.requireApproval.description')}</p>
             </div>
             <Switch
               checked={settings.mcpRequireApproval !== false}
@@ -493,7 +503,7 @@ export function McpSettingsPanel({
               >
                 <span className="text-sm text-zinc-200">{server.name ?? server.id}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500">Auto-approve</span>
+                  <span className="text-xs text-zinc-500">{t('mcp.autoApprove')}</span>
                   <Switch
                     checked={server.autoApprove === true}
                     onCheckedChange={(checked) => updateServer(server.id, { autoApprove: checked })}
@@ -504,7 +514,7 @@ export function McpSettingsPanel({
           </div>
 
           <Button type="button" size="sm" disabled={saving} onClick={() => void persistServers(servers)}>
-            Save policies
+            {t('mcp.savePolicies')}
           </Button>
         </div>
       )}

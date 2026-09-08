@@ -90,7 +90,7 @@ export class McpManager {
 
   async saveConfig(servers: McpServerConfig[]): Promise<McpServerConfig[]> {
     const error = validateMcpServerConfigs(servers)
-    if (error) throw new Error(error)
+    if (error) throw error
     return servers
   }
 
@@ -122,7 +122,7 @@ export class McpManager {
 
   async testServer(config: McpServerConfig): Promise<{ ok: boolean; toolCount: number; error?: string }> {
     const error = validateMcpServerConfigs([config])
-    if (error) return { ok: false, toolCount: 0, error }
+    if (error) return { ok: false, toolCount: 0, error: error.code }
 
     const session = new McpClientSession()
     try {

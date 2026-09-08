@@ -1,0 +1,59 @@
+{
+  "results": {
+    "noMatches": "No matches found",
+    "noOpenFiles": "No files are currently open",
+    "savedMemory": "Saved memory",
+    "deletedMemory": "Deleted memory",
+    "errorPrefix": "Error:"
+  },
+  "analytics": {
+    "title": "Tool Analytics",
+    "openLogs": "Open logs",
+    "empty": "No agent runs yet. Analytics appear after each chat with tools.",
+    "runMeta": "{{mode}} · {{model}}",
+    "runStats": "{{date}} · {{status}} · {{iterations}}/{{max}} steps",
+    "successCount": "{{count}} ok",
+    "errorCount": "{{count}} err",
+    "badArgsCount": "{{count}} bad args",
+    "toolStats": "{{name}}: {{success}}/{{total}}",
+    "iteration": "#{{n}} {{name}}",
+    "duration": "{{ms}}ms"
+  },
+  "issues": {
+    "invalidArgumentsJson": "Invalid JSON args",
+    "missingRequiredArgument": "Missing required arg",
+    "unknownTool": "Unknown tool",
+    "toolNotAllowedInMode": "Tool not allowed in mode",
+    "emptyPath": "Empty path",
+    "emptyQuery": "Empty query",
+    "emptyCommand": "Empty command",
+    "executionError": "Execution error",
+    "searchReplaceNotFound": "search_replace: not found",
+    "searchReplaceAmbiguous": "search_replace: ambiguous",
+    "searchReplaceIdentical": "search_replace: identical strings",
+    "terminalBlocked": "Terminal command blocked",
+    "noResults": "No search results"
+  },
+  "index": {
+    "scanning": "Scanning workspace",
+    "indexingFiles": "Indexing files",
+    "embedding": "Embedding chunks"
+  },
+  "hints": {
+    "oldStringNotFound": "Read the file with read_files first and copy the exact text including whitespace.",
+    "ambiguousMatch": "Add more surrounding context to old_string or set replace_all: true.",
+    "identicalStrings": "old_string and new_string must differ.",
+    "useSearchTools": "Use grep_workspace or codebase_search instead of shell search commands.",
+    "userRejected": "Ask the user before retrying this action.",
+    "switchMode": "Switch mode or use a read-only alternative.",
+    "fixArguments": "Fix tool arguments before retrying.",
+    "reviewError": "Review the error and adjust your approach before retrying.",
+    "retryExhausted": "Change your approach — read files, search the codebase, or ask the user."
+  },
+  "errors": {
+    "retryExhausted": "Tool \"{{toolName}}\" failed {{attempts}} times with the same arguments.",
+    "formatted": "Error [{{kind}}]: {{message}}",
+    "hint": "Hint: {{hint}}",
+    "retryable": "Retryable: {{yesNo}}"
+  }
+}

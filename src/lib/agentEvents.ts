@@ -3,6 +3,8 @@ import { useAnalyticsStore } from '@/stores/analyticsStore'
 import { useTokenUsageStore } from '@/stores/tokenUsageStore'
 import { useAgentRunStore } from '@/stores/agentRunStore'
 import { useToastStore } from '@/stores/toastStore'
+import { resolveErrorMessage } from '@/lib/errorMessages'
+import { getT } from '@/i18n/t'
 import type { AgentEvent } from '@/types'
 
 let unsubscribe: (() => void) | null = null
@@ -79,7 +81,12 @@ function handleAgentEvent(event: AgentEvent): void {
       }
       break
     case 'error': {
-      const errorText = event.error || 'Request failed'
+      const errorText = resolveErrorMessage(
+        event.errorCode,
+        event.errorParams,
+        event.error,
+        getT('errors')
+      )
       const { activeTimeline } = useChatStore.getState()
       finalizeAssistantMessage(
         errorText,

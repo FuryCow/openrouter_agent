@@ -1,0 +1,149 @@
+{
+  "title": "Settings",
+  "saveFailed": "Failed to save settings",
+  "sections": {
+    "general": {
+      "label": "General",
+      "description": "API key and model defaults"
+    },
+    "agent": {
+      "label": "Agent",
+      "description": "Prompt and project memory"
+    },
+    "safety": {
+      "label": "Safety",
+      "description": "Tool approval defaults"
+    },
+    "search": {
+      "label": "Web search",
+      "description": "Search provider and keys"
+    },
+    "index": {
+      "label": "Codebase index",
+      "description": "Indexing and semantic search"
+    },
+    "mcp": {
+      "label": "MCP",
+      "description": "Model Context Protocol servers"
+    }
+  },
+  "general": {
+    "apiKey": "OpenRouter API Key",
+    "apiKeyPlaceholder": "sk-or-...",
+    "temperature": "Temperature",
+    "temperatureHint": "Default creativity for new chat runs."
+  },
+  "agent": {
+    "customPrompt": "Custom system prompt",
+    "customPromptPlaceholder": "Optional extra instructions prepended to agent system prompt",
+    "verifyAfterEdits": {
+      "title": "Verify after edits",
+      "description": "Agent runs tests/lint/tsc after code changes (via run_terminal)"
+    }
+  },
+  "safety": {
+    "autoApproveWrites": {
+      "title": "Auto-approve file writes",
+      "description": "write_file / search_replace / update_project_memory"
+    },
+    "autoApproveTerminal": {
+      "title": "Auto-approve terminal",
+      "description": "run_terminal commands"
+    }
+  },
+  "search": {
+    "provider": "Provider",
+    "selectProvider": "Select provider",
+    "duckduckgo": "DuckDuckGo (no key)",
+    "tavily": "Tavily",
+    "brave": "Brave Search",
+    "apiKey": "Search API key",
+    "apiKeyPlaceholder": "API key"
+  },
+  "index": {
+    "onOpen": {
+      "title": "Index on folder open",
+      "description": "Background FTS + symbols + embeddings"
+    },
+    "semantic": {
+      "title": "Semantic search",
+      "description": "Local MiniLM embeddings (offline)"
+    },
+    "maxFileSize": "Max file size (KB)",
+    "rebuild": "Rebuild index"
+  },
+  "memory": {
+    "title": "Project memory",
+    "description": "Persistent workspace context for agent mode",
+    "autoLoadDocs": {
+      "title": "Load AGENTS.md / .openrouter/*.md",
+      "description": "Git-friendly docs from the workspace"
+    },
+    "noWorkspace": "Open a workspace to view or edit project memory.",
+    "manageEntries": "Manage memory entries",
+    "entryCount": "{{count}} entries",
+    "snapshotPreview": "Snapshot preview",
+    "dynamicEntries": "Dynamic entries (one per line)",
+    "entryPlaceholder": "[decision] We use Zustand for UI state",
+    "entryHint": "Prefix with [architecture], [decision], [bug], [convention], or [note]. Create AGENTS.md or .openrouter/rules.md in the repo for shared rules.",
+    "saveMemory": "Save memory",
+    "loadFailed": "Failed to load project memory",
+    "saveFailed": "Failed to save memory"
+  },
+  "mcp": {
+    "title": "MCP Servers",
+    "tabs": {
+      "servers": "servers",
+      "json": "json",
+      "policies": "policies"
+    },
+    "addServer": "Add server",
+    "importCursor": "Import Cursor",
+    "importFile": "Import file",
+    "reconnectAll": "Reconnect all",
+    "saveAndConnect": "Save & connect",
+    "unsavedHint": "Unsaved changes — status bar updates after Save. Test will save automatically on success.",
+    "loading": "Loading MCP servers…",
+    "empty": "No MCP servers configured.",
+    "newServer": "New Server",
+    "status": {
+      "connected": "connected",
+      "connecting": "connecting",
+      "error": "error",
+      "disabled": "disabled",
+      "unsaved": "unsaved",
+      "notConnected": "not connected"
+    },
+    "toolCount": "{{count}} tools",
+    "connectionOk": "Connection OK",
+    "testSave": "Test & save",
+    "testing": "Testing… (up to 2 min)",
+    "testSuccess": "Connected — {{count}} tools (saved)",
+    "testFailed": "Test failed",
+    "saveFailed": "Failed to save MCP config",
+    "importFailed": "Import failed",
+    "invalidJson": "Invalid JSON",
+    "missingMcpServers": "Missing mcpServers object",
+    "exportCopy": "Export copy",
+    "saveJson": "Save JSON",
+    "requireApproval": {
+      "title": "Require approval for MCP tools",
+      "description": "Read-only MCP tools (get_, list_, search_, …) skip approval"
+    },
+    "autoApprove": "Auto-approve",
+    "savePolicies": "Save policies",
+    "placeholders": {
+      "id": "id",
+      "command": "command",
+      "args": "args (space-separated)",
+      "env": "env (one per line)\nGITHUB_PERSONAL_ACCESS_TOKEN=ghp_...",
+      "url": "https://example.com/mcp"
+    },
+    "loadFailed": "Failed to load MCP status"
+  },
+  "models": {
+    "loadFailed": "Could not load models from OpenRouter. Check your connection and try Refresh.",
+    "staleCatalog": "Loaded outdated model list (50 without prices). Close the app completely and run start.bat again.",
+    "failed": "Failed to load models"
+  }
+}

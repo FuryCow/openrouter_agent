@@ -1,9 +1,11 @@
 import { Minus, Square, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { ModelPicker } from '../models/ModelPicker'
 import { AppLogo } from '../brand/AppLogo'
 import { useSettingsStore } from '@/stores/settingsStore'
 export function TitleBar(): React.ReactElement {
+  const { t } = useTranslation('layout')
   const { settings, models, modelsLoading, setSettings, setSettingsOpen, loadModels } =
     useSettingsStore()
 
@@ -17,7 +19,7 @@ export function TitleBar(): React.ReactElement {
     <div className="drag-region flex h-10 items-center justify-between border-b border-white/5 bg-[#0a0a0f]/90 px-3 backdrop-blur-xl">
       <div className="flex items-center gap-2.5 no-drag">
         <AppLogo size="sm" />
-        <span className="text-sm font-semibold gradient-text">OpenRouter Agent</span>
+        <span className="text-sm font-semibold gradient-text">{t('appName')}</span>
       </div>
       <div className="flex items-center gap-2 no-drag">
         <ModelPicker
@@ -30,7 +32,7 @@ export function TitleBar(): React.ReactElement {
         />
 
         <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
-          Settings
+          {t('titleBar.settings')}
         </Button>
       </div>
 

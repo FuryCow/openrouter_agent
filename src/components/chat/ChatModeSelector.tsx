@@ -1,4 +1,7 @@
-import { CHAT_MODES, getChatModeConfig, type ChatMode } from '@/lib/chatModes'
+import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useChatModes } from '@/hooks/useChatModes'
+import type { ChatMode } from '@/lib/chatModes'
 import {
   Select,
   SelectContent,
@@ -7,7 +10,9 @@ import {
   SelectValue
 } from '../ui/select'
 import { cn } from '@/lib/utils'
-import { Sparkles } from 'lucide-react'
+
+const MODE_SELECT_CLOSE_MS = 280
+const MODE_SELECT_OPEN_MS = 340
 
 export function ChatModeSelector({
   mode,
@@ -18,50 +23,67 @@ export function ChatModeSelector({
   onModeChange: (mode: ChatMode) => void
   disabled?: boolean
 }): React.ReactElement {
-  const current = getChatModeConfig(mode)
+  const { t } = useTranslation('chat')
+  const { modes, getModeConfig } = useChatModes()
+  const current = getModeConfig(mode)
   const Icon = current.icon
+  const [open, setOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const closeTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current)
+      }
+    }
+  }, [])
+
+  const handleOpenChange = (next: boolean): void => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+
+    if (next) {
+      setClosing(false)
+      setOpen(true)
+      return
+    }
+
+    if (!open || closing) return
+
+    setClosing(true)
+    closeTimerRef.current = window.setTimeout(() => {
+      setOpen(false)
+      setClosing(false)
+      closeTimerRef.current = null
+    }, MODE_SELECT_CLOSE_MS)
+  }
 
   return (
-    <Select value={mode} onValueChange={(v) => onModeChange(v as ChatMode)} disabled={disabled}>
+    <Select value={mode} open={open} onOpenChange={handleOpenChange} onValueChange={(v) => onModeChange(v as ChatMode)} disabled={disabled}>
       <SelectTrigger
         className={cn(
-          'group relative h-9 w-auto justify-start gap-2 overflow-hidden rounded-full border px-2.5 pr-2 text-left transition-all duration-300',
-          'focus:ring-2 focus:ring-offset-0 focus:ring-offset-transparent',
-          '[&>span:last-child_svg]:h-3.5 [&>span:last-child_svg]:w-3.5 [&>span:last-child_svg]:text-zinc-500',
-          '[&>span:last-child]:ml-auto',
-          '[&>span:last-child_svg]:transition-transform [&>span:last-child_svg]:duration-200',
-          'data-[state=open]:[&>span:last-child_svg]:rotate-180',
+          'relative h-7 w-auto min-w-[6.5rem] justify-start gap-1.5 rounded-md border px-1.5 pr-5 text-left shadow-none',
+          'hover:brightness-110 focus:ring-1 focus:ring-offset-0',
+          '[&>span:last-child]:absolute [&>span:last-child]:right-1 [&>span:last-child]:top-1/2 [&>span:last-child]:-translate-y-1/2',
+          '[&>span:last-child_svg]:h-3 [&>span:last-child_svg]:w-3 [&>span:last-child_svg]:rotate-180 [&>span:last-child_svg]:opacity-60',
+          '[&>span:last-child_svg]:transition-transform [&>span:last-child_svg]:duration-300 [&>span:last-child_svg]:ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'data-[state=open]:[&>span:last-child_svg]:rotate-0',
           current.theme.trigger,
-          current.theme.glow,
           disabled && 'opacity-50'
         )}
       >
         <span
-          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-          aria-hidden
-        >
-          <span className="absolute -left-4 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full bg-white/10 blur-md" />
-          <span className="absolute -right-2 top-0 h-full w-1/2 bg-gradient-to-l from-white/[0.06] to-transparent" />
-        </span>
-
-        <span
           className={cn(
-            'relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-1 ring-inset',
+            'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] ring-1 ring-inset',
             current.theme.iconBg
           )}
         >
-          <Icon className={cn('h-3.5 w-3.5', current.theme.icon)} />
+          <Icon className={cn('h-2.5 w-2.5', current.theme.icon)} />
         </span>
-
-        <span className="relative flex min-w-0 flex-1 flex-col items-start leading-none">
-          <span className="text-[11px] font-semibold tracking-wide text-zinc-100">
-            {current.label}
-          </span>
-          <span className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500">
-            mode
-          </span>
-        </span>
-
+        <span className="text-[11px] font-semibold tracking-wide text-zinc-100">{current.label}</span>
         <span className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
           <SelectValue />
         </span>
@@ -69,54 +91,66 @@ export function ChatModeSelector({
 
       <SelectContent
         align="start"
-        className="min-w-[18rem] rounded-2xl border-white/10 bg-[#12121c]/95 p-2 shadow-2xl shadow-black/40 backdrop-blur-xl"
+        side="top"
+        sideOffset={4}
+        style={{
+          ['--chat-mode-select-open-ms' as string]: `${MODE_SELECT_OPEN_MS}ms`,
+          ['--chat-mode-select-close-ms' as string]: `${MODE_SELECT_CLOSE_MS}ms`
+        }}
+        className={cn(
+          'chat-mode-select-content min-w-[10.5rem] max-w-[11.5rem] rounded-lg border border-white/10 bg-[#14141f]/98 p-0',
+          'shadow-lg shadow-black/50 backdrop-blur-md',
+          '[&>[data-radix-select-viewport]]:p-0',
+          closing && 'chat-mode-select-closing'
+        )}
       >
-        <div className="mb-1 flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500">
-          <Sparkles className="h-3 w-3 text-indigo-400/80" />
-          Режим чата
-        </div>
+        <div className="chat-mode-select-panel p-1">
+          <div className="px-2 pb-1 pt-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-600">
+            {t('modeSelector.title')}
+          </div>
 
-        {CHAT_MODES.map((item) => {
-          const ItemIcon = item.icon
-          const isActive = item.id === mode
+          {modes.map((item) => {
+            const ItemIcon = item.icon
+            const isActive = item.id === mode
 
-          return (
-            <SelectItem
-              key={item.id}
-              value={item.id}
-              className={cn(
-                'mb-1 rounded-xl border border-transparent p-0 pl-9 pr-2 last:mb-0',
-                'focus:bg-transparent data-[highlighted]:bg-transparent',
-                '[&>span:first-child]:top-3.5 [&>span:first-child]:left-2.5',
-                item.theme.item,
-                isActive && item.theme.itemActive
-              )}
-            >
-              <div className="flex w-full items-start gap-3 py-2.5">
-                <span
-                  className={cn(
-                    'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset',
-                    item.theme.iconBg
-                  )}
-                >
-                  <ItemIcon className={cn('h-4 w-4', item.theme.icon)} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-zinc-100">{item.label}</span>
-                    {isActive && (
-                      <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-zinc-400">
-                        active
-                      </span>
+            return (
+              <SelectItem
+                key={item.id}
+                value={item.id}
+                className={cn(
+                  'mb-0.5 rounded-md border border-transparent py-0 pl-2 pr-7 last:mb-0',
+                  'text-xs focus:bg-white/[0.04] data-[highlighted]:bg-white/[0.04]',
+                  '[&>span:first-child]:left-auto [&>span:first-child]:right-2',
+                  '[&>span:first-child]:top-1/2 [&>span:first-child]:-translate-y-1/2',
+                  '[&>span:first-child_svg]:text-zinc-500',
+                  isActive && cn('border-white/[0.06] bg-white/[0.03]', item.theme.itemActive)
+                )}
+              >
+                <div className="flex items-center gap-2 py-1.5">
+                  <span
+                    className={cn(
+                      'flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] ring-1 ring-inset',
+                      item.theme.iconBg
                     )}
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-zinc-500">{item.description}</p>
+                  >
+                    <ItemIcon className={cn('h-3 w-3', item.theme.icon)} />
+                  </span>
+                  <span className="font-medium text-zinc-200">{item.label}</span>
                 </div>
-              </div>
-            </SelectItem>
-          )
-        })}
+              </SelectItem>
+            )
+          })}
+        </div>
       </SelectContent>
     </Select>
+  )
+}
+
+export function ChatModeDescription({ mode }: { mode: ChatMode }): React.ReactElement {
+  const { getModeConfig } = useChatModes()
+  const current = getModeConfig(mode)
+
+  return (
+    <p className="min-w-0 flex-1 truncate text-[11px] leading-snug text-zinc-500">{current.description}</p>
   )
 }

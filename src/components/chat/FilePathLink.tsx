@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { openFileInEditor } from '@/lib/openFileInEditor'
 import { cn } from '@/lib/utils'
 import type { FileDiffPreview } from '@/types'
@@ -9,6 +10,8 @@ type FilePathLinkProps = {
 }
 
 export function FilePathLink({ path, className, fileDiff }: FilePathLinkProps): React.ReactElement {
+  const { t } = useTranslation('chat')
+
   const handleOpen = async (event: React.MouseEvent | React.KeyboardEvent): Promise<void> => {
     event.preventDefault()
     event.stopPropagation()
@@ -34,7 +37,7 @@ export function FilePathLink({ path, className, fileDiff }: FilePathLinkProps): 
         'font-mono text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer',
         className
       )}
-      title="Открыть в редакторе на месте изменения"
+      title={t('filePath.openInEditor')}
     >
       {path}
     </span>

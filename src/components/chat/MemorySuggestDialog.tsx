@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { useChatStore } from '@/stores/chatStore'
@@ -6,15 +7,9 @@ import { useFileStore } from '@/stores/fileStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { MemorySuggestEntry } from '@/types'
 
-const CATEGORY_LABELS: Record<MemorySuggestEntry['category'], string> = {
-  architecture: 'Architecture',
-  decision: 'Decision',
-  bug: 'Bug',
-  convention: 'Convention',
-  note: 'Note'
-}
-
 export function MemorySuggestDialog(): React.ReactElement {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
   const pendingSuggest = useChatStore((s) => s.pendingMemorySuggest)
   const setPendingMemorySuggest = useChatStore((s) => s.setPendingMemorySuggest)
   const workingDirectory = useFileStore((s) => s.workingDirectory)
@@ -62,26 +57,27 @@ export function MemorySuggestDialog(): React.ReactElement {
           workingDirectory
         )
       }
-      addToast(`Saved ${selected.size} item(s) to project memory`, 'success')
+      addToast(tc('toast.savedToMemory', { count: selected.size }), 'success')
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to save memory', 'error')
+      addToast(err instanceof Error ? err.message : t('memorySuggest.saveFailed'), 'error')
     }
 
     setPendingMemorySuggest(null)
   }
 
+  const categoryLabel = (category: MemorySuggestEntry['category']): string =>
+    t(`memory.category.${category}`)
+
   return (
     <Dialog open={Boolean(pendingSuggest)} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Save to project memory?</DialogTitle>
+          <DialogTitle>{t('memorySuggest.title')}</DialogTitle>
         </DialogHeader>
 
         {pendingSuggest && (
           <div className="mt-4 space-y-4">
-            <p className="text-sm text-zinc-400">
-              Suggested from the last agent run. Select entries to remember for future sessions.
-            </p>
+            <p className="text-sm text-zinc-400">{t('memorySuggest.description')}</p>
 
             <ul className="space-y-2">
               {entries.map((entry, index) => (
@@ -95,7 +91,7 @@ export function MemorySuggestDialog(): React.ReactElement {
                     />
                     <span className="min-w-0 flex-1">
                       <span className="mb-1 inline-block rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-indigo-300">
-                        {CATEGORY_LABELS[entry.category]}
+                        {categoryLabel(entry.category)}
                       </span>
                       <span className="block text-sm text-zinc-200 whitespace-pre-wrap break-words">
                         {entry.content}
@@ -108,10 +104,10 @@ export function MemorySuggestDialog(): React.ReactElement {
 
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => void handleSave()} disabled={selected.size === 0}>
-                Save selected
+                {t('memorySuggest.saveSelected')}
               </Button>
               <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-                Dismiss
+                {tc('actions.dismiss')}
               </Button>
             </div>
           </div>

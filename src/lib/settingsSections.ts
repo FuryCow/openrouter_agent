@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import type { LucideIcon } from 'lucide-react'
 import { Bot, Database, Plug, Search, Settings2, Shield } from 'lucide-react'
 
@@ -10,45 +11,26 @@ export interface SettingsSectionConfig {
   icon: LucideIcon
 }
 
-export const SETTINGS_SECTIONS: SettingsSectionConfig[] = [
-  {
-    id: 'general',
-    label: 'General',
-    description: 'API key and model defaults',
-    icon: Settings2
-  },
-  {
-    id: 'agent',
-    label: 'Agent',
-    description: 'Prompt and project memory',
-    icon: Bot
-  },
-  {
-    id: 'safety',
-    label: 'Safety',
-    description: 'Tool approval defaults',
-    icon: Shield
-  },
-  {
-    id: 'search',
-    label: 'Web search',
-    description: 'Search provider and keys',
-    icon: Search
-  },
-  {
-    id: 'index',
-    label: 'Codebase index',
-    description: 'Indexing and semantic search',
-    icon: Database
-  },
-  {
-    id: 'mcp',
-    label: 'MCP',
-    description: 'Model Context Protocol servers',
-    icon: Plug
-  }
-]
+const SECTION_ICONS: Record<SettingsSection, LucideIcon> = {
+  general: Settings2,
+  agent: Bot,
+  safety: Shield,
+  search: Search,
+  index: Database,
+  mcp: Plug
+}
 
-export function getSettingsSection(id: SettingsSection): SettingsSectionConfig {
-  return SETTINGS_SECTIONS.find((section) => section.id === id) ?? SETTINGS_SECTIONS[0]
+const SECTION_IDS: SettingsSection[] = ['general', 'agent', 'safety', 'search', 'index', 'mcp']
+
+export function getSettingsSections(t: TFunction<'settings'>): SettingsSectionConfig[] {
+  return SECTION_IDS.map((id) => ({
+    id,
+    label: t(`sections.${id}.label`),
+    description: t(`sections.${id}.description`),
+    icon: SECTION_ICONS[id]
+  }))
+}
+
+export function getSettingsSection(id: SettingsSection, t: TFunction<'settings'>): SettingsSectionConfig {
+  return getSettingsSections(t).find((section) => section.id === id) ?? getSettingsSections(t)[0]
 }

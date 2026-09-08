@@ -5,6 +5,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileIcon } from '../ui/FileIcon'
 import { ScrollArea } from '../ui/scroll-area'
@@ -140,6 +141,8 @@ interface NamePromptState {
 }
 
 export function FileExplorer(): React.ReactElement {
+  const { t } = useTranslation('explorer')
+  const { t: tCommon } = useTranslation('common')
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const setWorkingDirectory = useFileStore((s) => s.setWorkingDirectory)
   const openFile = useFileStore((s) => s.openFile)
@@ -165,9 +168,9 @@ export function FileExplorer(): React.ReactElement {
       setWorkingDirectory(null)
       const saved = await window.api.settings.get()
       await window.api.settings.save({ ...saved, workingDirectory: '' })
-      addToast(err instanceof Error ? err.message : 'Workspace folder is not allowed', 'error')
+      addToast(err instanceof Error ? err.message : t('workspaceNotAllowed'), 'error')
     }
-  }, [workingDirectory, setWorkingDirectory, addToast])
+  }, [workingDirectory, setWorkingDirectory, addToast, t])
 
   useEffect(() => {
     loadRoot()
@@ -202,12 +205,12 @@ export function FileExplorer(): React.ReactElement {
 
   const promptCreateFile = (directoryPath: string): void => {
     openNamePrompt({
-      title: 'Новый файл',
-      defaultValue: 'untitled.txt',
-      confirmLabel: 'Создать',
+      title: t('newFile'),
+      defaultValue: t('defaultFileName'),
+      confirmLabel: tCommon('actions.create'),
       onConfirm: (name) => {
         if (!isValidEntryName(name)) {
-          addToast('Недопустимое имя файла', 'error')
+          addToast(t('invalidFileName'), 'error')
           return
         }
         void window.api.fs
@@ -215,11 +218,11 @@ export function FileExplorer(): React.ReactElement {
           .then((path) => {
             setExpandPath(directoryPath)
             refresh()
-            addToast(`Создан файл ${name}`, 'success')
+            addToast(tCommon('toast.fileCreated', { name }), 'success')
             return handleFileClick(path)
           })
           .catch((err) =>
-            addToast(err instanceof Error ? err.message : 'Не удалось создать файл', 'error')
+            addToast(err instanceof Error ? err.message : t('createFileFailed'), 'error')
           )
       }
     })
@@ -227,12 +230,12 @@ export function FileExplorer(): React.ReactElement {
 
   const promptCreateFolder = (directoryPath: string): void => {
     openNamePrompt({
-      title: 'Новая папка',
-      defaultValue: 'new-folder',
-      confirmLabel: 'Создать',
+      title: t('newFolder'),
+      defaultValue: t('defaultFolderName'),
+      confirmLabel: tCommon('actions.create'),
       onConfirm: (name) => {
         if (!isValidEntryName(name)) {
-          addToast('Недопустимое имя папки', 'error')
+          addToast(t('invalidFolderName'), 'error')
           return
         }
         void window.api.fs
@@ -240,10 +243,10 @@ export function FileExplorer(): React.ReactElement {
           .then(() => {
             setExpandPath(directoryPath)
             refresh()
-            addToast(`Создана папка ${name}`, 'success')
+            addToast(tCommon('toast.folderCreated', { name }), 'success')
           })
           .catch((err) =>
-            addToast(err instanceof Error ? err.message : 'Не удалось создать папку', 'error')
+            addToast(err instanceof Error ? err.message : t('createFolderFailed'), 'error')
           )
       }
     })
@@ -270,17 +273,17 @@ export function FileExplorer(): React.ReactElement {
   const buildBackgroundMenuItems = (directory: DirEntry): ContextMenuItem[] => [
     {
       id: 'new-file',
-      label: 'Новый файл',
+      label: t('newFile'),
       onClick: () => promptCreateFile(directory.path)
     },
     {
       id: 'new-folder',
-      label: 'Новая папка',
+      label: t('newFolder'),
       onClick: () => promptCreateFolder(directory.path)
     },
     {
       id: 'refresh',
-      label: 'Обновить',
+      label: tCommon('actions.refresh'),
       onClick: refresh
     }
   ]
@@ -291,7 +294,7 @@ export function FileExplorer(): React.ReactElement {
     if (!entry.isDirectory) {
       items.push({
         id: 'open',
-        label: 'Открыть',
+        label: tCommon('actions.open'),
         onClick: () => {
           void handleFileClick(entry.path)
         }
@@ -302,12 +305,12 @@ export function FileExplorer(): React.ReactElement {
       items.push(
         {
           id: 'new-file',
-          label: 'Новый файл',
+          label: t('newFile'),
           onClick: () => promptCreateFile(entry.path)
         },
         {
           id: 'new-folder',
-          label: 'Новая папка',
+          label: t('newFolder'),
           onClick: () => promptCreateFolder(entry.path)
         }
       )
@@ -316,23 +319,23 @@ export function FileExplorer(): React.ReactElement {
     items.push(
       {
         id: 'copy-path',
-        label: 'Копировать путь',
+        label: t('copyPath'),
         onClick: () => {
           void navigator.clipboard.writeText(entry.path)
-          addToast('Путь скопирован', 'success')
+          addToast(tCommon('toast.pathCopied'), 'success')
         }
       },
       {
         id: 'rename',
-        label: 'Переименовать',
+        label: t('rename'),
         onClick: () => {
           openNamePrompt({
-            title: 'Переименовать',
+            title: t('rename'),
             defaultValue: entry.name,
-            confirmLabel: 'Сохранить',
+            confirmLabel: t('save'),
             onConfirm: (newName) => {
               if (!isValidEntryName(newName)) {
-                addToast('Недопустимое имя', 'error')
+                addToast(t('invalidName'), 'error')
                 return
               }
               if (newName === entry.name) return
@@ -341,10 +344,10 @@ export function FileExplorer(): React.ReactElement {
                 .then((newPath) => {
                   renameTabPath(entry.path, newPath)
                   refresh()
-                  addToast('Переименовано', 'success')
+                  addToast(tCommon('toast.renamed'), 'success')
                 })
                 .catch((err) =>
-                  addToast(err instanceof Error ? err.message : 'Не удалось переименовать', 'error')
+                  addToast(err instanceof Error ? err.message : t('renameFailed'), 'error')
                 )
             }
           })
@@ -352,16 +355,16 @@ export function FileExplorer(): React.ReactElement {
       },
       {
         id: 'reveal',
-        label: 'Показать в проводнике',
+        label: t('revealInExplorer'),
         onClick: () => {
           void window.api.fs.revealInExplorer(entry.path).catch((err) =>
-            addToast(err instanceof Error ? err.message : 'Не удалось открыть проводник', 'error')
+            addToast(err instanceof Error ? err.message : t('revealFailed'), 'error')
           )
         }
       },
       {
         id: 'refresh',
-        label: 'Обновить',
+        label: tCommon('actions.refresh'),
         onClick: refresh
       }
     )
@@ -370,11 +373,14 @@ export function FileExplorer(): React.ReactElement {
     if (!isWorkspaceRoot) {
       items.push({
         id: 'delete',
-        label: 'Удалить',
+        label: tCommon('actions.delete'),
         danger: true,
         onClick: () => {
           const confirmed = window.confirm(
-            `Удалить "${entry.name}"?${entry.isDirectory ? ' Папка и всё содержимое будут удалены.' : ''}`
+            t('deleteConfirm', {
+              name: entry.name,
+              folderSuffix: entry.isDirectory ? t('deleteFolderSuffix') : ''
+            })
           )
           if (!confirmed) return
           void window.api.fs
@@ -382,10 +388,10 @@ export function FileExplorer(): React.ReactElement {
             .then(() => {
               closeTabsUnderPath(entry.path)
               refresh()
-              addToast('Удалено', 'success')
+              addToast(tCommon('toast.deleted'), 'success')
             })
             .catch((err) =>
-              addToast(err instanceof Error ? err.message : 'Не удалось удалить', 'error')
+              addToast(err instanceof Error ? err.message : t('deleteFailed'), 'error')
             )
         }
       })
@@ -401,7 +407,7 @@ export function FileExplorer(): React.ReactElement {
           type="button"
           onClick={handleOpenFolder}
           className="w-full min-w-0 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-white/5"
-          title={workingDirectory || 'Open a project folder'}
+          title={workingDirectory || t('openProjectFolder')}
         >
           <div className="flex items-center gap-1.5">
             <FolderOpen
@@ -416,7 +422,7 @@ export function FileExplorer(): React.ReactElement {
                 workingDirectory ? 'text-zinc-100' : 'text-zinc-500'
               )}
             >
-              {workingDirectory ? getFileName(workingDirectory) : 'Open a project folder'}
+              {workingDirectory ? getFileName(workingDirectory) : t('openProjectFolder')}
             </span>
           </div>
           {workingDirectory && (
@@ -437,8 +443,8 @@ export function FileExplorer(): React.ReactElement {
               className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 p-6 text-center hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all"
             >
               <FolderOpen className="h-8 w-8 text-indigo-400/50" />
-              <span className="text-xs text-zinc-500">Open a project folder</span>
-              <span className="text-[10px] text-zinc-600">Not the agent app folder</span>
+              <span className="text-xs text-zinc-500">{t('openProjectFolder')}</span>
+              <span className="text-[10px] text-zinc-600">{t('notAgentFolder')}</span>
             </button>
           ) : (
             rootEntries.map((entry) => (

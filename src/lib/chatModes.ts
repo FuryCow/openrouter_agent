@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import type { LucideIcon } from 'lucide-react'
 import { Bot, MessageCircleQuestion, Map } from 'lucide-react'
 
@@ -21,13 +22,11 @@ export interface ChatModeConfig {
   }
 }
 
-export const CHAT_MODES: ChatModeConfig[] = [
-  {
-    id: 'agent',
-    label: 'Агент',
-    description: 'Читает, пишет файлы, запускает команды и использует инструменты',
-    placeholder: 'Попросите агента что-то сделать в проекте...',
-    requiresWorkspace: true,
+const CHAT_MODE_THEMES: Record<
+  ChatMode,
+  Omit<ChatModeConfig, 'id' | 'label' | 'description' | 'placeholder' | 'requiresWorkspace'>
+> = {
+  agent: {
     icon: Bot,
     accentClass: 'text-indigo-300',
     theme: {
@@ -40,12 +39,7 @@ export const CHAT_MODES: ChatModeConfig[] = [
       itemActive: 'bg-indigo-500/15 ring-1 ring-indigo-400/25'
     }
   },
-  {
-    id: 'ask',
-    label: 'ASK',
-    description: 'Ответы на вопросы без изменений в проекте',
-    placeholder: 'Задайте вопрос о коде, технологиях или задаче...',
-    requiresWorkspace: false,
+  ask: {
     icon: MessageCircleQuestion,
     accentClass: 'text-sky-300',
     theme: {
@@ -58,12 +52,7 @@ export const CHAT_MODES: ChatModeConfig[] = [
       itemActive: 'bg-sky-500/15 ring-1 ring-sky-400/25'
     }
   },
-  {
-    id: 'planner',
-    label: 'Планировщик',
-    description: 'Изучает проект и составляет план без правок файлов',
-    placeholder: 'Опишите задачу — получите пошаговый план...',
-    requiresWorkspace: true,
+  planner: {
     icon: Map,
     accentClass: 'text-amber-300',
     theme: {
@@ -76,8 +65,24 @@ export const CHAT_MODES: ChatModeConfig[] = [
       itemActive: 'bg-amber-500/15 ring-1 ring-amber-400/25'
     }
   }
-]
+}
 
-export function getChatModeConfig(mode: ChatMode): ChatModeConfig {
-  return CHAT_MODES.find((m) => m.id === mode) ?? CHAT_MODES[0]
+const CHAT_MODE_IDS: ChatMode[] = ['agent', 'ask', 'planner']
+
+export function getChatModeConfigs(t: TFunction<'chat'>): ChatModeConfig[] {
+  return CHAT_MODE_IDS.map((id) => {
+    const theme = CHAT_MODE_THEMES[id]
+    return {
+      id,
+      label: t(`modes.${id}.label`),
+      description: t(`modes.${id}.description`),
+      placeholder: t(`modes.${id}.placeholder`),
+      requiresWorkspace: id !== 'ask',
+      ...theme
+    }
+  })
+}
+
+export function getChatModeConfig(mode: ChatMode, t: TFunction<'chat'>): ChatModeConfig {
+  return getChatModeConfigs(t).find((m) => m.id === mode) ?? getChatModeConfigs(t)[0]
 }

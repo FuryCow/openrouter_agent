@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Terminal as TerminalIcon } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -9,6 +10,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { scheduleInAnimationFrame } from '@/lib/animation-frame'
 
 export function TerminalPanel(): React.ReactElement {
+  const { t } = useTranslation('layout')
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -97,10 +99,10 @@ export function TerminalPanel(): React.ReactElement {
           size="sm"
           className="h-6 text-xs text-zinc-500 hover:text-zinc-300"
           onClick={() => setTerminalOpen(true)}
-          title="Show terminal (Ctrl+`)"
+          title={t('terminal.showTooltip')}
         >
           <TerminalIcon className="mr-1 h-3 w-3" />
-          Показать терминал
+          {t('terminal.show')}
         </Button>
       </div>
     )
@@ -111,16 +113,16 @@ export function TerminalPanel(): React.ReactElement {
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-1">
         <div className="flex items-center gap-1.5 text-xs text-zinc-500">
           <TerminalIcon className="h-3 w-3" />
-          Terminal
+          {t('status.terminal')}
         </div>
         <Button
           variant="ghost"
           size="sm"
           className="h-5 text-[10px] text-zinc-600 hover:text-zinc-400"
           onClick={() => setTerminalOpen(false)}
-          title="Hide terminal (Ctrl+`)"
+          title={t('terminal.hideTooltip')}
         >
-          Скрыть
+          {t('terminal.hide')}
         </Button>
       </div>
       <div ref={containerRef} className="min-h-0 flex-1 overflow-hidden p-1" />

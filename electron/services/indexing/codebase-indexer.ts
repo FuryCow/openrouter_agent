@@ -18,6 +18,7 @@ import { parseSymbols } from './symbol-indexer'
 import { VectorIndex } from './vector-index'
 import { hybridSearch } from './hybrid-search'
 import { ripgrepSearch } from './ripgrep-search'
+import { AppErrorCode } from '../../lib/app-errors'
 import type { SearchResult } from '../../types'
 
 async function loadEmbeddingService(): Promise<typeof import('./embedding-service')> {
@@ -185,7 +186,12 @@ export class CodebaseIndexer {
     this.cancelRequested = false
 
     try {
-      this.emitProgress({ phase: 'scanning', filesDone: 0, filesTotal: 0, message: 'Scanning workspace' })
+      this.emitProgress({
+        phase: 'scanning',
+        phaseCode: AppErrorCode.INDEX_SCANNING,
+        filesDone: 0,
+        filesTotal: 0
+      })
       const manifest = await scanWorkspaceManifest(
         this.workspacePath,
         this.settings.maxFileSizeKb * 1024
@@ -194,9 +200,9 @@ export class CodebaseIndexer {
 
       this.emitProgress({
         phase: 'indexing_text',
+        phaseCode: AppErrorCode.INDEX_INDEXING_FILES,
         filesDone: 0,
-        filesTotal: manifest.length,
-        message: 'Indexing files'
+        filesTotal: manifest.length
       })
 
       const allChunks: Array<{ chunkId: number; vector: number[] }> = []
@@ -210,6 +216,7 @@ export class CodebaseIndexer {
         if (done % 10 === 0 || done === manifest.length) {
           this.emitProgress({
             phase: 'indexing_text',
+            phaseCode: AppErrorCode.INDEX_INDEXING_FILES,
             filesDone: done,
             filesTotal: manifest.length
           })
@@ -218,9 +225,9 @@ export class CodebaseIndexer {
         if (this.settings.semanticSearchEnabled && chunks.length > 0) {
           this.emitProgress({
             phase: 'embedding',
+            phaseCode: AppErrorCode.INDEX_EMBEDDING,
             filesDone: done,
-            filesTotal: manifest.length,
-            message: 'Embedding chunks'
+            filesTotal: manifest.length
           })
           const { embedTexts } = await loadEmbeddingService()
           const vectors = await embedTexts(

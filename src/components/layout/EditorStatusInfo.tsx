@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useEditorStore } from '@/stores/editorStore'
 import { formatFileSize } from '@/lib/fileStats'
 
@@ -6,6 +7,7 @@ function StatusSeparator(): React.ReactElement {
 }
 
 export function EditorStatusInfo(): React.ReactElement | null {
+  const { t } = useTranslation('layout')
   const stats = useEditorStore((s) => s.stats)
   if (!stats) return null
 
@@ -17,12 +19,12 @@ export function EditorStatusInfo(): React.ReactElement | null {
       {stats.showCursor && (
         <>
           <span className="font-mono text-zinc-400">
-            Ln {stats.line}, Col {stats.column}
+            {t('status.cursor', { line: stats.line, column: stats.column })}
           </span>
           <StatusSeparator />
         </>
       )}
-      <span>{stats.lineCount} lines</span>
+      <span>{t('status.lines', { count: stats.lineCount })}</span>
       <StatusSeparator />
       <span>{stats.indent}</span>
       <StatusSeparator />

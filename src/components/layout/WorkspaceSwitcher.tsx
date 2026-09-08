@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as Popover from '@radix-ui/react-popover'
 import { Check, FolderOpen, History } from 'lucide-react'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -9,6 +10,7 @@ function workspaceName(path: string): string {
 }
 
 export function WorkspaceSwitcher(): React.ReactElement {
+  const { t } = useTranslation('layout')
   const [open, setOpen] = useState(false)
   const { workingDirectory, recentWorkspaces, openFolderPicker, openWorkspace } = useWorkspace()
 
@@ -21,10 +23,10 @@ export function WorkspaceSwitcher(): React.ReactElement {
             'flex max-w-md items-center gap-1.5 truncate rounded px-1.5 py-0.5 transition-colors hover:bg-white/5 hover:text-zinc-300',
             open && 'bg-white/5 text-zinc-300'
           )}
-          title={workingDirectory || 'Открыть папку проекта'}
+          title={workingDirectory || t('workspace.openProjectTitle')}
         >
           <FolderOpen className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{workingDirectory || 'No folder open'}</span>
+          <span className="truncate">{workingDirectory || t('workspace.noFolder')}</span>
         </button>
       </Popover.Trigger>
 
@@ -45,7 +47,7 @@ export function WorkspaceSwitcher(): React.ReactElement {
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-300 hover:bg-white/5"
           >
             <FolderOpen className="h-3.5 w-3.5 text-indigo-400" />
-            Открыть другую папку…
+            {t('workspace.openAnother')}
           </button>
 
           {workingDirectory && (
@@ -62,7 +64,7 @@ export function WorkspaceSwitcher(): React.ReactElement {
             <div className="mt-2 border-t border-white/5 pt-2">
               <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-medium uppercase tracking-wide text-zinc-600">
                 <History className="h-3 w-3" />
-                Недавние
+                {t('workspace.recent')}
               </div>
               <div className="max-h-48 overflow-y-auto">
                 {recentWorkspaces.map((path) => (

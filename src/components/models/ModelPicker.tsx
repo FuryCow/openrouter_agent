@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown, Eye, Loader2, RefreshCw, Wrench } from 'lucide-react'
 import * as Popover from '@radix-ui/react-popover'
 import { Button } from '../ui/button'
@@ -46,6 +47,7 @@ function ModelRow({
   selected: boolean
   onSelect: () => void
 }): React.ReactElement {
+  const { t } = useTranslation('layout')
   const pricing = getModelPriceLabel(model)
 
   return (
@@ -72,22 +74,22 @@ function ModelRow({
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300">
           <Wrench className="h-2.5 w-2.5" />
-          Tools
+          {t('models.badge.tools')}
         </span>
         {model.supportsVision && (
           <span className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-300">
             <Eye className="h-2.5 w-2.5" />
-            Vision
+            {t('models.badge.vision')}
           </span>
         )}
         {model.agenticIndex != null && (
           <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-300">
-            Agentic {model.agenticIndex.toFixed(0)}
+            {t('models.badge.agentic', { score: model.agenticIndex.toFixed(0) })}
           </span>
         )}
         {model.contextLabel && (
           <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            {model.contextLabel} ctx
+            {t('models.badge.context', { label: model.contextLabel })}
           </span>
         )}
       </div>
@@ -114,6 +116,7 @@ export function ModelPicker({
   compact = false,
   className
 }: ModelPickerProps): React.ReactElement {
+  const { t } = useTranslation('layout')
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [visionOnly, setVisionOnly] = useState(false)
@@ -177,7 +180,7 @@ export function ModelPicker({
           )}
         >
           <div className="min-w-0 truncate text-left">
-            <div className="truncate">{selected?.name || value || 'Select model'}</div>
+            <div className="truncate">{selected?.name || value || t('models.selectModel')}</div>
             {selectedPricing && (
               <div className="truncate font-mono text-[9px] text-emerald-400/80">{selectedPricing}</div>
             )}
@@ -197,7 +200,7 @@ export function ModelPicker({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search: z-ai, glm, claude, deepseek..."
+              placeholder={t('models.searchPlaceholder')}
               className="h-9 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500/40 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
             />
             {onRefresh && (
@@ -232,7 +235,7 @@ export function ModelPicker({
                   : 'bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-zinc-300'
               )}
             >
-              Vision
+              {t('models.filter.vision')}
             </button>
 
             <button
@@ -245,17 +248,17 @@ export function ModelPicker({
                   : 'bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-zinc-300'
               )}
             >
-              Free
+              {t('models.filter.free')}
             </button>
 
             <span className="mx-1 h-4 w-px bg-white/10" />
 
             {(
               [
-                ['price-low', 'Cheapest'],
-                ['price-high', 'Premium'],
-                ['agentic', 'Agentic'],
-                ['name', 'A–Z']
+                ['price-low', t('models.sort.cheapest')],
+                ['price-high', t('models.sort.premium')],
+                ['agentic', t('models.sort.agentic')],
+                ['name', t('models.sort.name')]
               ] as const
             ).map(([key, label]) => (
               <button
@@ -275,15 +278,15 @@ export function ModelPicker({
           </div>
 
           <div className="mb-2 flex items-center justify-between px-1 text-[10px] text-zinc-500">
-            <span>Agent models · price per 1M tokens (input · output)</span>
+            <span>{t('models.caption')}</span>
             <span>
-              {filtered.length} / {models.length}
+              {t('models.count', { filtered: filtered.length, total: models.length })}
             </span>
           </div>
 
           {staleCatalog && (
             <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-              Outdated model catalog detected. Close the app and run <strong>start.bat</strong> again.
+              {t('models.staleCatalog')}
             </div>
           )}
 
@@ -291,14 +294,14 @@ export function ModelPicker({
             {loading && models.length === 0 ? (
               <div className="flex h-40 items-center justify-center text-sm text-zinc-500">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading models...
+                {t('models.loading')}
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex h-40 flex-col items-center justify-center gap-2 px-4 text-center text-sm text-zinc-500">
-                <span>No models match filters</span>
+                <span>{t('models.noMatch')}</span>
                 {onRefresh && (
                   <Button variant="secondary" size="sm" onClick={onRefresh}>
-                    Refresh list
+                    {t('models.refreshList')}
                   </Button>
                 )}
               </div>
@@ -307,7 +310,7 @@ export function ModelPicker({
                 {grouped.map(([provider, providerModels]) => (
                   <div key={provider}>
                     <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
-                      {provider} · {providerModels.length}
+                      {t('models.providerGroup', { provider, count: providerModels.length })}
                     </div>
                     <div className="space-y-1">
                       {providerModels.map((model) => (

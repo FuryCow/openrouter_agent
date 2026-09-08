@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { useChatStore } from '@/stores/chatStore'
@@ -5,6 +6,8 @@ import { DiffView } from './DiffView'
 import { FilePathLink } from './FilePathLink'
 
 export function ApprovalDialog(): React.ReactElement {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
   const pendingApproval = useChatStore((s) => s.pendingApproval)
   const setPendingApproval = useChatStore((s) => s.setPendingApproval)
 
@@ -29,7 +32,7 @@ export function ApprovalDialog(): React.ReactElement {
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-baseline gap-x-2">
-            <span>Подтверждение: {pendingApproval?.name}</span>
+            <span>{t('approval.title', { toolName: pendingApproval?.name ?? '' })}</span>
             {pendingApproval?.filePath && (
               <>
                 <span className="font-normal text-zinc-500">·</span>
@@ -61,12 +64,12 @@ export function ApprovalDialog(): React.ReactElement {
             )}
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => handleResponse(true)}>Approve</Button>
+              <Button onClick={() => handleResponse(true)}>{tc('actions.approve')}</Button>
               <Button variant="outline" onClick={() => handleResponse(true, true)}>
-                Always allow (session)
+                {t('approval.alwaysAllowSession')}
               </Button>
               <Button variant="ghost" onClick={() => handleResponse(false)}>
-                Reject
+                {tc('actions.reject')}
               </Button>
             </div>
           </div>

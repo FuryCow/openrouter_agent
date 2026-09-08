@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog'
 import { Button } from './button'
 
@@ -7,8 +8,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Подтвердить',
-  cancelLabel = 'Отмена',
+  confirmLabel,
+  cancelLabel,
   destructive = false,
   onConfirm
 }: {
@@ -21,6 +22,10 @@ export function ConfirmDialog({
   destructive?: boolean
   onConfirm: () => void
 }): React.ReactElement {
+  const { t } = useTranslation('common')
+  const resolvedConfirmLabel = confirmLabel ?? t('actions.confirm')
+  const resolvedCancelLabel = cancelLabel ?? t('actions.cancel')
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -30,7 +35,7 @@ export function ConfirmDialog({
         <p className="text-sm text-zinc-400">{description}</p>
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            {cancelLabel}
+            {resolvedCancelLabel}
           </Button>
           <Button
             type="button"
@@ -40,7 +45,7 @@ export function ConfirmDialog({
               onOpenChange(false)
             }}
           >
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </Button>
         </div>
       </DialogContent>

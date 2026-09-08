@@ -1,9 +1,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { dirname, join, normalize, resolve, sep } from 'path'
 import { app } from 'electron'
-
-export const AGENT_APP_WORKSPACE_ERROR =
-  'Cannot use the OpenRouter Agent installation folder as a workspace. Open a separate folder for your projects.'
+import { AppError, AppErrorCode } from '../lib/app-errors'
 
 const DANGEROUS_COMMAND_PATTERNS = [
   /\brm\s+(-[^\s]*r|-[^\s]*f|--recursive|--force)/i,
@@ -106,33 +104,29 @@ export function isInsideAgentApp(targetPath: string): boolean {
 export function assertAllowedWorkspace(dir: string): void {
   if (!dir) return
   if (isInsideAgentApp(dir)) {
-    throw new Error(AGENT_APP_WORKSPACE_ERROR)
+    throw new AppError(AppErrorCode.WORKSPACE_AGENT_APP_FOLDER)
   }
 }
 
 export function assertPathNotInAgentApp(targetPath: string): void {
   if (isInsideAgentApp(targetPath)) {
-    throw new Error(AGENT_APP_WORKSPACE_ERROR)
+    throw new AppError(AppErrorCode.WORKSPACE_AGENT_APP_FOLDER)
   }
 }
 
 export function assertSafeTerminalCommand(command: string): void {
   const trimmed = command.trim()
   if (!trimmed) {
-    throw new Error('Empty command')
+    throw new AppError(AppErrorCode.TERMINAL_EMPTY_COMMAND)
   }
 
   if (isCodeSearchShellCommand(trimmed)) {
-    throw new Error(
-      'Blocked: do not use the shell to search or grep source files. Use grep_workspace (regex) or codebase_search (hybrid navigation) instead.'
-    )
+    throw new AppError(AppErrorCode.TERMINAL_SHELL_SEARCH_BLOCKED)
   }
 
   for (const pattern of DANGEROUS_COMMAND_PATTERNS) {
     if (pattern.test(trimmed)) {
-      throw new Error(
-        'Blocked potentially destructive command. Use a safer alternative or run it manually outside the agent.'
-      )
+      throw new AppError(AppErrorCode.TERMINAL_DESTRUCTIVE_BLOCKED)
     }
   }
 }

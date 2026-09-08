@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ChatMessage, ChatMode } from '@/types'
 import { useChatStore } from '@/stores/chatStore'
 import { useFileStore } from '@/stores/fileStore'
@@ -24,6 +25,7 @@ async function loadWorkspaceChats(workspace: string | null): Promise<ChatMessage
 }
 
 export function useChatPersistence(): void {
+  const { t } = useTranslation('chat')
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const prevWorkspaceRef = useRef<string | null | undefined>(undefined)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -43,7 +45,7 @@ export function useChatPersistence(): void {
 
       if (showToast && workspace) {
         const name = workspace.split(/[/\\]/).pop() || workspace
-        useToastStore.getState().addToast(`Чат переключён на ${name}`, 'info')
+        useToastStore.getState().addToast(t('persistence.switched', { name }), 'info')
       }
     }
 
@@ -67,7 +69,7 @@ export function useChatPersistence(): void {
       prevWorkspaceRef.current = workingDirectory
       await switchWorkspace(workingDirectory, true)
     })()
-  }, [workingDirectory, flushSave])
+  }, [workingDirectory, flushSave, t])
 
   useEffect(() => {
     const unsubscribe = useChatStore.subscribe((state) => {

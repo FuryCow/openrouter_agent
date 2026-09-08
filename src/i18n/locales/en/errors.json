@@ -1,0 +1,54 @@
+{
+  "agent": {
+    "requestFailed": "Request failed",
+    "sendFailed": "Failed to send message",
+    "noWorkspace": "Open a project folder in Explorer first (not the agent app folder).",
+    "alreadyRunning": "Agent is already running. Wait or abort the current run.",
+    "noWorkspaceFolder": "No workspace folder open. Open a project folder in Explorer (not the agent app folder)."
+  },
+  "settings": {
+    "saveWhileRunning": "Cannot save settings while agent is running. Abort the current run first."
+  },
+  "workspace": {
+    "pathRequired": "Workspace path is required",
+    "agentAppFolder": "Cannot use the OpenRouter Agent installation folder as a workspace. Open a separate folder for your projects.",
+    "openFailed": "Failed to open folder",
+    "invalidFolder": "This folder cannot be used as a project"
+  },
+  "memory": {
+    "noWorkspace": "No workspace open",
+    "disabled": "Project memory is disabled in settings",
+    "contentRequired": "Content is required"
+  },
+  "mcp": {
+    "cursorConfigNotFound": "Cursor MCP config not found at {{path}}",
+    "invalidJsonObject": "Invalid MCP JSON: expected an object",
+    "missingMcpServers": "Invalid MCP JSON: missing mcpServers object",
+    "invalidServerEntry": "Invalid MCP server entry for \"{{id}}\"",
+    "transportRequired": "MCP server entry must have either command (stdio) or url (remote)",
+    "serverIdRequired": "Server id is required",
+    "commandRequired": "Server \"{{id}}\": command is required for stdio transport",
+    "urlRequired": "Server \"{{id}}\": url is required for remote transport",
+    "invalidUrl": "Server \"{{id}}\": url is not valid",
+    "duplicateId": "Duplicate MCP server id: {{id}}"
+  },
+  "openrouter": {
+    "requestFailed": "OpenRouter request failed",
+    "apiKeyMissing": "OpenRouter API key is not set. Open Settings and add your key.",
+    "connectionFailed": "Failed to connect to OpenRouter. Check your internet connection.",
+    "noResponseBody": "No response body from OpenRouter",
+    "provider": "Provider: {{name}}",
+    "code": "Code: {{code}}",
+    "idleTimeoutHint": "The model took too long to respond (often with large write_file). Use search_replace or split the task."
+  },
+  "terminal": {
+    "emptyCommand": "Empty command",
+    "shellSearchBlocked": "Blocked: do not use the shell to search or grep source files. Use grep_workspace (regex) or codebase_search (hybrid navigation) instead.",
+    "destructiveBlocked": "Blocked potentially destructive command. Use a safer alternative or run it manually outside the agent."
+  },
+  "index": {
+    "scanning": "Scanning workspace",
+    "indexingFiles": "Indexing files",
+    "embedding": "Embedding chunks"
+  }
+}

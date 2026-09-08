@@ -1,4 +1,5 @@
 import type { McpServerConfig, McpTransportType } from '../../types'
+import { AppError, AppErrorCode } from '../../lib/app-errors'
 
 export interface CursorMcpJson {
   mcpServers?: Record<string, CursorMcpServerEntry>
@@ -17,7 +18,7 @@ export interface CursorMcpServerEntry {
 export function detectTransport(entry: CursorMcpServerEntry): McpTransportType {
   if (entry.command) return 'stdio'
   if (entry.url) return 'streamable-http'
-  throw new Error('MCP server entry must have either command (stdio) or url (remote)')
+  throw new AppError(AppErrorCode.MCP_TRANSPORT_REQUIRED)
 }
 
 export function normalizeServerConfig(config: McpServerConfig): McpServerConfig {
@@ -33,20 +34,20 @@ export function normalizeServerConfig(config: McpServerConfig): McpServerConfig 
 
 export function parseCursorMcpJson(raw: unknown): McpServerConfig[] {
   if (!raw || typeof raw !== 'object') {
-    throw new Error('Invalid MCP JSON: expected an object')
+    throw new AppError(AppErrorCode.MCP_INVALID_JSON_OBJECT)
   }
 
   const data = raw as CursorMcpJson
   const servers = data.mcpServers
   if (!servers || typeof servers !== 'object') {
-    throw new Error('Invalid MCP JSON: missing mcpServers object')
+    throw new AppError(AppErrorCode.MCP_MISSING_MCP_SERVERS)
   }
 
   const result: McpServerConfig[] = []
 
   for (const [id, entry] of Object.entries(servers)) {
     if (!entry || typeof entry !== 'object') {
-      throw new Error(`Invalid MCP server entry for "${id}"`)
+      throw new AppError(AppErrorCode.MCP_INVALID_SERVER_ENTRY, { id })
     }
 
     const transport = detectTransport(entry)
@@ -106,29 +107,35 @@ export function mergeMcpServerConfigs(
   return [...map.values()]
 }
 
-export function validateMcpServerConfig(config: McpServerConfig): string | null {
-  if (!config.id.trim()) return 'Server id is required'
+export function validateMcpServerConfig(config: McpServerConfig): AppError | null {
+  if (!config.id.trim()) return new AppError(AppErrorCode.MCP_SERVER_ID_REQUIRED)
 
   if (config.transport === 'stdio') {
-    if (!config.command?.trim()) return `Server "${config.id}": command is required for stdio transport`
+    if (!config.command?.trim()) {
+      return new AppError(AppErrorCode.MCP_COMMAND_REQUIRED, { id: config.id })
+    }
     return null
   }
 
-  if (!config.url?.trim()) return `Server "${config.id}": url is required for remote transport`
+  if (!config.url?.trim()) {
+    return new AppError(AppErrorCode.MCP_URL_REQUIRED, { id: config.id })
+  }
   try {
     new URL(config.url)
   } catch {
-    return `Server "${config.id}": url is not valid`
+    return new AppError(AppErrorCode.MCP_INVALID_URL, { id: config.id })
   }
   return null
 }
 
-export function validateMcpServerConfigs(servers: McpServerConfig[]): string | null {
+export function validateMcpServerConfigs(servers: McpServerConfig[]): AppError | null {
   const ids = new Set<string>()
   for (const server of servers) {
     const error = validateMcpServerConfig(server)
     if (error) return error
-    if (ids.has(server.id)) return `Duplicate MCP server id: ${server.id}`
+    if (ids.has(server.id)) {
+      return new AppError(AppErrorCode.MCP_DUPLICATE_ID, { id: server.id })
+    }
     ids.add(server.id)
   }
   return null

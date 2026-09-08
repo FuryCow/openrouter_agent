@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useFileStore } from '@/stores/fileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useToastStore } from '@/stores/toastStore'
@@ -14,6 +15,7 @@ export function useWorkspace(): {
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const addToast = useToastStore((s) => s.addToast)
+  const { t } = useTranslation('errors')
 
   const syncFromSaved = useCallback(async (path: string) => {
     setWorkingDirectory(path)
@@ -27,10 +29,10 @@ export function useWorkspace(): {
         const applied = await window.api.fs.setWorkspace(path)
         await syncFromSaved(applied)
       } catch (err) {
-        addToast(err instanceof Error ? err.message : 'Не удалось открыть папку', 'error')
+        addToast(err instanceof Error ? err.message : t('workspace.openFailed'), 'error')
       }
     },
-    [addToast, syncFromSaved]
+    [addToast, syncFromSaved, t]
   )
 
   const openFolderPicker = useCallback(async (): Promise<void> => {
@@ -38,9 +40,9 @@ export function useWorkspace(): {
       const path = await window.api.fs.openFolder()
       if (path) await syncFromSaved(path)
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Эту папку нельзя использовать как проект', 'error')
+      addToast(err instanceof Error ? err.message : t('workspace.invalidFolder'), 'error')
     }
-  }, [addToast, syncFromSaved])
+  }, [addToast, syncFromSaved, t])
 
   const recentWorkspaces = (settings.recentWorkspaces ?? []).filter(
     (path) => path && path !== workingDirectory

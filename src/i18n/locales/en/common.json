@@ -1,0 +1,73 @@
+{
+  "actions": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "save": "Save",
+    "saving": "Saving...",
+    "dismiss": "Dismiss",
+    "create": "Create",
+    "reset": "Reset",
+    "delete": "Delete",
+    "approve": "Approve",
+    "reject": "Reject",
+    "copy": "Copy",
+    "retry": "Retry",
+    "edit": "Edit",
+    "remember": "Remember",
+    "open": "Open",
+    "refresh": "Refresh",
+    "rename": "Rename",
+    "close": "Close"
+  },
+  "toast": {
+    "copiedToClipboard": "Copied to clipboard",
+    "pathCopied": "Path copied",
+    "renamed": "Renamed",
+    "deleted": "Deleted",
+    "fileCreated": "Created file {{name}}",
+    "folderCreated": "Created folder {{name}}",
+    "memorySaved": "Memory saved",
+    "savedToMemory": "Saved {{count}} item(s) to project memory",
+    "addedToMemory": "Added to project memory"
+  },
+  "status": {
+    "loading": "Loading...",
+    "active": "active",
+    "mode": "mode",
+    "interrupted": "Interrupted",
+    "thinking": "Thinking",
+    "ok": "OK",
+    "badArgs": "Bad args",
+    "error": "Error"
+  },
+  "labels": {
+    "workspace": "Workspace",
+    "markdown": "Markdown",
+    "terminal": "Terminal",
+    "input": "Input",
+    "output": "Output",
+    "result": "Result",
+    "filter": "Filter",
+    "content": "Content",
+    "change": "Change",
+    "query": "Query",
+    "command": "Command",
+    "file": "File",
+    "files": "Files",
+    "dir": "dir",
+    "fileType": "file"
+  },
+  "meta": {
+    "category": "category",
+    "query": "query",
+    "action": "action",
+    "id": "id",
+    "mode": "mode",
+    "root": "root",
+    "glob": "glob",
+    "limit": "limit",
+    "step": "step",
+    "status": "status"
+  }
+}

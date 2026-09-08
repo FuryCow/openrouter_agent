@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Check, Circle, KeyRound, FolderOpen, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -5,6 +6,7 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { cn } from '@/lib/utils'
 
 export function ChatOnboarding(): React.ReactElement {
+  const { t } = useTranslation('chat')
   const settings = useSettingsStore((s) => s.settings)
   const models = useSettingsStore((s) => s.models)
   const setSettingsOpen = useSettingsStore((s) => s.setSettingsOpen)
@@ -19,37 +21,37 @@ export function ChatOnboarding(): React.ReactElement {
     {
       id: 'api',
       done: hasApiKey,
-      title: 'API-ключ OpenRouter',
-      description: 'Нужен для запросов к моделям',
+      title: t('onboarding.apiKey.title'),
+      description: t('onboarding.apiKey.description'),
       action: () => setSettingsOpen(true),
-      actionLabel: 'Открыть настройки',
+      actionLabel: t('onboarding.apiKey.action'),
       icon: KeyRound
     },
     {
       id: 'folder',
       done: hasFolder,
-      title: 'Папка проекта',
-      description: 'Агент и планировщик работают с файлами в workspace',
+      title: t('onboarding.folder.title'),
+      description: t('onboarding.folder.description'),
       action: () => void openFolderPicker(),
-      actionLabel: 'Открыть папку',
+      actionLabel: t('onboarding.folder.action'),
       icon: FolderOpen
     },
     {
       id: 'model',
       done: hasModel,
-      title: 'Модель',
-      description: 'Выберите модель с tool calling в title bar',
+      title: t('onboarding.model.title'),
+      description: t('onboarding.model.description'),
       action: () => setSettingsOpen(true),
-      actionLabel: 'Настройки',
+      actionLabel: t('onboarding.model.action'),
       icon: Sparkles
     }
   ]
 
   return (
     <div className="mx-auto w-full max-w-sm rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left">
-      <h3 className="text-sm font-medium text-zinc-200">Быстрый старт</h3>
+      <h3 className="text-sm font-medium text-zinc-200">{t('onboarding.title')}</h3>
       <p className="mt-1 text-xs text-zinc-500">
-        {allDone ? 'Всё готово — можно отправлять задачу агенту.' : 'Пройдите шаги ниже, чтобы начать работу.'}
+        {allDone ? t('onboarding.allDone') : t('onboarding.incomplete')}
       </p>
 
       <ul className="mt-4 space-y-3">

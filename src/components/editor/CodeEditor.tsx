@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { X } from 'lucide-react'
@@ -56,6 +57,8 @@ function applyEditorReveal(
 }
 
 export function CodeEditor(): React.ReactElement {
+  const { t } = useTranslation('layout')
+  const { t: tCommon } = useTranslation('common')
   const tabs = useFileStore((s) => s.tabs)
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const activeTabPath = useFileStore((s) => s.activeTabPath)
@@ -181,30 +184,30 @@ export function CodeEditor(): React.ReactElement {
       return [
         {
           id: 'close',
-          label: 'Закрыть',
+          label: t('editor.tabs.close'),
           onClick: () => closeTab(tabPath)
         },
         {
           id: 'close-left',
-          label: 'Закрыть слева',
+          label: t('editor.tabs.closeLeft'),
           disabled: !hasLeft,
           onClick: () => closeTabsToLeftOf(tabPath)
         },
         {
           id: 'close-right',
-          label: 'Закрыть справа',
+          label: t('editor.tabs.closeRight'),
           disabled: !hasRight,
           onClick: () => closeTabsToRightOf(tabPath)
         },
         {
           id: 'close-others',
-          label: 'Закрыть остальные',
+          label: t('editor.tabs.closeOthers'),
           disabled: !hasOthers,
           onClick: () => closeOtherTabs(tabPath)
         }
       ]
     },
-    [tabs, closeTab, closeTabsToLeftOf, closeTabsToRightOf, closeOtherTabs]
+    [tabs, closeTab, closeTabsToLeftOf, closeTabsToRightOf, closeOtherTabs, t]
   )
 
   return (
@@ -275,7 +278,7 @@ export function CodeEditor(): React.ReactElement {
 
       {activeTab && isMarkdownTab && (
         <div className="flex items-center justify-between border-b border-white/5 bg-[#0d0d14] px-3 py-1.5">
-          <span className="text-[11px] text-zinc-500">Markdown</span>
+          <span className="text-[11px] text-zinc-500">{tCommon('labels.markdown')}</span>
           <MarkdownViewToggle
             mode={markdownViewMode}
             onChange={(mode) => setTabViewMode(activeTab.path, mode)}
