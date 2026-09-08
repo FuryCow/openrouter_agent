@@ -1,4 +1,5 @@
-import type { ChatMode } from '../types'
+import type { ApprovedPlan, ChatMode } from '../types'
+import { parsePlannerPlan } from '../lib/parsePlannerPlan'
 import { useChatStore } from '../stores/chatStore'
 import { useFileStore } from '../stores/fileStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -21,7 +22,12 @@ ${planContent}`
 export function useAgent(): {
   sendMessage: (
     message: string,
-    options?: { mode?: ChatMode; images?: string[]; skipUserMessage?: boolean }
+    options?: {
+      mode?: ChatMode
+      images?: string[]
+      skipUserMessage?: boolean
+      approvedPlan?: ApprovedPlan
+    }
   ) => Promise<void>
   implementPlan: (planContent: string) => Promise<void>
   abort: () => void
@@ -29,7 +35,12 @@ export function useAgent(): {
 } {
   const sendMessage = async (
     message: string,
-    options?: { mode?: ChatMode; images?: string[]; skipUserMessage?: boolean }
+    options?: {
+      mode?: ChatMode
+      images?: string[]
+      skipUserMessage?: boolean
+      approvedPlan?: ApprovedPlan
+    }
   ): Promise<void> => {
     const { chatMode, addUserMessage, clearStream, setStreaming } = useChatStore.getState()
     const mode = options?.mode ?? chatMode
@@ -79,7 +90,8 @@ export function useAgent(): {
         images: options?.images,
         customSystemPrompt: settings.customSystemPrompt,
         autoApproveWrites: settings.autoApproveWrites,
-        autoApproveTerminal: settings.autoApproveTerminal
+        autoApproveTerminal: settings.autoApproveTerminal,
+        approvedPlan: options?.approvedPlan
       })
     } catch (err) {
       setStreaming(false)
@@ -100,8 +112,9 @@ export function useAgent(): {
     setChatMode('agent')
     useToastStore.getState().addToast('Режим Агента — реализация плана', 'info')
 
+    const approvedPlan = parsePlannerPlan(planContent)
     const prompt = buildImplementPlanPrompt(planContent, originalTask)
-    await sendMessage(prompt, { mode: 'agent' })
+    await sendMessage(prompt, { mode: 'agent', approvedPlan })
   }
 
   const abort = (): void => {

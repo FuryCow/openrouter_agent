@@ -192,6 +192,43 @@ function formatVerifySection(enabled: boolean | undefined): string {
   return `\n${VERIFY_WORKFLOW}\n`
 }
 
+const CHECKLIST_WORKFLOW = `Task checklist workflow (multi-step tasks):
+- For 3+ files or an approved plan with multiple steps: call create_task_checklist first with ordered steps
+- Mark the active step in_progress before editing; mark done when finished
+- Do not skip checklist updates on long runs — they keep execution on track`
+
+function formatApprovedPlanSection(plan: AgentContext['approvedPlan']): string {
+  if (!plan) return ''
+
+  const parts: string[] = [
+    'Approved plan (planner handoff):',
+    'Execute steps in order. Do not skip verification.',
+    'Use create_task_checklist + update_task_checklist to track progress.'
+  ]
+
+  if (plan.goal) {
+    parts.push('', `Goal:\n${plan.goal}`)
+  }
+
+  if (plan.steps.length > 0) {
+    parts.push('', 'Steps:', ...plan.steps.map((step) => `${step.order}. ${step.text}`))
+  }
+
+  if (plan.files.length > 0) {
+    parts.push('', 'Files to touch:', ...plan.files.map((file) => `- ${file}`))
+  }
+
+  if (plan.verificationSteps.length > 0) {
+    parts.push(
+      '',
+      'Verification (required before finishing):',
+      ...plan.verificationSteps.map((step) => `- ${step}`)
+    )
+  }
+
+  return `\n${parts.join('\n')}\n`
+}
+
 const PROJECT_MEMORY_GUIDELINES = `Guidelines for memory:
 - Prefer existing memory over re-discovering conventions
 - Use update_project_memory to persist important decisions, architecture notes, and recurring pitfalls
@@ -285,9 +322,12 @@ ${formatProjectMemorySection(context.projectMemory)}
 
 ${formatWorkspaceStateSection(context.workspaceState)}
 
+${formatApprovedPlanSection(context.approvedPlan)}
+
 ${EXPLORATION_WORKFLOW}
 
-${EDITING_WORKFLOW}${formatVerifySection(context.agentAutoVerify)}
+${EDITING_WORKFLOW}
+${CHECKLIST_WORKFLOW}${formatVerifySection(context.agentAutoVerify)}
 ${mcpSection ? `\n${mcpSection}\n` : ''}
 Guidelines:
 - Read target files (via read_files) before editing; search snippets are not enough for search_replace

@@ -141,6 +141,20 @@ export function buildToolArgsView(toolName: string, argsJson: string): ToolArgsV
     }
     case 'get_open_files':
       return { kind: 'empty' }
+    case 'create_task_checklist': {
+      const steps = asStringArray(args.steps)
+      return steps.length > 0
+        ? { kind: 'generic', fields: steps.map((step, index) => ({ key: `${index + 1}`, value: step })) }
+        : genericFields(args)
+    }
+    case 'update_task_checklist': {
+      const step = asString(args.step)
+      const status = asString(args.status)
+      const fields: Array<{ key: string; value: string }> = []
+      if (step) fields.push({ key: 'step', value: step })
+      if (status) fields.push({ key: 'status', value: status })
+      return fields.length > 0 ? { kind: 'generic', fields } : genericFields(args)
+    }
     default:
       return genericFields(args)
   }

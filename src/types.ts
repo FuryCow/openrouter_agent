@@ -49,5 +49,7 @@ export type {
   ProjectMemoryEntry,
   ProjectMemoryCategory,
   AgentRunStatus,
-  RunCheckpointSummary
+  RunCheckpointSummary,
+  ApprovedPlan,
+  ApprovedPlanStep
 } from '../../electron/types'

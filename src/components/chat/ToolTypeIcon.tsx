@@ -66,6 +66,9 @@ export function resolveToolIconKind(toolName: string): ToolIconKind {
       return 'memory-read'
     case 'update_project_memory':
       return 'memory-write'
+    case 'create_task_checklist':
+    case 'update_task_checklist':
+      return 'group'
     default:
       return 'generic'
   }

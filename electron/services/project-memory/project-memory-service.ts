@@ -10,6 +10,7 @@ import type {
   UpdateProjectMemoryInput
 } from './project-memory-types'
 import { DEFAULT_SNAPSHOT_TOKEN_BUDGET } from './project-memory-types'
+import { applyMemoryHygiene } from './memory-hygiene'
 
 export class ProjectMemoryService {
   private cache = new Map<string, string>()
@@ -35,29 +36,40 @@ export class ProjectMemoryService {
   }
 
   listEntries(workspacePath: string): ProjectMemoryEntry[] {
-    return this.store.listEntries(workspacePath)
+    const entries = this.store.listEntries(workspacePath)
+    const cleaned = applyMemoryHygiene(entries)
+    if (cleaned.length !== entries.length) {
+      this.store.saveEntries(workspacePath, cleaned)
+      this.invalidate(workspacePath)
+    }
+    return cleaned
   }
 
   saveEntries(workspacePath: string, entries: ProjectMemoryEntry[]): ProjectMemoryEntry[] {
-    const saved = this.store.saveEntries(workspacePath, entries)
+    const saved = this.store.saveEntries(workspacePath, applyMemoryHygiene(entries))
     this.invalidate(workspacePath)
     return saved
   }
 
   remember(workspacePath: string, input: RememberMemoryInput): ProjectMemoryEntry {
     const entry = this.store.remember(workspacePath, input)
+    const cleaned = applyMemoryHygiene(this.store.listEntries(workspacePath))
+    this.store.saveEntries(workspacePath, cleaned)
     this.invalidate(workspacePath)
-    return entry
+    return cleaned.find((item) => item.id === entry.id) ?? entry
   }
 
   update(workspacePath: string, input: UpdateProjectMemoryInput): ProjectMemoryEntry | null {
     const entry = this.store.update(workspacePath, input)
+    const cleaned = applyMemoryHygiene(this.store.listEntries(workspacePath))
+    this.store.saveEntries(workspacePath, cleaned)
     this.invalidate(workspacePath)
-    return entry
+    if (input.action === 'delete') return null
+    return cleaned.find((item) => item.id === entry?.id) ?? entry
   }
 
   read(workspacePath: string, input: ReadProjectMemoryInput = {}): string {
-    let entries = this.store.listEntries(workspacePath)
+    let entries = this.listEntries(workspacePath)
     if (input.category) {
       entries = entries.filter((entry) => entry.category === input.category)
     }
@@ -110,7 +122,7 @@ export class ProjectMemoryService {
       }
     }
 
-    const entries = this.store.listEntries(workspacePath)
+    const entries = this.listEntries(workspacePath)
     if (entries.length > 0) {
       parts.push('## Dynamic memory')
       const grouped = new Map<string, ProjectMemoryEntry[]>()

@@ -1,5 +1,6 @@
 import { join, isAbsolute } from 'path'
 import type { AgentContext, AgentEvent, ChatMode, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest, FileDiffPreview, CodebaseSearchMode } from '../types'
+import type { TaskStepStatus } from './run-task-checklist'
 import type { FileSystemService } from './filesystem'
 import type { TerminalService } from './terminal'
 import type { WebSearchService } from './websearch'
@@ -35,6 +36,7 @@ import { parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
 import type { ProjectMemoryService } from './project-memory/project-memory-service'
 import type { ProjectMemoryCategory } from './project-memory/project-memory-types'
 import { suggestMemoryFromRun } from './project-memory/run-memory-suggest'
+import { RunTaskChecklist } from './run-task-checklist'
 import { RunCheckpoint } from './run-checkpoint'
 import {
   buildRetryExhaustedError,
@@ -268,6 +270,44 @@ const TOOLS: ToolDefinition[] = [
         required: ['action']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_task_checklist',
+      description:
+        'Create an internal run checklist for multi-step tasks. Use before touching 3+ files or when executing an approved plan with multiple steps.',
+      parameters: {
+        type: 'object',
+        properties: {
+          steps: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Ordered checklist steps (3-20 items)'
+          }
+        },
+        required: ['steps']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_task_checklist',
+      description: 'Mark a checklist step as pending, in_progress, or done during the current run.',
+      parameters: {
+        type: 'object',
+        properties: {
+          step: { type: 'number', description: '1-based step number' },
+          status: {
+            type: 'string',
+            enum: ['pending', 'in_progress', 'done'],
+            description: 'New step status'
+          }
+        },
+        required: ['step', 'status']
+      }
+    }
   }
 ]
 
@@ -290,6 +330,7 @@ export class AgentService {
   private runCheckpoint = new RunCheckpoint()
   private lastCheckpoint: RunCheckpoint | null = null
   private toolRetryCounts = new Map<string, number>()
+  private runTaskChecklist = new RunTaskChecklist()
   private runEmit: ((event: AgentEvent) => void) | null = null
 
   constructor(
@@ -396,6 +437,7 @@ export class AgentService {
     this.running = true
     this.runCheckpoint = new RunCheckpoint()
     this.toolRetryCounts.clear()
+    this.runTaskChecklist.clear()
     this.runEmit = emit
     this.emitRunStatus(emit, 'running')
 
@@ -976,6 +1018,30 @@ export class AgentService {
             return `Deleted memory entry ${String(args.id ?? '')}`
           }
           return `Saved memory entry ${entry?.id ?? ''} (${entry?.category ?? 'note'})`
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`
+        }
+      }
+      case 'create_task_checklist': {
+        const steps = Array.isArray(args.steps)
+          ? args.steps.map((step) => String(step).trim()).filter(Boolean)
+          : []
+        if (steps.length === 0) return 'Error: steps must contain at least one non-empty item'
+        if (steps.length > 20) return 'Error: maximum 20 checklist steps'
+        try {
+          return this.runTaskChecklist.create(steps)
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`
+        }
+      }
+      case 'update_task_checklist': {
+        const step = Number(args.step)
+        const status = String(args.status ?? '') as TaskStepStatus
+        if (!['pending', 'in_progress', 'done'].includes(status)) {
+          return 'Error: status must be pending, in_progress, or done'
+        }
+        try {
+          return this.runTaskChecklist.update(step, status)
         } catch (err) {
           return `Error: ${err instanceof Error ? err.message : String(err)}`
         }

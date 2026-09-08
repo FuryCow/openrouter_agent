@@ -160,6 +160,20 @@ export interface AgentContext {
   projectMemory?: string
   workspaceState?: string
   agentAutoVerify?: boolean
+  approvedPlan?: ApprovedPlan
+}
+
+export interface ApprovedPlanStep {
+  order: number
+  text: string
+}
+
+export interface ApprovedPlan {
+  raw: string
+  goal?: string
+  steps: ApprovedPlanStep[]
+  files: string[]
+  verificationSteps: string[]
 }
 
 export interface DiffHighlightRange {
