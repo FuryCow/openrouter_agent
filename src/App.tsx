@@ -25,6 +25,7 @@ import { Toaster } from './components/ui/toaster'
 import { QuickOpenModal } from './components/layout/QuickOpenModal'
 import { ShortcutsModal } from './components/layout/ShortcutsModal'
 import { useUiStore } from './stores/uiStore'
+import { isImagePath } from './lib/utils'
 
 function ResizeHandle({ direction }: { direction: 'horizontal' | 'vertical' }): React.ReactElement {
   return (
@@ -81,7 +82,7 @@ export default function App(): React.ReactElement {
       if (e.ctrlKey && e.key === 's') {
         e.preventDefault()
         const tab = tabs.find((t) => t.path === activeTabPath)
-        if (tab) {
+        if (tab && !isImagePath(tab.path)) {
           await window.api.fs.writeFile(tab.path, tab.content)
           markTabSaved(tab.path)
           useToastStore.getState().addToast(`Saved ${tab.path.split(/[/\\]/).pop()}`, 'success')
@@ -154,8 +155,10 @@ export default function App(): React.ReactElement {
 
           <ResizeHandle direction="horizontal" />
 
-          <Panel defaultSize={30} minSize={20} maxSize={45}>
-            <ChatPanel />
+          <Panel defaultSize={30} minSize={20} maxSize={45} className="min-h-0">
+            <div className="h-full min-h-0 overflow-hidden">
+              <ChatPanel />
+            </div>
           </Panel>
         </PanelGroup>
       </div>

@@ -24,6 +24,22 @@ describe('buildToolArgsView', () => {
     const view = buildToolArgsView('run_terminal', JSON.stringify({ command: 'npm test' }))
     expect(view).toEqual({ kind: 'command', command: 'npm test' })
   })
+
+  it('formats create_task_checklist object steps', () => {
+    const view = buildToolArgsView(
+      'create_task_checklist',
+      JSON.stringify({
+        steps: [{ text: 'Read files' }, { description: 'Apply edits' }]
+      })
+    )
+    expect(view).toEqual({
+      kind: 'generic',
+      fields: [
+        { key: '1', value: 'Read files' },
+        { key: '2', value: 'Apply edits' }
+      ]
+    })
+  })
 })
 
 describe('buildToolResultView', () => {

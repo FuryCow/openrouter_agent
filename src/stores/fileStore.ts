@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { getLanguageFromPath } from '../lib/utils'
+import { getLanguageFromPath, isImagePath } from '../lib/utils'
+import { loadFileForEditor } from '../lib/loadFileForEditor'
 import type { DiffHighlightRange } from '../types'
 
 export interface EditorTab {
@@ -203,7 +204,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     for (const tab of tabs) {
       if (tab.isDirty) continue
       try {
-        const content = await window.api.fs.readFile(tab.path)
+        const content = await loadFileForEditor(tab.path)
         if (content !== tab.content) {
           updates.push({ path: tab.path, content })
         }
@@ -224,10 +225,12 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   getOpenFilesContext: () => {
     const { tabs } = get()
-    return tabs.map((t) => ({
-      path: t.path,
-      content: t.content,
-      language: t.language
-    }))
+    return tabs
+      .filter((t) => !isImagePath(t.path))
+      .map((t) => ({
+        path: t.path,
+        content: t.content,
+        language: t.language
+      }))
   }
 }))

@@ -5,8 +5,9 @@ import type { editor } from 'monaco-editor'
 import { X } from 'lucide-react'
 import { useFileStore, type EditorRevealRequest } from '@/stores/fileStore'
 import { FileIcon } from '@/components/ui/FileIcon'
-import { getFileName, getRelativePath, truncateRelativePath, isMarkdownPath, cn } from '@/lib/utils'
+import { getFileName, getRelativePath, truncateRelativePath, isMarkdownPath, isImagePath, cn } from '@/lib/utils'
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview'
+import { ImagePreview } from '@/components/editor/ImagePreview'
 import { MarkdownViewToggle } from '@/components/editor/MarkdownViewToggle'
 import { EditorEmptyState } from '@/components/editor/EditorEmptyState'
 import {
@@ -84,6 +85,7 @@ export function CodeEditor(): React.ReactElement {
 
   const activeTab = tabs.find((t) => t.path === activeTabPath)
   const isMarkdownTab = activeTab ? isMarkdownPath(activeTab.path) : false
+  const isImageTab = activeTab ? isImagePath(activeTab.path) : false
   const markdownViewMode = activeTab?.viewMode ?? 'edit'
   const showMarkdownPreview = isMarkdownTab && markdownViewMode === 'preview'
 
@@ -95,17 +97,19 @@ export function CodeEditor(): React.ReactElement {
       return
     }
 
-    const preview = isMarkdownPath(tab.path) && (tab.viewMode ?? 'edit') === 'preview'
+    const preview =
+      isMarkdownPath(tab.path) && (tab.viewMode ?? 'edit') === 'preview'
+    const imagePreview = isImagePath(tab.path)
     setEditorStats(
-      buildEditorFileStats(tab, preview ? null : monacoEditorRef.current, {
-        showCursor: !preview
+      buildEditorFileStats(tab, preview || imagePreview ? null : monacoEditorRef.current, {
+        showCursor: !preview && !imagePreview
       })
     )
   }, [setEditorStats])
 
   useEffect(() => {
     publishEditorStats()
-  }, [activeTab, activeTab?.content, activeTab?.language, showMarkdownPreview, publishEditorStats])
+  }, [activeTab, activeTab?.content, activeTab?.language, showMarkdownPreview, isImageTab, publishEditorStats])
 
   useEffect(() => {
     return () => {
@@ -169,7 +173,7 @@ export function CodeEditor(): React.ReactElement {
   }, [])
 
   const handleSave = async (): Promise<void> => {
-    if (!activeTab) return
+    if (!activeTab || isImagePath(activeTab.path)) return
     await window.api.fs.writeFile(activeTab.path, activeTab.content)
     markTabSaved(activeTab.path)
   }
@@ -286,10 +290,18 @@ export function CodeEditor(): React.ReactElement {
         </div>
       )}
 
+      {activeTab && isImageTab && (
+        <div className="flex items-center border-b border-white/5 bg-[#0d0d14] px-3 py-1.5">
+          <span className="text-[11px] text-zinc-500">{t('editor.imagePreview')}</span>
+        </div>
+      )}
+
       <div ref={editorContainerRef} className="relative min-h-0 flex-1 overflow-hidden">
         {activeTab ? (
           showMarkdownPreview ? (
             <MarkdownPreview content={activeTab.content} />
+          ) : isImageTab ? (
+            <ImagePreview src={activeTab.content} alt={getFileName(activeTab.path)} />
           ) : (
           <Editor
             height="100%"

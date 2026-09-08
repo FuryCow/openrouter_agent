@@ -38,6 +38,40 @@ export function isMarkdownPath(path: string): boolean {
   return ext === 'md' || ext === 'mdx' || ext === 'markdown'
 }
 
+const IMAGE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'svg',
+  'ico',
+  'bmp',
+  'avif'
+])
+
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  ico: 'image/x-icon',
+  bmp: 'image/bmp',
+  avif: 'image/avif'
+}
+
+export function isImagePath(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase() || ''
+  return IMAGE_EXTENSIONS.has(ext)
+}
+
+export function getImageMimeType(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase() || ''
+  return IMAGE_MIME_TYPES[ext] ?? 'application/octet-stream'
+}
+
 export function normalizePathSeparators(path: string): string {
   return path.replace(/\\/g, '/')
 }

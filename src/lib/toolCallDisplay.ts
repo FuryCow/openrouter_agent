@@ -1,3 +1,5 @@
+import { normalizeChecklistSteps } from '../../electron/lib/checklist-steps'
+
 export type ToolArgsView =
   | { kind: 'empty' }
   | { kind: 'paths'; paths: string[] }
@@ -142,7 +144,7 @@ export function buildToolArgsView(toolName: string, argsJson: string): ToolArgsV
     case 'get_open_files':
       return { kind: 'empty' }
     case 'create_task_checklist': {
-      const steps = asStringArray(args.steps)
+      const steps = normalizeChecklistSteps(args.steps)
       return steps.length > 0
         ? { kind: 'generic', fields: steps.map((step, index) => ({ key: `${index + 1}`, value: step })) }
         : genericFields(args)

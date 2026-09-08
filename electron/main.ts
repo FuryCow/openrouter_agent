@@ -61,6 +61,8 @@ const store = new Store<{ settings: AppSettings }>({
 })
 
 let mainWindow: BrowserWindow | null = null
+let closeConfirmed = false
+let closeFlushTimer: ReturnType<typeof setTimeout> | null = null
 const codebaseIndexer = new CodebaseIndexer()
 const fsService = new FileSystemService()
 fsService.setIndexer(codebaseIndexer)
@@ -124,8 +126,14 @@ function createWindow(): void {
     mainWindow?.show()
   })
 
-  mainWindow.on('close', () => {
-    shutdownApp()
+  mainWindow.on('close', (event) => {
+    if (closeConfirmed) {
+      shutdownApp()
+      return
+    }
+
+    event.preventDefault()
+    requestRendererFlushAndClose()
   })
 
   mainWindow.on('closed', () => {
@@ -153,6 +161,22 @@ function sendToRenderer(channel: string, ...args: unknown[]): void {
   } catch {
     // Window was destroyed during shutdown
   }
+}
+
+function finishAppClose(): void {
+  if (closeFlushTimer) {
+    clearTimeout(closeFlushTimer)
+    closeFlushTimer = null
+  }
+  closeConfirmed = true
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.close()
+}
+
+function requestRendererFlushAndClose(): void {
+  sendToRenderer('app:flush-request')
+  if (closeFlushTimer) clearTimeout(closeFlushTimer)
+  closeFlushTimer = setTimeout(() => finishAppClose(), 3000)
 }
 
 function applyWorkspaceSelection(workspacePath: string): AppSettings {
@@ -213,6 +237,10 @@ function shutdownApp(): void {
 }
 
 function registerIpc(): void {
+  ipcMain.on('app:flush-complete', () => {
+    finishAppClose()
+  })
+
   ipcMain.handle('window:minimize', () => getWindow().minimize())
   ipcMain.handle('window:maximize', () => {
     const win = getWindow()
@@ -269,6 +297,10 @@ function registerIpc(): void {
   ipcMain.handle('fs:read-file', (_event, filePath: string) => {
     assertPathNotInAgentApp(filePath)
     return fsService.readFile(filePath)
+  })
+  ipcMain.handle('fs:read-file-data-url', (_event, filePath: string) => {
+    assertPathNotInAgentApp(filePath)
+    return fsService.readFileAsDataUrl(filePath)
   })
   ipcMain.handle('fs:write-file', (_event, filePath: string, content: string) => {
     assertPathNotInAgentApp(filePath)

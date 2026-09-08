@@ -310,7 +310,7 @@ export function ChatPanel(): React.ReactElement {
 
   return (
     <div
-      className="flex h-full flex-col border-l border-white/5 bg-[#0d0d14]"
+      className="flex h-full min-h-0 flex-col border-l border-white/5 bg-[#0d0d14]"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault()
@@ -438,7 +438,7 @@ export function ChatPanel(): React.ReactElement {
         </div>
       </div>
 
-      <div className="border-t border-white/5 p-3">
+      <div className="relative z-10 shrink-0 border-t border-white/5 p-3">
         <div
           className={cn(
             'overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] transition-all',
@@ -475,9 +475,14 @@ export function ChatPanel(): React.ReactElement {
 
           <div
             className={cn(
-              'relative flex gap-1 p-1.5',
+              'relative z-10 flex gap-1 p-1.5',
               inputIsMultiline ? 'items-end' : 'items-center'
             )}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                inputRef.current?.focus()
+              }
+            }}
           >
           <input
             ref={fileInputRef}
@@ -506,7 +511,7 @@ export function ChatPanel(): React.ReactElement {
             onPaste={handlePaste}
             placeholder={editingMessageId ? t('editMessagePlaceholder') : modeConfig.placeholder}
             rows={1}
-            className="flex-1 resize-none overflow-hidden bg-transparent px-1 py-2 text-sm leading-5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
+            className="relative z-10 min-h-[36px] flex-1 resize-none overflow-hidden bg-transparent px-1 py-2 text-sm leading-5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
           />
           {isStreaming ? (
             <Button variant="destructive" size="icon" className="size-9 shrink-0" onClick={abort}>

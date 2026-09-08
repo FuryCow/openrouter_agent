@@ -35,6 +35,7 @@ export interface ElectronAPI {
     setWorkspace: (path: string) => Promise<string>
     listWorkspaceFiles: () => Promise<string[]>
     readFile: (path: string) => Promise<string>
+    readFileDataUrl: (path: string) => Promise<string>
     writeFile: (path: string, content: string) => Promise<void>
     listDir: (path: string) => Promise<DirEntry[]>
     searchFiles: (query: string, root: string) => Promise<SearchResult[]>
@@ -106,6 +107,10 @@ export interface ElectronAPI {
       workspacePath?: string
     ) => Promise<ProjectMemoryEntry>
   }
+  app: {
+    onFlushRequest: (callback: () => void) => () => void
+    flushComplete: () => void
+  }
 }
 
 const api: ElectronAPI = {
@@ -126,6 +131,7 @@ const api: ElectronAPI = {
     setWorkspace: (path) => ipcRenderer.invoke('fs:set-workspace', path),
     listWorkspaceFiles: () => ipcRenderer.invoke('fs:list-workspace-files'),
     readFile: (path) => ipcRenderer.invoke('fs:read-file', path),
+    readFileDataUrl: (path) => ipcRenderer.invoke('fs:read-file-data-url', path),
     writeFile: (path, content) => ipcRenderer.invoke('fs:write-file', path, content),
     listDir: (path) => ipcRenderer.invoke('fs:list-dir', path),
     searchFiles: (query, root) => ipcRenderer.invoke('fs:search-files', query, root),
@@ -221,6 +227,14 @@ const api: ElectronAPI = {
     saveEntries: (entries, workspacePath) =>
       ipcRenderer.invoke('memory:saveEntries', entries, workspacePath),
     remember: (input, workspacePath) => ipcRenderer.invoke('memory:remember', input, workspacePath)
+  },
+  app: {
+    onFlushRequest: (callback) => {
+      const handler = (): void => callback()
+      ipcRenderer.on('app:flush-request', handler)
+      return () => ipcRenderer.removeListener('app:flush-request', handler)
+    },
+    flushComplete: () => ipcRenderer.send('app:flush-complete')
   }
 }
 

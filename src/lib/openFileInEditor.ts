@@ -1,4 +1,5 @@
 import { useFileStore } from '@/stores/fileStore'
+import { loadFileForEditor } from '@/lib/loadFileForEditor'
 import type { DiffHighlightRange } from '@/types'
 
 function normalizePath(path: string): string {
@@ -33,7 +34,7 @@ export async function openFileInEditor(path: string, options?: OpenFileOptions):
     useFileStore.getState()
   const target = normalizePath(resolved)
 
-  const content = await window.api.fs.readFile(resolved)
+  const content = await loadFileForEditor(resolved)
   const existing = tabs.find((tab) => normalizePath(tab.path) === target)
 
   if (existing) {

@@ -8,6 +8,7 @@ import { getT } from '../i18n/t'
 
 interface SettingsState {
   settings: AppSettings
+  hydrated: boolean
   models: ModelInfo[]
   modelsLoading: boolean
   modelsError: string | null
@@ -29,6 +30,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     workingDirectory: '',
     locale: 'en'
   },
+  hydrated: false,
   models: [],
   modelsLoading: false,
   modelsError: null,
@@ -85,10 +87,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   loadSettings: async () => {
-    const settings = await window.api.settings.get()
-    await setAppLocale(settings.locale ?? 'en')
-    set({ settings })
-    useFileStore.getState().setWorkingDirectory(settings.workingDirectory || null)
-    await get().loadModels()
+    try {
+      const settings = await window.api.settings.get()
+      await setAppLocale(settings.locale ?? 'en')
+      set({ settings, hydrated: true })
+      useFileStore.getState().setWorkingDirectory(settings.workingDirectory || null)
+      await get().loadModels()
+    } catch {
+      set({ hydrated: true })
+    }
   }
 }))

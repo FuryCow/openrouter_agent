@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useChatModes } from '@/hooks/useChatModes'
 import type { ChatMode } from '@/lib/chatModes'
@@ -11,7 +10,6 @@ import {
 } from '../ui/select'
 import { cn } from '@/lib/utils'
 
-const MODE_SELECT_CLOSE_MS = 280
 const MODE_SELECT_OPEN_MS = 340
 
 export function ChatModeSelector({
@@ -27,42 +25,9 @@ export function ChatModeSelector({
   const { modes, getModeConfig } = useChatModes()
   const current = getModeConfig(mode)
   const Icon = current.icon
-  const [open, setOpen] = useState(false)
-  const [closing, setClosing] = useState(false)
-  const closeTimerRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current !== null) {
-        window.clearTimeout(closeTimerRef.current)
-      }
-    }
-  }, [])
-
-  const handleOpenChange = (next: boolean): void => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
-    }
-
-    if (next) {
-      setClosing(false)
-      setOpen(true)
-      return
-    }
-
-    if (!open || closing) return
-
-    setClosing(true)
-    closeTimerRef.current = window.setTimeout(() => {
-      setOpen(false)
-      setClosing(false)
-      closeTimerRef.current = null
-    }, MODE_SELECT_CLOSE_MS)
-  }
 
   return (
-    <Select value={mode} open={open} onOpenChange={handleOpenChange} onValueChange={(v) => onModeChange(v as ChatMode)} disabled={disabled}>
+    <Select value={mode} onValueChange={(v) => onModeChange(v as ChatMode)} disabled={disabled}>
       <SelectTrigger
         className={cn(
           'relative h-7 w-auto min-w-[6.5rem] justify-start gap-1.5 rounded-md border px-1.5 pr-5 text-left shadow-none',
@@ -94,14 +59,12 @@ export function ChatModeSelector({
         side="top"
         sideOffset={4}
         style={{
-          ['--chat-mode-select-open-ms' as string]: `${MODE_SELECT_OPEN_MS}ms`,
-          ['--chat-mode-select-close-ms' as string]: `${MODE_SELECT_CLOSE_MS}ms`
+          ['--chat-mode-select-open-ms' as string]: `${MODE_SELECT_OPEN_MS}ms`
         }}
         className={cn(
           'chat-mode-select-content min-w-[10.5rem] max-w-[11.5rem] rounded-lg border border-white/10 bg-[#14141f]/98 p-0',
           'shadow-lg shadow-black/50 backdrop-blur-md',
-          '[&>[data-radix-select-viewport]]:p-0',
-          closing && 'chat-mode-select-closing'
+          '[&>[data-radix-select-viewport]]:p-0'
         )}
       >
         <div className="chat-mode-select-panel p-1">

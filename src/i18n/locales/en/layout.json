@@ -52,7 +52,8 @@
       "closeLeft": "Close to the left",
       "closeRight": "Close to the right",
       "closeOthers": "Close others"
-    }
+    },
+    "imagePreview": "Image preview"
   },
   "status": {
     "cursor": "Ln {{line}}, Col {{column}}",

@@ -1,6 +1,7 @@
 import type { ChatCompletionMessage, ToolCall } from '../services/openrouter'
 import type { ChatMode, TimelineItem, ToolCallInfo, ToolValidationIssue } from '../types'
 import { buildExecutionWaves } from './tool-execution-plan'
+import { normalizeToolCall } from './tool-call-normalize'
 import {
   classifyToolResult,
   validateToolArguments,
@@ -51,6 +52,30 @@ interface ExecutionResult {
   issues: ToolValidationIssue[]
 }
 
+function normalizeCall(call: ToolCall): ToolCall {
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>
+  } catch {
+    return call
+  }
+
+  const { name, args } = normalizeToolCall(call.function.name, parsed)
+  const normalizedArgsJson = JSON.stringify(args)
+  if (name === call.function.name && normalizedArgsJson === call.function.arguments) {
+    return call
+  }
+
+  return {
+    ...call,
+    function: {
+      ...call.function,
+      name,
+      arguments: normalizedArgsJson
+    }
+  }
+}
+
 export async function processToolCallsBatch(options: ProcessToolCallsOptions): Promise<void> {
   const {
     toolCalls,
@@ -68,7 +93,9 @@ export async function processToolCallsBatch(options: ProcessToolCallsOptions): P
     onExecuteSuccess
   } = options
 
-  const prepared: PreparedCall[] = toolCalls.map((call) => {
+  const normalizedToolCalls = toolCalls.map(normalizeCall)
+
+  const prepared: PreparedCall[] = normalizedToolCalls.map((call) => {
     const toolInfo: ToolCallInfo = {
       id: call.id,
       name: call.function.name,
@@ -95,7 +122,7 @@ export async function processToolCallsBatch(options: ProcessToolCallsOptions): P
   }
 
   const executionResults = new Map<string, ExecutionResult>()
-  const waves = buildExecutionWaves(toolCalls, cwd)
+  const waves = buildExecutionWaves(normalizedToolCalls, cwd)
 
   for (const wave of waves) {
     await Promise.all(

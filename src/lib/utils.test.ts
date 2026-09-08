@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRelativePath, truncateMiddle, truncateRelativePath, isMarkdownPath } from './utils'
+import { getRelativePath, truncateMiddle, truncateRelativePath, isMarkdownPath, isImagePath } from './utils'
 
 describe('isMarkdownPath', () => {
   it('detects markdown file extensions', () => {
@@ -7,6 +7,15 @@ describe('isMarkdownPath', () => {
     expect(isMarkdownPath('page.MDX')).toBe(true)
     expect(isMarkdownPath('notes.markdown')).toBe(true)
     expect(isMarkdownPath('App.tsx')).toBe(false)
+  })
+})
+
+describe('isImagePath', () => {
+  it('detects common image file extensions', () => {
+    expect(isImagePath('assets/logo.png')).toBe(true)
+    expect(isImagePath('photo.JPG')).toBe(true)
+    expect(isImagePath('icon.svg')).toBe(true)
+    expect(isImagePath('App.tsx')).toBe(false)
   })
 })
 

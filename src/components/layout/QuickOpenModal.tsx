@@ -4,6 +4,7 @@ import { File } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useUiStore } from '@/stores/uiStore'
 import { useFileStore } from '@/stores/fileStore'
+import { loadFileForEditor } from '@/lib/loadFileForEditor'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { cn } from '@/lib/utils'
 
@@ -72,7 +73,7 @@ export function QuickOpenModal(): React.ReactElement {
   }, [query, results.length])
 
   const openPath = async (path: string): Promise<void> => {
-    const content = await window.api.fs.readFile(path)
+    const content = await loadFileForEditor(path)
     openFile(path, content)
     setOpen(false)
   }

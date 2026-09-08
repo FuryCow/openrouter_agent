@@ -11,6 +11,7 @@ import { FileIcon } from '../ui/FileIcon'
 import { ScrollArea } from '../ui/scroll-area'
 import { ExplorerContextMenu, type ContextMenuItem } from './ExplorerContextMenu'
 import { NameInputDialog } from './NameInputDialog'
+import { loadFileForEditor } from '@/lib/loadFileForEditor'
 import { useFileStore } from '@/stores/fileStore'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useToastStore } from '@/stores/toastStore'
@@ -186,7 +187,7 @@ export function FileExplorer(): React.ReactElement {
   }
 
   const handleFileClick = async (path: string): Promise<void> => {
-    const content = await window.api.fs.readFile(path)
+    const content = await loadFileForEditor(path)
     openFile(path, content)
   }
 

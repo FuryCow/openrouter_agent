@@ -1,5 +1,5 @@
 import { readFile, writeFile, readdir, stat, mkdir, rm, rename } from 'fs/promises'
-import { join, dirname } from 'path'
+import { join, dirname, extname } from 'path'
 import type { DirEntry, SearchResult } from '../types'
 import type { CodebaseIndexer } from './indexing/codebase-indexer'
 import { ripgrepSearch } from './indexing/ripgrep-search'
@@ -12,6 +12,24 @@ export class FileSystemService {
   }
   async readFile(filePath: string): Promise<string> {
     return readFile(filePath, 'utf-8')
+  }
+
+  async readFileAsDataUrl(filePath: string): Promise<string> {
+    const buffer = await readFile(filePath)
+    const ext = extname(filePath).toLowerCase()
+    const mimeByExt: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+      '.bmp': 'image/bmp',
+      '.avif': 'image/avif'
+    }
+    const mime = mimeByExt[ext] ?? 'application/octet-stream'
+    return `data:${mime};base64,${buffer.toString('base64')}`
   }
 
   async writeFile(filePath: string, content: string): Promise<void> {

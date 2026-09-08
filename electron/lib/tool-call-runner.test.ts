@@ -38,6 +38,30 @@ describe('processToolCallsBatch', () => {
     expect(messages[0]?.content).toBe('ok')
   })
 
+  it('normalizes grep alias to grep_workspace before execution', async () => {
+    const executeTool = vi.fn(async (call: ToolCall) => {
+      expect(call.function.name).toBe('grep_workspace')
+      expect(JSON.parse(call.function.arguments).query).toBe('className')
+      return 'match'
+    })
+
+    await processToolCallsBatch({
+      toolCalls: [tool('grep', { pattern: 'className', path: 'src' }, '1')],
+      mode: 'agent',
+      cwd,
+      iteration: 1,
+      timeline: [],
+      messages: [],
+      onToolStart: vi.fn(),
+      onToolDone: vi.fn(),
+      onRecordAnalytics: vi.fn(),
+      requestApproval: vi.fn(),
+      executeTool
+    })
+
+    expect(executeTool).toHaveBeenCalledTimes(1)
+  })
+
   it('requests approval sequentially for mutating tools', async () => {
     const order: string[] = []
     const requestApproval = vi.fn(async (call: ToolCall) => {

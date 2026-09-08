@@ -1,23 +1,17 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { ChatMessage, ChatMode } from '@/types'
+import type { ChatMessage } from '@/types'
 import { useChatStore } from '@/stores/chatStore'
 import { useFileStore } from '@/stores/fileStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useToastStore } from '@/stores/toastStore'
+import { CHAT_PERSISTENCE_MODES, messagesForMode } from '@/lib/chatPersistenceCore'
 
-const MODES: ChatMode[] = ['agent', 'ask', 'planner']
-
-async function saveAllModes(workspace: string | null): Promise<void> {
-  const state = useChatStore.getState()
-  for (const mode of MODES) {
-    const modeMessages = state.messages.filter((m) => m.mode === mode || !m.mode)
-    await window.api.chat.save(mode, modeMessages, workspace)
-  }
-}
+const SAVE_DEBOUNCE_MS = 400
 
 async function loadWorkspaceChats(workspace: string | null): Promise<ChatMessage[]> {
   const allMessages: ChatMessage[] = []
-  for (const mode of MODES) {
+  for (const mode of CHAT_PERSISTENCE_MODES) {
     const messages = await window.api.chat.load(mode, workspace)
     if (messages.length > 0) allMessages.push(...messages)
   }
@@ -26,33 +20,43 @@ async function loadWorkspaceChats(workspace: string | null): Promise<ChatMessage
 
 export function useChatPersistence(): void {
   const { t } = useTranslation('chat')
+  const hydrated = useSettingsStore((s) => s.hydrated)
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const prevWorkspaceRef = useRef<string | null | undefined>(undefined)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const loadSeqRef = useRef(0)
   const initializedRef = useRef(false)
 
   const flushSave = useCallback(async (workspace: string | null) => {
-    await saveAllModes(workspace)
+    const state = useChatStore.getState()
+    for (const mode of CHAT_PERSISTENCE_MODES) {
+      await window.api.chat.save(mode, messagesForMode(state.messages, mode), workspace)
+    }
   }, [])
 
-  useEffect(() => {
-    const switchWorkspace = async (
-      workspace: string | null,
-      showToast: boolean
-    ): Promise<void> => {
+  const loadWorkspace = useCallback(
+    async (workspace: string | null, showToast: boolean): Promise<void> => {
+      const seq = ++loadSeqRef.current
       const messages = await loadWorkspaceChats(workspace)
+      if (seq !== loadSeqRef.current) return
+
       useChatStore.getState().setAllMessages(messages)
 
       if (showToast && workspace) {
         const name = workspace.split(/[/\\]/).pop() || workspace
         useToastStore.getState().addToast(t('persistence.switched', { name }), 'info')
       }
-    }
+    },
+    [t]
+  )
+
+  useEffect(() => {
+    if (!hydrated) return
 
     const prev = prevWorkspaceRef.current
     if (prev === undefined) {
       prevWorkspaceRef.current = workingDirectory
-      void switchWorkspace(workingDirectory, false).then(() => {
+      void loadWorkspace(workingDirectory, false).then(() => {
         initializedRef.current = true
       })
       return
@@ -67,26 +71,56 @@ export function useChatPersistence(): void {
       }
       await flushSave(prev)
       prevWorkspaceRef.current = workingDirectory
-      await switchWorkspace(workingDirectory, true)
+      await loadWorkspace(workingDirectory, true)
     })()
-  }, [workingDirectory, flushSave, t])
+  }, [hydrated, workingDirectory, flushSave, loadWorkspace])
 
   useEffect(() => {
-    const unsubscribe = useChatStore.subscribe((state) => {
+    if (!hydrated) return
+
+    const unsubscribe = useChatStore.subscribe(() => {
       if (!initializedRef.current) return
       const workspace = useFileStore.getState().workingDirectory
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
-        for (const mode of MODES) {
-          const modeMessages = state.messages.filter((m) => m.mode === mode || !m.mode)
-          void window.api.chat.save(mode, modeMessages, workspace)
-        }
-      }, 500)
+        void flushSave(workspace)
+      }, SAVE_DEBOUNCE_MS)
     })
 
     return () => {
       unsubscribe()
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [])
+  }, [hydrated, flushSave])
+
+  useEffect(() => {
+    if (!hydrated) return
+
+    const flushNow = async (): Promise<void> => {
+      if (!initializedRef.current) return
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+      await flushSave(useFileStore.getState().workingDirectory)
+    }
+
+    const onVisibility = (): void => {
+      if (document.visibilityState === 'hidden') {
+        void flushNow()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    const unsubFlush = window.api.app.onFlushRequest(() => {
+      void flushNow().finally(() => {
+        window.api.app.flushComplete()
+      })
+    })
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      unsubFlush()
+    }
+  }, [hydrated, flushSave])
 }

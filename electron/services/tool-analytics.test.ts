@@ -83,6 +83,24 @@ describe('validateToolArguments', () => {
     expect(result.ok).toBe(false)
     expect(result.issues).toContain('tool_not_allowed_in_mode')
   })
+
+  it('accepts create_task_checklist in agent mode', () => {
+    const result = validateToolArguments(
+      'create_task_checklist',
+      JSON.stringify({ steps: ['Step one', 'Step two', 'Step three'] }),
+      'agent'
+    )
+    expect(result.ok).toBe(true)
+  })
+
+  it('accepts update_task_checklist in agent mode', () => {
+    const result = validateToolArguments(
+      'update_task_checklist',
+      JSON.stringify({ step: 1, status: 'done' }),
+      'agent'
+    )
+    expect(result.ok).toBe(true)
+  })
 })
 
 describe('classifyToolResult', () => {

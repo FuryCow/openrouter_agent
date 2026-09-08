@@ -26,6 +26,7 @@ import {
   expandHistoryForApi
 } from './agent-modes'
 import { buildFallbackFileDiffPreview, formatFileChangeDiff } from '../lib/diff'
+import { normalizeChecklistSteps } from '../lib/checklist-steps'
 import { processToolCallsBatch } from '../lib/tool-call-runner'
 import {
   ToolAnalyticsCollector,
@@ -283,7 +284,8 @@ const TOOLS: ToolDefinition[] = [
           steps: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Ordered checklist steps (3-20 items)'
+            description:
+              'Ordered checklist steps as plain strings, e.g. ["Read layout files", "Add burger menu", "Verify in browser"]'
           }
         },
         required: ['steps']
@@ -1027,9 +1029,7 @@ export class AgentService {
         }
       }
       case 'create_task_checklist': {
-        const steps = Array.isArray(args.steps)
-          ? args.steps.map((step) => String(step).trim()).filter(Boolean)
-          : []
+        const steps = normalizeChecklistSteps(args.steps)
         if (steps.length === 0) return 'Error: steps must contain at least one non-empty item'
         if (steps.length > 20) return 'Error: maximum 20 checklist steps'
         try {

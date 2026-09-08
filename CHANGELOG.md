@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.2] — 2026-09-08
+
+### Bug fixes
+
+- **Chat persistence:** Wait for settings hydration before loading/saving chats; flush debounced saves on app close and tab hide so conversations survive restarts.
+- **Chat composer:** Fix unfocusable input caused by the mode selector’s invisible overlay; restore click-to-focus on the composer area.
+- **Task checklist:** Normalize object-shaped `steps` (e.g. `{ text: "..." }`) instead of storing `[object Object]`; register `create_task_checklist` / `update_task_checklist` in tool validation.
+- **Tool aliases:** Map model `grep` calls (`pattern` / `path`) to `grep_workspace` before execution.
+- **Editor images:** Open PNG/JPEG/WebP and other images as a preview instead of binary garbage in Monaco; skip save for image tabs.
+
+### Tests
+
+- 168 tests passing; added coverage for checklist normalization, grep alias, chat persistence core, and tool-call display.
+
+---
+
 ## [0.9.1] — 2026-09-08
 
 ### Internationalization (i18n)
