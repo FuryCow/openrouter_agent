@@ -9,8 +9,10 @@ import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileIcon } from '../ui/FileIcon'
 import { ScrollArea } from '../ui/scroll-area'
+import { Button } from '../ui/button'
 import { ExplorerContextMenu, type ContextMenuItem } from './ExplorerContextMenu'
 import { NameInputDialog } from './NameInputDialog'
+import { EmptyStateShell } from '@/components/ui/EmptyStateShell'
 import { loadFileForEditor } from '@/lib/loadFileForEditor'
 import { useFileStore } from '@/stores/fileStore'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -402,8 +404,8 @@ export function FileExplorer(): React.ReactElement {
   }
 
   return (
-    <div className="flex h-full flex-col border-r border-white/5 bg-[#0d0d14]">
-      <div className="border-b border-white/5 px-2 py-2">
+    <div className="flex h-full flex-col border-r border-white/5 bg-background">
+      <div className="chrome-header px-2">
         <button
           type="button"
           onClick={handleOpenFolder}
@@ -438,15 +440,19 @@ export function FileExplorer(): React.ReactElement {
         <ScrollArea className="h-full">
           <div className="min-h-full p-1">
           {!workingDirectory ? (
-            <button
-              type="button"
-              onClick={handleOpenFolder}
-              className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 p-6 text-center hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all"
-            >
-              <FolderOpen className="h-8 w-8 text-indigo-400/50" />
-              <span className="text-xs text-zinc-500">{t('openProjectFolder')}</span>
-              <span className="text-[10px] text-zinc-600">{t('notAgentFolder')}</span>
-            </button>
+            <div className="p-3">
+              <EmptyStateShell
+                compact
+                icon={FolderOpen}
+                title={t('openProjectFolder')}
+                description={t('notAgentFolder')}
+              >
+                <Button type="button" className="w-full gap-2" onClick={() => void handleOpenFolder()}>
+                  <FolderOpen className="h-4 w-4" />
+                  {t('openProjectFolder')}
+                </Button>
+              </EmptyStateShell>
+            </div>
           ) : (
             rootEntries.map((entry) => (
               <TreeNode

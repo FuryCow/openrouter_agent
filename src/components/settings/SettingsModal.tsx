@@ -204,7 +204,7 @@ export function SettingsModal(): React.ReactElement {
                 step="0.1"
                 value={temperature}
                 onChange={(e) => setTemperature(e.target.value)}
-                className="w-full max-w-xs rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200"
+                className="input-field max-w-xs"
               />
               <p className="mt-1 text-[11px] text-zinc-500">{t('general.temperatureHint')}</p>
             </div>
@@ -223,7 +223,7 @@ export function SettingsModal(): React.ReactElement {
                 onChange={(e) => setCustomSystemPrompt(e.target.value)}
                 rows={4}
                 placeholder={t('agent.customPromptPlaceholder')}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200"
+                className="input-field"
               />
             </div>
             <ProjectMemorySettings
@@ -320,7 +320,7 @@ export function SettingsModal(): React.ReactElement {
                 max="8192"
                 value={maxFileSizeKb}
                 onChange={(e) => setMaxFileSizeKb(e.target.value)}
-                className="w-full max-w-xs rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200"
+                className="input-field max-w-xs"
               />
             </div>
             <Button type="button" variant="secondary" onClick={() => void window.api.index.rebuild()}>

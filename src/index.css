@@ -4,13 +4,19 @@
   --font-sans: 'Geist', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --color-background: #0a0a0f;
+  --color-surface-panel: #0a0a0f;
   --color-surface: #12121a;
+  --color-surface-popover: #14141f;
   --color-surface-elevated: #1a1a26;
   --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
   --color-accent: #6366f1;
   --color-accent-secondary: #8b5cf6;
   --color-muted: #71717a;
   --color-foreground: #f4f4f5;
+  --color-foreground-muted: #a1a1aa;
+  --color-code: #d4d4d8;
+  --spacing-chrome: 2.25rem;
 }
 
 * {
@@ -140,7 +146,7 @@ body {
 .chat-markdown blockquote {
   border-left: 3px solid rgba(99, 102, 241, 0.45);
   padding-left: 0.85em;
-  color: #a1a1aa;
+  color: var(--color-foreground-muted);
   margin: 0.5em 0;
 }
 
@@ -154,7 +160,7 @@ body {
 
 .chat-markdown pre {
   background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.7em 0.9em;
   overflow-x: auto;
@@ -167,7 +173,7 @@ body {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.5;
-  color: #d4d4d8;
+  color: var(--color-code);
 }
 
 .chat-markdown table {
@@ -181,7 +187,7 @@ body {
 
 .chat-markdown th,
 .chat-markdown td {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border);
   padding: 0.35em 0.55em;
   text-align: left;
 }
@@ -193,17 +199,24 @@ body {
 
 .chat-markdown hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--color-border);
   margin: 0.85em 0;
 }
 
 .chat-markdown strong {
-  color: #f4f4f5;
+  color: var(--color-foreground);
   font-weight: 600;
 }
 
 .chat-markdown a {
+  color: color-mix(in srgb, var(--color-accent) 85%, white);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   word-break: break-all;
+}
+
+.chat-markdown a:hover {
+  color: var(--color-accent-secondary);
 }
 
 .doc-markdown {
@@ -265,7 +278,7 @@ body {
 .doc-markdown blockquote {
   border-left: 3px solid rgba(99, 102, 241, 0.45);
   padding-left: 1em;
-  color: #a1a1aa;
+  color: var(--color-foreground-muted);
   margin: 0.75em 0;
 }
 
@@ -279,7 +292,7 @@ body {
 
 .doc-markdown pre {
   background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.85em 1em;
   overflow-x: auto;
@@ -292,7 +305,7 @@ body {
   font-family: var(--font-mono);
   font-size: 0.85rem;
   line-height: 1.55;
-  color: #d4d4d8;
+  color: var(--color-code);
 }
 
 .doc-markdown table {
@@ -323,7 +336,7 @@ body {
 }
 
 .doc-markdown strong {
-  color: #f4f4f5;
+  color: var(--color-foreground);
   font-weight: 600;
 }
 
@@ -378,6 +391,53 @@ body {
 }
 
 .glass {
-  background: rgba(18, 18, 26, 0.8);
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
   backdrop-filter: blur(12px);
+}
+
+.chrome-header {
+  display: flex;
+  height: var(--spacing-chrome);
+  flex-shrink: 0;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.input-field {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-foreground);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.input-field:focus {
+  border-color: rgba(99, 102, 241, 0.5);
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3);
+}
+
+.input-field::placeholder {
+  color: var(--color-muted);
+}
+
+.interactive-header {
+  transition: background-color 0.15s ease;
+}
+
+.interactive-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.interactive-header:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.35);
 }

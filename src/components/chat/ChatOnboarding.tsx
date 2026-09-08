@@ -48,7 +48,7 @@ export function ChatOnboarding(): React.ReactElement {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-sm rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left">
+    <div className="mx-auto w-full max-w-sm text-left">
       <h3 className="text-sm font-medium text-zinc-200">{t('onboarding.title')}</h3>
       <p className="mt-1 text-xs text-zinc-500">
         {allDone ? t('onboarding.allDone') : t('onboarding.incomplete')}

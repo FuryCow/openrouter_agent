@@ -62,7 +62,7 @@ export function ChatModeSelector({
           ['--chat-mode-select-open-ms' as string]: `${MODE_SELECT_OPEN_MS}ms`
         }}
         className={cn(
-          'chat-mode-select-content min-w-[10.5rem] max-w-[11.5rem] rounded-lg border border-white/10 bg-[#14141f]/98 p-0',
+          'chat-mode-select-content min-w-[10.5rem] max-w-[11.5rem] rounded-lg border border-white/10 bg-surface-popover/98 p-0',
           'shadow-lg shadow-black/50 backdrop-blur-md',
           '[&>[data-radix-select-viewport]]:p-0'
         )}

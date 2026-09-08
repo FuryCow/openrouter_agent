@@ -158,7 +158,7 @@ export function ToolAnalyticsPanel(): React.ReactElement | null {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-white/10 bg-[#0d0d14] shadow-2xl">
+      <div className="flex h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-white/10 bg-background shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-indigo-400" />

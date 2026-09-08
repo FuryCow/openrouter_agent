@@ -18,7 +18,7 @@ export function MarkdownViewToggle({
         className={cn(
           'inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors',
           mode === 'edit'
-            ? 'bg-[#0a0a0f] text-zinc-200 shadow-sm'
+            ? 'bg-background text-zinc-200 shadow-sm'
             : 'text-zinc-500 hover:text-zinc-300'
         )}
       >
@@ -31,7 +31,7 @@ export function MarkdownViewToggle({
         className={cn(
           'inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors',
           mode === 'preview'
-            ? 'bg-[#0a0a0f] text-zinc-200 shadow-sm'
+            ? 'bg-background text-zinc-200 shadow-sm'
             : 'text-zinc-500 hover:text-zinc-300'
         )}
       >

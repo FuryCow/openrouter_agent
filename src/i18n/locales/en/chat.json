@@ -5,6 +5,7 @@
   "revertRunTitle": "Revert {{count}} file(s) from last agent run",
   "retryLast": "Retry last",
   "attachImage": "Attach image",
+  "removeAttachment": "Remove attachment",
   "visionNotSupported": "Vision not supported by current model",
   "editMessagePlaceholder": "Edit message…",
   "shortcutSend": "Enter — send",

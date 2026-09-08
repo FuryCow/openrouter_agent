@@ -193,7 +193,7 @@ export function ModelPicker({
         <Popover.Content
           align={compact ? 'center' : 'start'}
           sideOffset={6}
-          className="z-50 w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-[#12121a] p-3 shadow-2xl backdrop-blur-xl"
+          className="z-50 w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-surface p-3 shadow-2xl backdrop-blur-xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <div className="mb-3 flex items-center gap-2">

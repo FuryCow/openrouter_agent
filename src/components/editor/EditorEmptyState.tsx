@@ -1,6 +1,7 @@
 import { FolderOpen, FileSearch, FolderTree, Keyboard, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { EmptyStateShell } from '@/components/ui/EmptyStateShell'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
@@ -38,39 +39,6 @@ function ShortcutHint({
   )
 }
 
-function EmptyStateShell({
-  title,
-  description,
-  children
-}: {
-  title: string
-  description: string
-  children: React.ReactNode
-}): React.ReactElement {
-  return (
-    <div className="relative flex h-full items-center justify-center overflow-hidden p-6">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-1/3 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="absolute left-1/3 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/8 blur-3xl" />
-      </div>
-
-      <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0a0a0f]/80 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset] backdrop-blur-sm">
-        <div className="mb-5 flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-inset ring-indigo-500/20">
-            <Sparkles className="h-5 w-5 text-indigo-300" />
-          </div>
-          <div>
-            <h2 className="text-base font-medium text-zinc-100">{title}</h2>
-            <p className="mt-1 text-sm leading-relaxed text-zinc-500">{description}</p>
-          </div>
-        </div>
-
-        {children}
-      </div>
-    </div>
-  )
-}
-
 export function EditorEmptyState(): React.ReactElement {
   const { t } = useTranslation('layout')
   const { t: tCommon } = useTranslation('common')
@@ -81,6 +49,7 @@ export function EditorEmptyState(): React.ReactElement {
   if (!workingDirectory) {
     return (
       <EmptyStateShell
+        icon={Sparkles}
         title={t('editor.empty.noProject.title')}
         description={t('editor.empty.noProject.description')}
       >
@@ -104,6 +73,7 @@ export function EditorEmptyState(): React.ReactElement {
 
   return (
     <EmptyStateShell
+      icon={Sparkles}
       title={t('editor.empty.noFile.title')}
       description={t('editor.empty.noFile.description')}
     >

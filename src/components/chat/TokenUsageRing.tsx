@@ -229,7 +229,7 @@ export function TokenUsageRing({ compact = false }: { compact?: boolean }): Reac
             side="top"
             align="end"
             sideOffset={8}
-            className="z-50 w-80 rounded-xl border border-white/10 bg-[#12121a] p-4 shadow-2xl backdrop-blur-xl"
+            className="z-50 w-80 rounded-xl border border-white/10 bg-surface p-4 shadow-2xl backdrop-blur-xl"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <PopoverBody
@@ -237,7 +237,7 @@ export function TokenUsageRing({ compact = false }: { compact?: boolean }): Reac
               modelName={modelName}
               onResetSession={resetSession}
             />
-            <Popover.Arrow className="fill-[#12121a]" />
+            <Popover.Arrow className="fill-surface" />
           </Popover.Content>
         </Popover.Portal>
       )}

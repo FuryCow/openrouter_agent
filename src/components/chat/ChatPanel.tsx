@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Square, Trash2, RotateCcw, Paperclip, Undo2 } from 'lucide-react'
+import { Send, Square, Trash2, RotateCcw, Paperclip, Undo2, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '../ui/button'
 import { MessageBubble, MemoMessageBubble } from './MessageBubble'
@@ -16,6 +16,7 @@ import { useChatModes } from '@/hooks/useChatModes'
 import { scheduleInAnimationFrame } from '@/lib/animation-frame'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { EmptyStateShell } from '@/components/ui/EmptyStateShell'
 import { ChatOnboarding } from './ChatOnboarding'
 import { TokenUsageRing } from './TokenUsageRing'
 import { useUiStore } from '@/stores/uiStore'
@@ -310,14 +311,14 @@ export function ChatPanel(): React.ReactElement {
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col border-l border-white/5 bg-[#0d0d14]"
+      className="flex h-full min-h-0 flex-col border-l border-white/5 bg-background"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault()
         if (e.dataTransfer.files.length > 0) addImageFiles(e.dataTransfer.files)
       }}
     >
-      <div className="flex items-center justify-between border-b border-white/5 px-4 py-2.5">
+      <div className="chrome-header justify-between px-4">
         <div className="flex items-center gap-2">
           <div
             className={cn(
@@ -371,16 +372,17 @@ export function ChatPanel(): React.ReactElement {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center py-10 text-center"
+              className="flex flex-col items-center justify-center py-8 text-center"
             >
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border border-white/5">
-                <modeConfig.icon className={`h-8 w-8 ${modeConfig.accentClass} opacity-60`} />
-              </div>
-              <h3 className="text-sm font-medium text-zinc-300">{modeConfig.label}</h3>
-              <p className="mt-1 max-w-xs text-xs text-zinc-500">{modeConfig.description}</p>
-              <div className="mt-5 w-full px-2">
+              <EmptyStateShell
+                compact
+                icon={ModeIcon}
+                title={modeConfig.label}
+                description={modeConfig.description}
+                className="max-w-sm"
+              >
                 <ChatOnboarding />
-              </div>
+              </EmptyStateShell>
             </motion.div>
           )}
 
@@ -441,11 +443,11 @@ export function ChatPanel(): React.ReactElement {
       <div className="relative z-10 shrink-0 border-t border-white/5 p-3">
         <div
           className={cn(
-            'overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] transition-all',
+            'overflow-hidden rounded-xl border border-white/10 bg-surface-elevated/20 transition-all',
             'focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20'
           )}
         >
-          <div className="flex items-center gap-2 border-b border-white/5 bg-white/[0.02] px-2 py-1.5">
+          <div className="flex h-9 items-center gap-2 border-b border-white/5 bg-white/[0.02] px-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <ChatModeSelector mode={chatMode} onModeChange={setChatMode} disabled={isStreaming} />
               <ChatModeDescription mode={chatMode} />
@@ -463,10 +465,11 @@ export function ChatPanel(): React.ReactElement {
                   />
                   <button
                     type="button"
-                    className="absolute -right-1 -top-1 z-10 rounded-full bg-zinc-800 px-1 text-[10px] text-zinc-300"
+                    className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white/10 bg-surface text-zinc-300 shadow-sm transition-colors hover:bg-surface-elevated hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
                     onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                    aria-label={t('removeAttachment')}
                   >
-                    ×
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
               ))}

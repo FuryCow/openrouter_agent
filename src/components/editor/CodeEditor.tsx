@@ -215,9 +215,9 @@ export function CodeEditor(): React.ReactElement {
   )
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#0a0a0f]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       {tabs.length > 0 && (
-        <div className="flex items-center border-b border-white/5 bg-[#0d0d14] overflow-x-auto">
+        <div className="chrome-header overflow-x-auto bg-background px-0">
           {tabs.map((tab) => {
             const relativePath = workingDirectory
               ? getRelativePath(workingDirectory, tab.path)
@@ -244,10 +244,10 @@ export function CodeEditor(): React.ReactElement {
               }}
               title={relativePath}
               className={cn(
-                'group flex max-w-[240px] min-w-0 items-center gap-1.5 border-r border-white/5 px-3 py-1.5 text-xs transition-colors shrink-0',
+                'group relative flex h-9 max-w-[240px] min-w-0 shrink-0 items-center gap-1.5 border-r border-white/5 px-3 text-xs transition-colors',
                 activeTabPath === tab.path
-                  ? 'bg-[#0a0a0f] text-zinc-200'
-                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                  ? 'bg-background text-zinc-200 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-indigo-500/80'
+                  : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300'
               )}
             >
               <FileIcon
@@ -281,7 +281,7 @@ export function CodeEditor(): React.ReactElement {
       )}
 
       {activeTab && isMarkdownTab && (
-        <div className="flex items-center justify-between border-b border-white/5 bg-[#0d0d14] px-3 py-1.5">
+        <div className="chrome-header justify-between bg-background px-3">
           <span className="text-[11px] text-zinc-500">{tCommon('labels.markdown')}</span>
           <MarkdownViewToggle
             mode={markdownViewMode}
@@ -291,7 +291,7 @@ export function CodeEditor(): React.ReactElement {
       )}
 
       {activeTab && isImageTab && (
-        <div className="flex items-center border-b border-white/5 bg-[#0d0d14] px-3 py-1.5">
+        <div className="chrome-header bg-background px-3">
           <span className="text-[11px] text-zinc-500">{t('editor.imagePreview')}</span>
         </div>
       )}

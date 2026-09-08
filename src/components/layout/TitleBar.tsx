@@ -16,7 +16,7 @@ export function TitleBar(): React.ReactElement {
   }
 
   return (
-    <div className="drag-region flex h-10 items-center justify-between border-b border-white/5 bg-[#0a0a0f]/90 px-3 backdrop-blur-xl">
+    <div className="drag-region chrome-header justify-between bg-background/90 backdrop-blur-xl">
       <div className="flex items-center gap-2.5 no-drag">
         <AppLogo size="sm" />
         <span className="text-sm font-semibold gradient-text">{t('appName')}</span>

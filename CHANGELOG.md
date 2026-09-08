@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.3] — 2026-09-08
+
+### Visual polish
+
+- **Design tokens:** Extended `@theme` with surface, popover, and chrome spacing tokens; added shared utilities (`.chrome-header`, `.input-field`, `.interactive-header`).
+- **Unified shell:** Replaced ad-hoc panel hex colors with consistent `bg-background` / `bg-surface` across title bar, chat, explorer, editor, terminal, dialogs, and popovers.
+- **Header rhythm:** Aligned chrome row heights (`h-9`) across panels for cleaner horizontal dividers.
+- **Chat:** Softer user bubbles, elevated assistant cards, improved composer attachment remove button and message actions.
+- **Empty states:** Shared `EmptyStateShell` for editor, chat onboarding, and explorer.
+- **Misc:** Settings input focus rings, editor tab active accent, toast placement/animation, markdown colors via CSS tokens.
+
+---
+
 ## [0.9.2] — 2026-09-08
 
 ### Bug fixes

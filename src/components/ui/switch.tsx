@@ -22,7 +22,7 @@ export function Switch({
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0f]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         checked
           ? 'border-indigo-400/40 bg-gradient-to-r from-indigo-500 to-violet-500'
           : 'border-white/10 bg-white/10',

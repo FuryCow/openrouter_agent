@@ -93,7 +93,7 @@ export function TerminalPanel(): React.ReactElement {
 
   if (!terminalOpen) {
     return (
-      <div className="flex h-full min-h-0 items-center overflow-hidden border-t border-white/5 bg-[#0d0d14] px-3">
+      <div className="flex h-full min-h-0 items-center overflow-hidden border-t border-white/5 bg-background px-3">
         <Button
           variant="ghost"
           size="sm"
@@ -109,7 +109,7 @@ export function TerminalPanel(): React.ReactElement {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden border-t border-white/5 bg-[#0a0a0f]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden border-t border-white/5 bg-background">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-1">
         <div className="flex items-center gap-1.5 text-xs text-zinc-500">
           <TerminalIcon className="h-3 w-3" />

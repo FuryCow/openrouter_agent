@@ -116,7 +116,7 @@ const ToolCallCardHeader = memo(function ToolCallCardHeader({
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.03]"
+      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left interactive-header"
       aria-expanded={expanded}
       aria-label={expanded ? t('tool.collapseDetails') : t('tool.expandDetails')}
     >
@@ -233,7 +233,8 @@ const ThinkingBlockHeader = memo(function ThinkingBlockHeader({
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-violet-500/[0.06] transition-colors"
+      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left interactive-header hover:bg-violet-500/[0.06]"
+      aria-expanded={expanded}
     >
       <ThinkingIcon />
       <span className="text-sm font-medium text-violet-300">{tc('status.thinking')}</span>
@@ -377,7 +378,7 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.03]"
+      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left interactive-header"
       aria-expanded={expanded}
       aria-label={expanded ? t('tool.collapseTools') : t('tool.expandTools')}
     >
@@ -431,7 +432,7 @@ function TimelineDot({ className }: { className: string }): React.ReactElement {
   return (
     <span
       className={cn(
-        'absolute -left-[13px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ring-2 ring-[#0d0d14]',
+        'absolute -left-[13px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ring-2 ring-background',
         className
       )}
     />
@@ -543,7 +544,7 @@ function MessageActions({
           key={action.label}
           type="button"
           onClick={action.onClick}
-          className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-300"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30"
         >
           {action.icon}
           {action.label}
@@ -615,7 +616,7 @@ export function MessageBubble({
         className="flex justify-end"
       >
         <div className="flex max-w-[90%] flex-col items-end">
-          <div className="rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3 text-sm leading-relaxed text-white shadow-lg shadow-indigo-500/10">
+          <div className="rounded-xl border border-white/10 bg-indigo-500/15 px-4 py-3 text-sm leading-relaxed text-zinc-100 ring-1 ring-inset ring-indigo-500/20">
             {images && images.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {images.map((src) => (
@@ -662,7 +663,7 @@ export function MessageBubble({
             'w-full rounded-xl px-4 py-3',
             isError
               ? 'bg-red-500/[0.08] border border-red-500/20'
-              : 'bg-white/[0.03] border border-white/5'
+              : 'border border-white/10 bg-surface/40'
           )}
         >
           {interrupted && (

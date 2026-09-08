@@ -35,7 +35,7 @@ export function WorkspaceSwitcher(): React.ReactElement {
           align="start"
           side="top"
           sideOffset={8}
-          className="z-50 w-80 rounded-xl border border-white/10 bg-[#12121a] p-2 shadow-2xl backdrop-blur-xl"
+          className="z-50 w-80 rounded-xl border border-white/10 bg-surface p-2 shadow-2xl backdrop-blur-xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <button
@@ -85,7 +85,7 @@ export function WorkspaceSwitcher(): React.ReactElement {
             </div>
           )}
 
-          <Popover.Arrow className="fill-[#12121a]" />
+          <Popover.Arrow className="fill-surface" />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

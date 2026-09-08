@@ -92,7 +92,7 @@ export function StatusBar(): React.ReactElement {
           .join('\n')
 
   return (
-    <div className="flex h-8 items-center justify-between border-t border-white/5 bg-[#0a0a0f] px-3 text-xs text-zinc-500">
+    <div className="flex h-9 items-center justify-between border-t border-white/5 bg-background px-3 text-xs text-zinc-500">
       <div className="flex items-center gap-3">
         <WorkspaceSwitcher />
         <button
@@ -159,7 +159,7 @@ export function StatusBar(): React.ReactElement {
         <EditorStatusInfo />
       </div>
 
-      <div className="flex shrink-0 items-center gap-3 text-sm">
+      <div className="flex shrink-0 items-center gap-3 text-xs">
         <span>{settings.apiKey ? t('status.apiConnected') : t('status.noApiKey')}</span>
         <span className="text-zinc-600">{t('status.modelCount', { count: modelCount })}</span>
         <span className="font-medium text-indigo-400">{settings.model.split('/').pop()}</span>

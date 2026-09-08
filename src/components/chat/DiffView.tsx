@@ -41,7 +41,7 @@ export function DiffView({ fileDiff, diff, filePath, className }: DiffViewProps)
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-lg border border-white/10 bg-[#0d0d14]/80',
+        'overflow-hidden rounded-lg border border-white/10 bg-background/80',
         className
       )}
     >
