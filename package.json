@@ -3,6 +3,7 @@
   "version": "0.9.4",
   "description": "LLM agent desktop app with chat, file browser, editor, and tools via OpenRouter",
   "author": "FuryCow",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/FuryCow/openrouter_agent.git"

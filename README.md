@@ -1,8 +1,8 @@
 # OpenRouter Agent
 
 [![Latest release](https://img.shields.io/github/v/release/FuryCow/openrouter_agent?label=latest&sort=semver&style=flat-square)](https://github.com/FuryCow/openrouter_agent/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/FuryCow/openrouter_agent/release.yml?branch=main&style=flat-square&label=release%20build)](https://github.com/FuryCow/openrouter_agent/actions/workflows/release.yml)
-[![License: MIT](https://img.shields.io/github/license/FuryCow/openrouter_agent?style=flat-square)](https://github.com/FuryCow/openrouter_agent/blob/main/README.md#license)
+[![Build](https://img.shields.io/github/actions/workflow/status/FuryCow/openrouter_agent/ci.yml?branch=main&style=flat-square&label=build)](https://github.com/FuryCow/openrouter_agent/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/FuryCow/openrouter_agent?style=flat-square)](https://github.com/FuryCow/openrouter_agent/blob/main/LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
 
 **Desktop AI coding environment** — chat, file explorer, Monaco editor, integrated terminal, and autonomous agent tools over the [OpenRouter](https://openrouter.ai/) API.
@@ -278,4 +278,4 @@ See [CHANGELOG.md](./CHANGELOG.md) for release notes.
 
 ## License
 
-MIT — see repository for details.
+MIT — see [LICENSE](./LICENSE).
