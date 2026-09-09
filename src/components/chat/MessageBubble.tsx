@@ -13,8 +13,9 @@ import {
 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { useState, useRef, useEffect, useLayoutEffect, memo, useMemo } from 'react'
-import type { TimelineItem, ToolCallInfo } from '@/types'
+import type { TimelineItem, ToolCallInfo, AgentRunOutcome, ChatFileAttachment } from '@/types'
 import { cn, getFileName } from '@/lib/utils'
+import { FileIcon } from '@/components/ui/FileIcon'
 import { resolveMessageTimeline, segmentTimeline, type TimelineToolItem } from '@/lib/timeline'
 import { MarkdownContent } from './MarkdownContent'
 import { DiffView } from './DiffView'
@@ -305,6 +306,20 @@ function getToolDisplayLabel(toolCall: ToolCallInfo): string {
   return toolCall.name
 }
 
+function shouldCompactToolGroupLabels(tools: TimelineToolItem[]): boolean {
+  if (tools.length <= 1) return false
+
+  const sharedName = tools[0].toolCall.name
+  if (sharedName === 'preparing') return false
+  if (!tools.every((item) => item.toolCall.name === sharedName)) return false
+
+  return tools.every((item) => {
+    const filePath = resolveToolFilePath(item.toolCall)
+    if (filePath) return false
+    return getToolDisplayLabel(item.toolCall) === item.toolCall.name
+  })
+}
+
 function toolsHeaderEqual(a: TimelineToolItem[], b: TimelineToolItem[]): boolean {
   if (a.length !== b.length) return false
   return a.every((item, index) => {
@@ -369,6 +384,7 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
   const sharedToolName = tools.every((item) => item.toolCall.name === tools[0].toolCall.name)
     ? tools[0].toolCall.name
     : null
+  const compactLabels = shouldCompactToolGroupLabels(tools)
   const title =
     sharedToolName && sharedToolName !== 'preparing'
       ? sharedToolName
@@ -388,27 +404,34 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
         <ToolTypeIcon kind="group" />
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-zinc-200">{title}</div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-relaxed">
-          {tools.map((item, index) => {
-            const filePath = resolveToolFilePath(item.toolCall)
-            return (
-              <span key={item.id} className="inline-flex items-center gap-1">
-                {index > 0 && <span className="text-zinc-600">·</span>}
-                <ToolTypeIcon toolName={item.toolCall.name} className="h-3.5 w-3.5" />
-                {filePath ? (
-                  <FilePathLink
-                    path={filePath}
-                    fileDiff={item.toolCall.fileDiff}
-                    className="text-xs"
-                  />
-                ) : (
-                  <span className="text-zinc-400">{getToolDisplayLabel(item.toolCall)}</span>
-                )}
-              </span>
-            )
-          })}
+        <div className="truncate text-sm font-medium text-zinc-200">
+          {title}
+          {compactLabels && (
+            <span className="ml-1.5 text-xs font-normal text-zinc-500">×{tools.length}</span>
+          )}
         </div>
+        {!compactLabels && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-relaxed">
+            {tools.map((item, index) => {
+              const filePath = resolveToolFilePath(item.toolCall)
+              return (
+                <span key={item.id} className="inline-flex items-center gap-1">
+                  {index > 0 && <span className="text-zinc-600">·</span>}
+                  <ToolTypeIcon toolName={item.toolCall.name} className="h-3.5 w-3.5" />
+                  {filePath ? (
+                    <FilePathLink
+                      path={filePath}
+                      fileDiff={item.toolCall.fileDiff}
+                      className="text-xs"
+                    />
+                  ) : (
+                    <span className="text-zinc-400">{getToolDisplayLabel(item.toolCall)}</span>
+                  )}
+                </span>
+              )
+            })}
+          </div>
+        )}
       </div>
       <span className="ml-auto flex shrink-0 items-center gap-1.5">
         {showSpinner && <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />}
@@ -554,6 +577,27 @@ function MessageActions({
   )
 }
 
+function RunOutcomeBadge({ outcome }: { outcome: AgentRunOutcome }): React.ReactElement {
+  const { t } = useTranslation('chat')
+  const styles: Record<AgentRunOutcome, string> = {
+    success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+    aborted: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+    max_iterations: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+    error: 'border-red-500/30 bg-red-500/10 text-red-300'
+  }
+
+  return (
+    <div
+      className={cn(
+        'mb-2 inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+        styles[outcome]
+      )}
+    >
+      {t(`runOutcome.${outcome}`)}
+    </div>
+  )
+}
+
 export function MessageBubble({
   role,
   timeline,
@@ -561,9 +605,11 @@ export function MessageBubble({
   reasoning,
   toolCalls,
   images,
+  attachedFiles,
   isStreaming,
   isError,
   interrupted,
+  runOutcome,
   showImplementPlan,
   onImplementPlan,
   onCopy,
@@ -577,9 +623,11 @@ export function MessageBubble({
   reasoning?: string
   toolCalls?: ToolCallInfo[]
   images?: string[]
+  attachedFiles?: ChatFileAttachment[]
   isStreaming?: boolean
   isError?: boolean
   interrupted?: boolean
+  runOutcome?: AgentRunOutcome
   showImplementPlan?: boolean
   onImplementPlan?: () => void
   onCopy?: () => void
@@ -597,7 +645,7 @@ export function MessageBubble({
       : resolveMessageTimeline({ content, reasoning, toolCalls, timeline })
 
   const hasTimeline = resolvedTimeline.length > 0
-  const hasUserContent = Boolean(content?.trim())
+  const hasUserContent = Boolean(content?.trim()) || Boolean(images?.length) || Boolean(attachedFiles?.length)
 
   if (!isUser && !isStreaming && !hasTimeline && !hasUserContent) {
     return null
@@ -630,7 +678,21 @@ export function MessageBubble({
                 ))}
               </div>
             )}
-            <div className="whitespace-pre-wrap break-words">{content}</div>
+            {attachedFiles && attachedFiles.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {attachedFiles.map((file) => (
+                  <div
+                    key={`${file.name}-${file.content.slice(0, 24)}`}
+                    className="flex max-w-[14rem] items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5"
+                    title={file.name}
+                  >
+                    <FileIcon name={file.name} className="h-4 w-4 shrink-0 opacity-80" />
+                    <span className="truncate font-mono text-[10px] text-zinc-300">{file.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {content?.trim() ? <div className="whitespace-pre-wrap break-words">{content}</div> : null}
           </div>
           <MessageActions actions={userActions} align="end" />
         </div>
@@ -666,7 +728,8 @@ export function MessageBubble({
               : 'border border-white/10 bg-surface/40'
           )}
         >
-          {interrupted && (
+          {runOutcome && !isStreaming && <RunOutcomeBadge outcome={runOutcome} />}
+          {interrupted && !runOutcome && (
             <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-amber-400/80">
               {tc('status.interrupted')}
             </div>
@@ -710,8 +773,10 @@ function areMessageBubblePropsEqual(
     prev.timeline === next.timeline &&
     prev.toolCalls === next.toolCalls &&
     prev.images === next.images &&
+    prev.attachedFiles === next.attachedFiles &&
     prev.isError === next.isError &&
     prev.interrupted === next.interrupted &&
+    prev.runOutcome === next.runOutcome &&
     prev.showImplementPlan === next.showImplementPlan
   )
 }

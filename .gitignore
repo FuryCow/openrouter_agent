@@ -8,3 +8,6 @@ Thumbs.db
 .env
 .env.local
 .cursor/
+.playwright-mcp/
+# Local screenshots / scratch captures (repo root only)
+/*.png

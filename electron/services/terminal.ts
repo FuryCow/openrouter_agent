@@ -1,5 +1,7 @@
 import * as pty from 'node-pty'
+import { spawn } from 'node:child_process'
 import { EventEmitter } from 'events'
+import { sanitizeTerminalOutput } from '../lib/strip-ansi'
 
 interface TerminalSession {
   pty: pty.IPty
@@ -74,49 +76,58 @@ export class TerminalService extends EventEmitter {
 
   async runCommand(command: string, cwd: string, timeoutMs = 30000): Promise<string> {
     return new Promise((resolve, reject) => {
-      const shell = process.platform === 'win32' ? 'powershell.exe' : '/bin/bash'
-      const args =
-        process.platform === 'win32'
-          ? ['-NoProfile', '-Command', command]
-          : ['-c', command]
+      const isWin = process.platform === 'win32'
+      const shell = isWin ? 'powershell.exe' : '/bin/bash'
+      const args = isWin
+        ? ['-NoProfile', '-NoLogo', '-NonInteractive', '-Command', command]
+        : ['-lc', command]
 
-      const terminal = pty.spawn(shell, args, {
-        name: 'xterm-256color',
-        cols: 120,
-        rows: 30,
+      const child = spawn(shell, args, {
         cwd,
-        env: process.env as Record<string, string>
+        env: process.env,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe']
       })
 
-      let output = ''
+      let stdout = ''
+      let stderr = ''
       let settled = false
 
       const finish = (fn: () => void): void => {
         if (settled) return
         settled = true
         clearTimeout(timer)
-        try {
-          terminal.kill()
-        } catch {
-          // ignore
-        }
         fn()
       }
 
       const timer = setTimeout(() => {
-        finish(() => resolve(output || '(command timed out)'))
+        try {
+          child.kill()
+        } catch {
+          // ignore
+        }
+        finish(() => resolve(sanitizeTerminalOutput(`${stdout}\n${stderr}`) || '(command timed out)'))
       }, timeoutMs)
 
-      terminal.onData((data) => {
-        output += data
+      child.stdout?.on('data', (chunk: Buffer | string) => {
+        stdout += chunk.toString()
       })
 
-      terminal.onExit(({ exitCode }) => {
+      child.stderr?.on('data', (chunk: Buffer | string) => {
+        stderr += chunk.toString()
+      })
+
+      child.on('error', (err) => {
+        finish(() => reject(err))
+      })
+
+      child.on('close', (exitCode) => {
+        const output = sanitizeTerminalOutput([stdout, stderr].filter(Boolean).join('\n'))
         finish(() => {
-          if (exitCode !== 0 && !output.trim()) {
+          if (exitCode !== 0 && !output) {
             reject(new Error(`Command exited with code ${exitCode}`))
           } else {
-            resolve(output.trim() || '(no output)')
+            resolve(output)
           }
         })
       })

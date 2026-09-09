@@ -40,10 +40,20 @@ export class RunCheckpoint {
   }
 
   async restore(fs: FileSystemService): Promise<{ restored: number; deleted: number }> {
+    return this.restorePaths(fs, [...this.snapshots.keys()])
+  }
+
+  async restorePaths(
+    fs: FileSystemService,
+    paths: string[]
+  ): Promise<{ restored: number; deleted: number }> {
     let restored = 0
     let deleted = 0
 
-    for (const [path, entry] of this.snapshots) {
+    for (const path of paths) {
+      const entry = this.snapshots.get(path)
+      if (!entry) continue
+
       if (entry.kind === 'new') {
         if (existsSync(path)) {
           await unlink(path)
@@ -53,9 +63,10 @@ export class RunCheckpoint {
         await fs.writeFile(path, entry.content)
         restored++
       }
+
+      this.snapshots.delete(path)
     }
 
-    this.snapshots.clear()
     return { restored, deleted }
   }
 

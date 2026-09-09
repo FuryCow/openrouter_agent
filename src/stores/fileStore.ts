@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { getLanguageFromPath, isImagePath } from '../lib/utils'
 import { loadFileForEditor } from '../lib/loadFileForEditor'
-import type { DiffHighlightRange } from '../types'
+import type {
+  DiffHighlightRange,
+  InlineDiffRange,
+  DeletedLineHighlight,
+  InlineDeleteHighlight
+} from '../types'
 
 export interface EditorTab {
   path: string
@@ -15,6 +20,11 @@ export interface EditorRevealRequest {
   path: string
   scrollToLine: number
   highlightRanges: DiffHighlightRange[]
+  inlineRanges?: InlineDiffRange[]
+  inlineDeleteHighlights?: InlineDeleteHighlight[]
+  deletedLines?: DeletedLineHighlight[]
+  modifiedLines?: DeletedLineHighlight[]
+  persistent?: boolean
 }
 
 interface FileState {

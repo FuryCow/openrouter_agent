@@ -3,6 +3,10 @@ import type { ToolDefinition } from './openrouter'
 import type { McpManager } from './mcp/mcp-manager'
 import { isMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
 import { estimateTokens, trimToTokenBudget, DEFAULT_CONTEXT_BUDGET } from '../lib/tokens'
+import {
+  buildUserMessageWithAttachments,
+  formatAttachedFilesForSystemPrompt
+} from '../lib/attached-files'
 
 const READ_ONLY_TOOL_NAMES = new Set([
   'read_file',
@@ -141,11 +145,14 @@ export function expandHistoryForApi(
       continue
     }
 
-    const msgTokens = estimateTokens(message.content)
+    const content = message.attachedFiles?.length
+      ? buildUserMessageWithAttachments(message.content, message.attachedFiles)
+      : message.content
+    const msgTokens = estimateTokens(content)
     if (tokenCount + msgTokens > budget) break
     expanded.push({
       role: message.role as 'user' | 'assistant',
-      content: message.content
+      content
     })
     tokenCount += msgTokens
   }
@@ -260,21 +267,23 @@ export function buildSystemPrompt(
     : 'Working directory: not set'
   const mcpSection = formatMcpServersSection(mcpServers)
 
+  const attachmentSection = formatAttachedFilesForSystemPrompt(context.attachedFiles)
+
   switch (context.mode) {
     case 'ask':
       return `You are a helpful programming assistant in ASK mode inside a desktop IDE.
 You answer questions clearly and concisely. You do NOT have tools and cannot read or modify files directly.
 
 ${workspaceLine}
-Open files in editor:
+${attachmentSection ? `${attachmentSection}\n\n` : ''}Open files in editor:
 ${formatOpenFiles(context)}
 
 File contents (if any open in editor):
-${formatOpenFilesWithContent(context)}
+${context.attachedFiles?.length ? '(Omitted for this turn — use the attached file content in the user message.)' : formatOpenFilesWithContent(context)}
 
 Guidelines:
 - Answer questions, explain concepts, review ideas, and suggest approaches
-- If open file contents are relevant, use the context provided above
+${context.attachedFiles?.length ? '- When the user attached files, answer from those attachments — not open editor tabs unless they ask about them\n' : ''}- If open file contents are relevant, use the context provided above
 - Do not claim you ran commands or changed files
 - Prefer practical, accurate answers with code examples when useful
 - Respond in the same language the user writes in`
@@ -284,7 +293,7 @@ Guidelines:
 Your job is to explore the codebase (read-only) and produce clear, actionable plans. You must NOT modify files or run shell commands.
 
 ${workspaceLine}
-Open files:
+${attachmentSection ? `${attachmentSection}\n\n` : ''}Open files:
 ${openFilesList}
 
 ${formatWorkspaceStateSection(context.workspaceState)}
@@ -315,7 +324,7 @@ Guidelines:
 You have tools for reading/writing files, searching the codebase, running terminal commands, and web search.
 
 ${workspaceLine}
-Open files:
+${attachmentSection ? `${attachmentSection}\n\n` : ''}Open files:
 ${openFilesList}
 
 ${formatProjectMemorySection(context.projectMemory)}
@@ -330,7 +339,7 @@ ${EDITING_WORKFLOW}
 ${CHECKLIST_WORKFLOW}${formatVerifySection(context.agentAutoVerify)}
 ${mcpSection ? `\n${mcpSection}\n` : ''}
 Guidelines:
-- Read target files (via read_files) before editing; search snippets are not enough for search_replace
+${context.attachedFiles?.length ? '- When the user attached files, use the `<attached_file>` content in their message — not open editor tabs or earlier chat files unless explicitly named\n' : ''}- Read target files (via read_files) before editing; search snippets are not enough for search_replace
 - Prefer search_replace for editing existing files; use write_file for new files or full rewrites
 - Avoid write_file with very large content in one call — split edits with search_replace
 - Prefer small, focused changes

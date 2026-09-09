@@ -1,5 +1,5 @@
 import { join, isAbsolute } from 'path'
-import type { AgentContext, AgentEvent, ChatMode, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest, FileDiffPreview, CodebaseSearchMode } from '../types'
+import type { AgentContext, AgentEvent, ChatFileAttachment, ChatMode, TimelineItem, AgentRunAnalytics, ApiChatMessage, ToolApprovalRequest, FileDiffPreview, CodebaseSearchMode } from '../types'
 import type { TaskStepStatus } from './run-task-checklist'
 import type { FileSystemService } from './filesystem'
 import type { TerminalService } from './terminal'
@@ -25,7 +25,8 @@ import {
   modeRequiresWorkspace,
   expandHistoryForApi
 } from './agent-modes'
-import { buildFallbackFileDiffPreview, formatFileChangeDiff } from '../lib/diff'
+import { buildFallbackFileDiffPreview, formatFileChangeDiff, countDiffStats, buildInlineDiffRanges, buildInlineDeleteHighlights, buildDeletedLineHighlights, buildModifiedLineHighlights, buildPureAdditionHighlightRanges } from '../lib/diff'
+import { sanitizeTerminalOutput } from '../lib/strip-ansi'
 import { normalizeChecklistSteps } from '../lib/checklist-steps'
 import { processToolCallsBatch } from '../lib/tool-call-runner'
 import {
@@ -44,6 +45,9 @@ import {
   formatToolErrorFromMessage,
   toolRetryKey
 } from '../lib/tool-errors'
+import {
+  buildUserMessageWithAttachments
+} from '../lib/attached-files'
 
 const MAX_TOOL_RETRIES = 2
 
@@ -353,12 +357,66 @@ export class AgentService {
     return this.lastCheckpoint?.summary ?? null
   }
 
+  async getRunCheckpointDetails() {
+    if (!this.lastCheckpoint?.hasChanges()) return null
+
+    const details = []
+    for (const path of this.lastCheckpoint.summary.paths) {
+      const before = this.lastCheckpoint.getBeforeContent(path) ?? ''
+      let after = ''
+      try {
+        after = await this.fs.readFile(path)
+      } catch {
+        after = ''
+      }
+
+      const stats = countDiffStats(before, after)
+      details.push({
+        path,
+        additions: stats.additions,
+        deletions: stats.deletions,
+        fileDiff: formatFileChangeDiff(before, after),
+        inlineRanges: buildInlineDiffRanges(before, after),
+        inlineDeleteHighlights: buildInlineDeleteHighlights(before, after),
+        deletedLines: buildDeletedLineHighlights(before, after),
+        modifiedLines: buildModifiedLineHighlights(before, after),
+        additionHighlightRanges: buildPureAdditionHighlightRanges(before, after)
+      })
+    }
+
+    return details
+  }
+
   async restoreRunCheckpoint(): Promise<{ restored: number; deleted: number } | null> {
     if (!this.lastCheckpoint?.hasChanges()) return null
     const result = await this.lastCheckpoint.restore(this.fs)
-    this.lastCheckpoint.clear()
-    this.lastCheckpoint = null
+    if (!this.lastCheckpoint.hasChanges()) {
+      this.lastCheckpoint = null
+    }
     return result
+  }
+
+  async restoreRunCheckpointPaths(
+    paths: string[]
+  ): Promise<{ restored: number; deleted: number } | null> {
+    if (!this.lastCheckpoint?.hasChanges() || paths.length === 0) return null
+    const result = await this.lastCheckpoint.restorePaths(this.fs, paths)
+    if (!this.lastCheckpoint.hasChanges()) {
+      this.lastCheckpoint = null
+    }
+    return result
+  }
+
+  private emitChecklistUpdated(emit: (event: AgentEvent) => void): void {
+    emit({
+      type: 'checklist_updated',
+      checklist: {
+        steps: this.runTaskChecklist.getSteps().map((step) => ({
+          text: step.text,
+          status: step.status
+        }))
+      }
+    })
   }
 
   private emitRunStatus(
@@ -445,6 +503,7 @@ export class AgentService {
     this.runTaskChecklist.clear()
     this.runEmit = emit
     this.emitRunStatus(emit, 'running')
+    this.emitChecklistUpdated(emit)
 
     const tools = [...getToolsForMode(mode, TOOLS), ...this.mcpManager.getToolsForMode(mode)]
     const maxIterations = getMaxIterations(mode)
@@ -486,16 +545,18 @@ export class AgentService {
       }))
     ]
 
+    const userMessageText = buildUserMessageWithAttachments(userMessage, context.attachedFiles)
+
     const userContent =
       context.images && context.images.length > 0
         ? ([
-            { type: 'text' as const, text: userMessage },
+            { type: 'text' as const, text: userMessageText },
             ...context.images.map((url) => ({
               type: 'image_url' as const,
               image_url: { url }
             }))
           ] as ChatCompletionMessage['content'])
-        : userMessage
+        : userMessageText
 
     messages.push({ role: 'user', content: userContent })
     const runApiStartIndex = messages.length
@@ -533,7 +594,8 @@ export class AgentService {
           apiMessages,
           interrupted: true,
           isError: true,
-          runAnalytics: run
+          runAnalytics: run,
+          runOutcome: status
         }
       })
     }
@@ -679,7 +741,8 @@ export class AgentService {
             content: finalContent,
             timeline: timeline.length > 0 ? [...timeline] : undefined,
             apiMessages,
-            runAnalytics: run
+            runAnalytics: run,
+            runOutcome: 'success'
           }
         })
 
@@ -851,6 +914,15 @@ export class AgentService {
     }
 
     if (!result.startsWith('Error')) {
+      if (call.function.name === 'run_terminal' && this.runEmit) {
+        const cleaned = sanitizeTerminalOutput(result)
+        if (cleaned !== '(no output)') {
+          this.runEmit({
+            type: 'terminal_output',
+            content: cleaned.length > 4000 ? cleaned.slice(-4000) : cleaned
+          })
+        }
+      }
       return result
     }
 
@@ -1033,7 +1105,9 @@ export class AgentService {
         if (steps.length === 0) return 'Error: steps must contain at least one non-empty item'
         if (steps.length > 20) return 'Error: maximum 20 checklist steps'
         try {
-          return this.runTaskChecklist.create(steps)
+          const result = this.runTaskChecklist.create(steps)
+          if (this.runEmit) this.emitChecklistUpdated(this.runEmit)
+          return result
         } catch (err) {
           return `Error: ${err instanceof Error ? err.message : String(err)}`
         }
@@ -1045,7 +1119,9 @@ export class AgentService {
           return 'Error: status must be pending, in_progress, or done'
         }
         try {
-          return this.runTaskChecklist.update(step, status)
+          const result = this.runTaskChecklist.update(step, status)
+          if (this.runEmit) this.emitChecklistUpdated(this.runEmit)
+          return result
         } catch (err) {
           return `Error: ${err instanceof Error ? err.message : String(err)}`
         }

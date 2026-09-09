@@ -21,6 +21,16 @@ import { ChatOnboarding } from './ChatOnboarding'
 import { TokenUsageRing } from './TokenUsageRing'
 import { useUiStore } from '@/stores/uiStore'
 import { useAgentRunStore } from '@/stores/agentRunStore'
+import { AgentContextChips } from './AgentContextChips'
+import { AgentRunPanel } from './AgentRunPanel'
+import { RunChangesPanel } from './RunChangesPanel'
+import { FileIcon } from '@/components/ui/FileIcon'
+import {
+  CHAT_ATTACHMENT_MAX_COUNT,
+  readChatAttachment,
+  splitChatAttachments,
+  type ChatInputAttachment
+} from '@/lib/chatAttachments'
 
 function StreamingMessageBubble(): React.ReactElement {
   const activeTimeline = useChatStore((s) => s.activeTimeline)
@@ -59,7 +69,7 @@ export function ChatPanel(): React.ReactElement {
   const { t: tc } = useTranslation('common')
   const { getModeConfig } = useChatModes()
   const [input, setInput] = useState('')
-  const [attachments, setAttachments] = useState<string[]>([])
+  const [attachments, setAttachments] = useState<ChatInputAttachment[]>([])
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [inputIsMultiline, setInputIsMultiline] = useState(false)
@@ -87,7 +97,6 @@ export function ChatPanel(): React.ReactElement {
   const chatDraft = useUiStore((s) => s.chatDraft)
   const clearChatDraft = useUiStore((s) => s.clearChatDraft)
   const runCheckpoint = useAgentRunStore((s) => s.checkpoint)
-  const clearRunCheckpoint = useAgentRunStore((s) => s.clearCheckpoint)
 
   const modeConfig = getModeConfig(chatMode)
   const ModeIcon = modeConfig.icon
@@ -148,67 +157,80 @@ export function ChatPanel(): React.ReactElement {
     return () => container.removeEventListener('scroll', onScroll)
   }, [])
 
-  const addImageFiles = (files: FileList | File[]): void => {
-    const list = Array.from(files).filter((f) => f.type.startsWith('image/'))
-    if (list.length === 0) {
-      useToastStore.getState().addToast(t('toast.onlyImages'), 'error')
+  const addAttachmentFiles = async (files: FileList | File[]): Promise<void> => {
+    const list = Array.from(files)
+    if (list.length === 0) return
+
+    let remaining = CHAT_ATTACHMENT_MAX_COUNT - attachments.length
+    if (remaining <= 0) {
+      useToastStore.getState().addToast(t('toast.maxAttachments'), 'error')
       return
     }
-    if (!visionSupported) {
-      useToastStore.getState().addToast(t('toast.noVision'), 'error')
-      return
-    }
-    list.forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setAttachments((prev) => [...prev, reader.result as string])
+
+    for (const file of list) {
+      if (remaining <= 0) {
+        useToastStore.getState().addToast(t('toast.maxAttachments'), 'error')
+        break
+      }
+
+      try {
+        const attachment = await readChatAttachment(file)
+        if (attachment.kind === 'image' && !visionSupported) {
+          useToastStore.getState().addToast(t('toast.noVision'), 'error')
+          continue
+        }
+        setAttachments((prev) => [...prev, attachment])
+        remaining -= 1
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'read_failed'
+        if (code === 'unsupported') {
+          useToastStore.getState().addToast(t('toast.unsupportedAttachment'), 'error')
+        } else if (code === 'too_large') {
+          useToastStore.getState().addToast(t('toast.attachmentTooLarge'), 'error')
+        } else {
+          useToastStore.getState().addToast(t('toast.attachmentReadFailed'), 'error')
         }
       }
-      reader.readAsDataURL(file)
-    })
+    }
   }
 
   const handleAttachClick = (): void => {
-    if (!visionSupported) {
-      useToastStore.getState().addToast(t('toast.noVision'), 'error')
-      return
-    }
     fileInputRef.current?.click()
   }
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     if (e.target.files && e.target.files.length > 0) {
-      addImageFiles(e.target.files)
+      void addAttachmentFiles(e.target.files)
     }
     e.target.value = ''
   }
 
   const handleSend = async (): Promise<void> => {
     const text = input.trim()
-    if (!text || isStreaming) return
+    const hasAttachments = attachments.length > 0
+    if ((!text && !hasAttachments) || isStreaming) return
     if (!settings.apiKey) {
       setSettingsOpen(true)
       return
     }
+
+    const payload = splitChatAttachments(attachments)
 
     if (editingMessageId) {
       truncateAfterMessage(editingMessageId)
       updateUserMessage(editingMessageId, text)
       setEditingMessageId(null)
       setInput('')
-      const images = attachments.length > 0 ? attachments : undefined
       setAttachments([])
       stickToBottomRef.current = true
-      await sendMessage(text, { images, skipUserMessage: true })
+      await sendMessage(text, { ...payload, skipUserMessage: true })
       return
     }
 
     setInput('')
-    const images = attachments.length > 0 ? attachments : undefined
     setAttachments([])
     stickToBottomRef.current = true
-    await sendMessage(text, { images })
+    await sendMessage(text, payload)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
@@ -221,13 +243,14 @@ export function ChatPanel(): React.ReactElement {
   const handlePaste = (e: React.ClipboardEvent): void => {
     const items = e.clipboardData?.items
     if (!items) return
-    const imageItems = Array.from(items)
-      .filter((item) => item.type.startsWith('image/'))
+
+    const pastedFiles = Array.from(items)
       .map((item) => item.getAsFile())
-      .filter(Boolean) as File[]
-    if (imageItems.length > 0) {
+      .filter((file): file is File => Boolean(file))
+
+    if (pastedFiles.length > 0) {
       e.preventDefault()
-      addImageFiles(imageItems)
+      void addAttachmentFiles(pastedFiles)
     }
   }
 
@@ -248,7 +271,7 @@ export function ChatPanel(): React.ReactElement {
         useToastStore.getState().addToast(t('toast.nothingToRevert'), 'info')
         return
       }
-      clearRunCheckpoint()
+      useAgentRunStore.getState().clearCheckpoint()
       await useFileStore.getState().reloadCleanTabsFromDisk()
       useToastStore.getState().addToast(
         t('toast.revertedFiles', { count: result.restored + result.deleted }),
@@ -261,6 +284,11 @@ export function ChatPanel(): React.ReactElement {
       )
     }
   }
+
+  const showRevertRun =
+    runCheckpoint &&
+    runCheckpoint.count > 0 &&
+    chatMode !== 'agent'
 
   const handleImplementPlan = async (planContent: string): Promise<void> => {
     if (isStreaming) return
@@ -315,7 +343,7 @@ export function ChatPanel(): React.ReactElement {
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault()
-        if (e.dataTransfer.files.length > 0) addImageFiles(e.dataTransfer.files)
+        if (e.dataTransfer.files.length > 0) void addAttachmentFiles(e.dataTransfer.files)
       }}
     >
       <div className="chrome-header justify-between px-4">
@@ -334,14 +362,14 @@ export function ChatPanel(): React.ReactElement {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {runCheckpoint && runCheckpoint.count > 0 && (
+          {showRevertRun && (
             <Button
               variant="ghost"
               size="sm"
               className="h-7 gap-1 px-2 text-amber-300 hover:text-amber-200"
               onClick={() => void handleRestoreRunCheckpoint()}
               disabled={isStreaming}
-              title={t('revertRunTitle', { count: runCheckpoint.count })}
+              title={t('revertRunTitle', { count: runCheckpoint!.count })}
             >
               <Undo2 className="h-3.5 w-3.5" />
               <span className="text-[10px]">{t('revertRun')}</span>
@@ -362,6 +390,8 @@ export function ChatPanel(): React.ReactElement {
           </Button>
         </div>
       </div>
+
+      {chatMode === 'agent' && <AgentRunPanel />}
 
       <div
         ref={scrollRef}
@@ -395,8 +425,10 @@ export function ChatPanel(): React.ReactElement {
               reasoning={msg.reasoning}
               toolCalls={msg.toolCalls}
               images={msg.images}
+              attachedFiles={msg.attachedFiles}
               isError={msg.isError}
               interrupted={msg.interrupted}
+              runOutcome={msg.runOutcome}
               showImplementPlan={
                 chatMode === 'planner' &&
                 msg.role === 'assistant' &&
@@ -447,6 +479,8 @@ export function ChatPanel(): React.ReactElement {
             'focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20'
           )}
         >
+          {chatMode === 'agent' && <RunChangesPanel />}
+
           <div className="flex h-9 items-center gap-2 border-b border-white/5 bg-white/[0.02] px-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <ChatModeSelector mode={chatMode} onModeChange={setChatMode} disabled={isStreaming} />
@@ -455,18 +489,37 @@ export function ChatPanel(): React.ReactElement {
             <TokenUsageRing compact />
           </div>
 
+          {chatMode === 'agent' && <AgentContextChips />}
+
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 border-b border-white/5 px-2 py-2">
-              {attachments.map((src, i) => (
-                <div key={i} className="relative">
-                  <ChatImagePreview
-                    src={src}
-                    thumbnailClassName="h-14 w-14 object-cover"
-                  />
+              {attachments.map((attachment) => (
+                <div key={attachment.id} className="relative">
+                  {attachment.kind === 'image' ? (
+                    <ChatImagePreview
+                      src={attachment.dataUrl}
+                      thumbnailClassName="h-14 w-14 object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-14 max-w-[12rem] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-2.5"
+                      title={attachment.name}
+                    >
+                      <FileIcon name={attachment.name} className="h-4 w-4 shrink-0 opacity-80" />
+                      <div className="min-w-0">
+                        <div className="truncate font-mono text-[10px] text-zinc-300">{attachment.name}</div>
+                        {attachment.truncated && (
+                          <div className="text-[9px] text-amber-400/80">{t('attachmentTruncated')}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <button
                     type="button"
                     className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white/10 bg-surface text-zinc-300 shadow-sm transition-colors hover:bg-surface-elevated hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
-                    onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                    onClick={() =>
+                      setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))
+                    }
                     aria-label={t('removeAttachment')}
                   >
                     <X className="h-3 w-3" />
@@ -490,7 +543,6 @@ export function ChatPanel(): React.ReactElement {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
             multiple
             className="hidden"
             onChange={handleFileInputChange}
@@ -502,7 +554,7 @@ export function ChatPanel(): React.ReactElement {
             className="size-9 shrink-0 text-zinc-500 hover:text-zinc-300"
             onClick={handleAttachClick}
             disabled={isStreaming}
-            title={visionSupported ? t('attachImage') : t('visionNotSupported')}
+            title={t('attachFile')}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -525,7 +577,7 @@ export function ChatPanel(): React.ReactElement {
               size="icon"
               className="size-9 shrink-0"
               onClick={handleSend}
-              disabled={!input.trim()}
+              disabled={!input.trim() && attachments.length === 0}
             >
               <Send className="h-4 w-4" />
             </Button>

@@ -42,7 +42,8 @@ function handleAgentEvent(event: AgentEvent): void {
         event.message?.isError ?? false,
         event.message?.runAnalytics,
         event.message?.interrupted,
-        event.message?.apiMessages
+        event.message?.apiMessages,
+        event.message?.runOutcome
       )
       setStreaming(false)
       if (event.message?.isError && event.message?.content) {
@@ -73,6 +74,17 @@ function handleAgentEvent(event: AgentEvent): void {
     case 'checkpoint_updated':
       if (event.checkpoint) {
         useAgentRunStore.getState().setCheckpoint(event.checkpoint)
+        useAgentRunStore.getState().showChangesPanel()
+      }
+      break
+    case 'checklist_updated':
+      if (event.checklist) {
+        useAgentRunStore.getState().setChecklist(event.checklist.steps)
+      }
+      break
+    case 'terminal_output':
+      if (event.content) {
+        useAgentRunStore.getState().setLastTerminalOutput(event.content)
       }
       break
     case 'iteration_warning':
@@ -103,6 +115,12 @@ function handleAgentEvent(event: AgentEvent): void {
 export function initAgentEvents(): () => void {
   unsubscribe?.()
   unsubscribe = window.api.agent.onEvent(handleAgentEvent)
+
+  void window.api.agent.getRunCheckpoint().then((checkpoint) => {
+    if (checkpoint) {
+      useAgentRunStore.getState().setCheckpoint(checkpoint)
+    }
+  })
 
   return () => {
     unsubscribe?.()

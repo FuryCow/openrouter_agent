@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.4] — 2026-09-09
+
+### Agent UX & review
+
+- **Context chips:** Pin/exclude open files for agent context; compact chips above the composer.
+- **Run status:** Live status line (running, awaiting approval, checklist step) in the agent run panel.
+- **Changes panel:** Cursor-like compact strip after a run; open changed files with inline diff in the editor; partial revert per file.
+- **Diff review:** Fixed modified-line highlights, inline add/delete rendering, and minimap alignment in Monaco.
+- **Tool groups:** Collapse repeated identical tool calls (e.g. `run_terminal ×8`) instead of spamming chips.
+
+### Chat attachments
+
+- Paperclip accepts text/code files, not only images; content is sent to the model in `<attached_file>` blocks.
+- Fixed attachment priority so the agent answers from attached files instead of open editor tabs or chat history.
+
+### Terminal
+
+- Multiple terminal tabs; auto-name from first command; closing the last tab hides the panel.
+- Strip ANSI escapes from tab titles and terminal output summaries.
+
+### Shell & navigation
+
+- Title bar layout: centered command palette, model picker + settings on the right.
+- Command palette replaces quick-open (commands + recent files).
+- Model picker polish: spacing from window edge, wider trigger, readable pricing.
+
+### Tests
+
+- 189 tests passing; added coverage for attachments, agent context, terminal tab titles, and ANSI stripping.
+
+---
+
 ## [0.9.3] — 2026-09-08
 
 ### Visual polish

@@ -22,9 +22,10 @@ import { useChatPersistence } from './hooks/useChatPersistence'
 import { initAgentEvents } from './lib/agentEvents'
 import { useIndexStore } from './stores/indexStore'
 import { Toaster } from './components/ui/toaster'
-import { QuickOpenModal } from './components/layout/QuickOpenModal'
+import { CommandPalette } from './components/layout/CommandPalette'
 import { ShortcutsModal } from './components/layout/ShortcutsModal'
 import { useUiStore } from './stores/uiStore'
+import { useTerminalStore } from './stores/terminalStore'
 import { isImagePath } from './lib/utils'
 
 function ResizeHandle({ direction }: { direction: 'horizontal' | 'vertical' }): React.ReactElement {
@@ -88,6 +89,11 @@ export default function App(): React.ReactElement {
           useToastStore.getState().addToast(`Saved ${tab.path.split(/[/\\]/).pop()}`, 'success')
         }
       }
+      if (e.ctrlKey && e.shiftKey && e.key === '`') {
+        e.preventDefault()
+        useSettingsStore.getState().setTerminalOpen(true)
+        useTerminalStore.getState().addTab(useFileStore.getState().workingDirectory)
+      }
       if (e.ctrlKey && e.key === '`') {
         e.preventDefault()
         useSettingsStore.getState().setTerminalOpen(
@@ -100,7 +106,7 @@ export default function App(): React.ReactElement {
       }
       if (e.ctrlKey && e.key === 'p') {
         e.preventDefault()
-        useUiStore.getState().setQuickOpenOpen(true)
+        useUiStore.getState().setCommandPaletteOpen(true)
       }
       if (e.ctrlKey && e.key === '/') {
         e.preventDefault()
@@ -169,7 +175,7 @@ export default function App(): React.ReactElement {
       <ToolAnalyticsPanel />
       <ApprovalDialog />
       <MemorySuggestDialog />
-      <QuickOpenModal />
+      <CommandPalette />
       <ShortcutsModal />
     </div>
   )

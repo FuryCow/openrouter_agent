@@ -1,10 +1,13 @@
-import type { ApprovedPlan, ChatMode } from '../types'
+import type { ApprovedPlan, ChatMode, ChatFileAttachment } from '../types'
 import { parsePlannerPlan } from '../lib/parsePlannerPlan'
 import { useChatStore } from '../stores/chatStore'
 import { useFileStore } from '../stores/fileStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useToastStore } from '../stores/toastStore'
 import { useAgentRunStore } from '../stores/agentRunStore'
+import { useAgentContextStore } from '../stores/agentContextStore'
+import { buildAgentContextFiles, buildAgentOpenFilesPayload } from '../lib/agentContext'
+import { isImagePath } from '../lib/utils'
 import { getChatModeConfig } from '../lib/chatModes'
 import { getT } from '../i18n/t'
 
@@ -23,6 +26,7 @@ export function useAgent(): {
     options?: {
       mode?: ChatMode
       images?: string[]
+      attachedFiles?: ChatFileAttachment[]
       skipUserMessage?: boolean
       approvedPlan?: ApprovedPlan
     }
@@ -36,6 +40,7 @@ export function useAgent(): {
     options?: {
       mode?: ChatMode
       images?: string[]
+      attachedFiles?: ChatFileAttachment[]
       skipUserMessage?: boolean
       approvedPlan?: ApprovedPlan
     }
@@ -59,14 +64,23 @@ export function useAgent(): {
     }
 
     if (!options?.skipUserMessage) {
-      addUserMessage(message, mode, options?.images)
+      addUserMessage(message, mode, options?.images, options?.attachedFiles)
     }
     clearStream()
     setStreaming(true)
+    useAgentRunStore.getState().resetRunUi()
     useAgentRunStore.getState().setRunStatus('running')
 
     try {
-      const openFiles = useFileStore.getState().getOpenFilesContext()
+      const { tabs, activeTabPath } = useFileStore.getState()
+      const { pinnedPaths, excludedPaths } = useAgentContextStore.getState()
+      const codeTabs = tabs.filter((tab) => !isImagePath(tab.path))
+      const contextFiles = buildAgentContextFiles(codeTabs, {
+        pinnedPaths,
+        excludedPaths,
+        activeTabPath
+      })
+      const openFiles = buildAgentOpenFilesPayload(contextFiles)
       const history = useChatStore
         .getState()
         .messages.filter(
@@ -85,6 +99,7 @@ export function useAgent(): {
         model: settings.model,
         temperature: settings.temperature,
         images: options?.images,
+        attachedFiles: options?.attachedFiles,
         customSystemPrompt: settings.customSystemPrompt,
         autoApproveWrites: settings.autoApproveWrites,
         autoApproveTerminal: settings.autoApproveTerminal,
@@ -141,6 +156,7 @@ export function useAgent(): {
     await sendMessage(lastUser.content, {
       mode,
       images: lastUser.images,
+      attachedFiles: lastUser.attachedFiles,
       skipUserMessage: true
     })
   }

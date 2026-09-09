@@ -1,6 +1,11 @@
 import { useFileStore } from '@/stores/fileStore'
 import { loadFileForEditor } from '@/lib/loadFileForEditor'
-import type { DiffHighlightRange } from '@/types'
+import type {
+  DeletedLineHighlight,
+  FileDiffPreview,
+  InlineDeleteHighlight,
+  InlineDiffRange
+} from '@/types'
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').toLowerCase()
@@ -25,7 +30,13 @@ function resolveEditorPath(path: string): string {
 
 export type OpenFileOptions = {
   scrollToLine?: number
-  highlightRanges?: DiffHighlightRange[]
+  highlightRanges?: FileDiffPreview['highlightRanges']
+  inlineRanges?: InlineDiffRange[]
+  inlineDeleteHighlights?: InlineDeleteHighlight[]
+  deletedLines?: DeletedLineHighlight[]
+  modifiedLines?: DeletedLineHighlight[]
+  fileDiff?: FileDiffPreview
+  persistent?: boolean
 }
 
 export async function openFileInEditor(path: string, options?: OpenFileOptions): Promise<void> {
@@ -44,11 +55,60 @@ export async function openFileInEditor(path: string, options?: OpenFileOptions):
     openFile(resolved, content)
   }
 
-  if (options?.scrollToLine || (options?.highlightRanges && options.highlightRanges.length > 0)) {
+  const highlightRanges = options?.highlightRanges ?? options?.fileDiff?.highlightRanges ?? []
+  const inlineRanges = options?.inlineRanges ?? []
+  const inlineDeleteHighlights = options?.inlineDeleteHighlights ?? []
+  const deletedLines = options?.deletedLines ?? []
+  const modifiedLines = options?.modifiedLines ?? []
+  const scrollToLine =
+    options?.fileDiff?.scrollToLine ??
+    options?.scrollToLine ??
+    highlightRanges[0]?.startLine ??
+    inlineRanges[0]?.line ??
+    modifiedLines[0]?.afterLine ??
+    deletedLines[0]?.afterLine ??
+    1
+
+  if (
+    highlightRanges.length > 0 ||
+    inlineRanges.length > 0 ||
+    inlineDeleteHighlights.length > 0 ||
+    deletedLines.length > 0 ||
+    modifiedLines.length > 0 ||
+    scrollToLine > 1
+  ) {
     requestEditorReveal({
       path: existing?.path ?? resolved,
-      scrollToLine: options.scrollToLine ?? options.highlightRanges?.[0]?.startLine ?? 1,
-      highlightRanges: options.highlightRanges ?? []
+      scrollToLine,
+      highlightRanges,
+      inlineRanges,
+      inlineDeleteHighlights,
+      deletedLines,
+      modifiedLines,
+      persistent: options?.persistent
     })
   }
+}
+
+export async function openFileWithRunDiff(
+  path: string,
+  detail: Pick<
+    import('@/types').RunCheckpointFileDetail,
+    | 'fileDiff'
+    | 'inlineRanges'
+    | 'inlineDeleteHighlights'
+    | 'deletedLines'
+    | 'modifiedLines'
+    | 'additionHighlightRanges'
+  >
+): Promise<void> {
+  await openFileInEditor(path, {
+    fileDiff: detail.fileDiff,
+    highlightRanges: detail.additionHighlightRanges,
+    inlineRanges: detail.inlineRanges,
+    inlineDeleteHighlights: detail.inlineDeleteHighlights,
+    deletedLines: detail.deletedLines,
+    modifiedLines: detail.modifiedLines,
+    persistent: true
+  })
 }

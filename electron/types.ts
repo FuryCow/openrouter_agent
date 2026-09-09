@@ -156,6 +156,7 @@ export interface AgentContext {
   temperature?: number
   maxTokens?: number
   images?: string[]
+  attachedFiles?: ChatFileAttachment[]
   customSystemPrompt?: string
   autoApproveWrites?: boolean
   autoApproveTerminal?: boolean
@@ -163,6 +164,12 @@ export interface AgentContext {
   workspaceState?: string
   agentAutoVerify?: boolean
   approvedPlan?: ApprovedPlan
+}
+
+export interface ChatFileAttachment {
+  name: string
+  content: string
+  truncated?: boolean
 }
 
 export interface ApprovedPlanStep {
@@ -238,8 +245,10 @@ export interface ChatMessage {
   isError?: boolean
   interrupted?: boolean
   images?: string[]
+  attachedFiles?: ChatFileAttachment[]
   apiMessages?: ApiChatMessage[]
   runAnalytics?: AgentRunAnalytics
+  runOutcome?: AgentRunOutcome
 }
 
 export type ToolValidationIssue =
@@ -339,6 +348,49 @@ export interface RunCheckpointSummary {
   count: number
 }
 
+export interface RunCheckpointFileDetail {
+  path: string
+  additions: number
+  deletions: number
+  fileDiff: FileDiffPreview
+  inlineRanges: InlineDiffRange[]
+  inlineDeleteHighlights: InlineDeleteHighlight[]
+  deletedLines: DeletedLineHighlight[]
+  modifiedLines: DeletedLineHighlight[]
+  additionHighlightRanges: DiffHighlightRange[]
+}
+
+export interface InlineDiffRange {
+  line: number
+  startColumn: number
+  endColumn: number
+}
+
+export interface DeletedLineHighlight {
+  afterLine: number
+  content: string
+  markerLine?: number
+}
+
+export interface InlineDeleteHighlight {
+  line: number
+  removedText: string
+  insertColumn: number
+}
+
+export type TaskStepStatus = 'pending' | 'in_progress' | 'done'
+
+export interface TaskChecklistStepState {
+  text: string
+  status: TaskStepStatus
+}
+
+export interface TaskChecklistState {
+  steps: TaskChecklistStepState[]
+}
+
+export type AgentRunOutcome = 'success' | 'aborted' | 'max_iterations' | 'error'
+
 export interface AgentEvent {
   type:
     | 'stream'
@@ -354,6 +406,8 @@ export interface AgentEvent {
     | 'iteration_warning'
     | 'checkpoint_updated'
     | 'memory_suggest'
+    | 'checklist_updated'
+    | 'terminal_output'
   content?: string
   toolCall?: ToolCallInfo
   message?: ChatMessage
@@ -366,6 +420,7 @@ export interface AgentEvent {
   runStatus?: AgentRunStatus
   iterationsRemaining?: number
   checkpoint?: RunCheckpointSummary
+  checklist?: TaskChecklistState
 }
 
 export interface ModelInfo {

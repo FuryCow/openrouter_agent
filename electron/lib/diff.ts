@@ -16,6 +16,32 @@ export interface FileDiffPreview {
   highlightRanges: DiffHighlightRange[]
 }
 
+export interface InlineDiffRange {
+  line: number
+  startColumn: number
+  endColumn: number
+}
+
+export interface DeletedLineHighlight {
+  afterLine: number
+  content: string
+  markerLine?: number
+}
+
+export interface InlineDeleteHighlight {
+  line: number
+  removedText: string
+  insertColumn: number
+}
+
+export interface RunCheckpointFileDetail {
+  path: string
+  additions: number
+  deletions: number
+  fileDiff: FileDiffPreview
+  inlineRanges: InlineDiffRange[]
+}
+
 type RawDiffLine = Exclude<DiffDisplayLine, { type: 'sep' }>
 
 const DIFF_CONTEXT_LINES = 4
@@ -164,6 +190,199 @@ function computeScrollLine(lines: RawDiffLine[], highlightRanges: DiffHighlightR
   }
 
   return 1
+}
+
+function extractAddedMiddle(
+  oldLine: string,
+  newLine: string,
+  lineNumber: number
+): InlineDiffRange | null {
+  if (oldLine === newLine) return null
+
+  let prefix = 0
+  while (prefix < oldLine.length && prefix < newLine.length && oldLine[prefix] === newLine[prefix]) {
+    prefix++
+  }
+
+  let suffix = 0
+  while (
+    suffix < oldLine.length - prefix &&
+    suffix < newLine.length - prefix &&
+    oldLine[oldLine.length - 1 - suffix] === newLine[newLine.length - 1 - suffix]
+  ) {
+    suffix++
+  }
+
+  const added = newLine.slice(prefix, newLine.length - suffix)
+  if (!added) return null
+
+  const startColumn = prefix + 1
+  const endColumn = Math.max(startColumn + 1, newLine.length - suffix + 1)
+  return { line: lineNumber, startColumn, endColumn }
+}
+
+export function buildInlineDiffRanges(oldText: string, newText: string): InlineDiffRange[] {
+  const diffLines = computeLineDiff(oldText.split('\n'), newText.split('\n'))
+  const ranges: InlineDiffRange[] = []
+
+  for (let index = 0; index < diffLines.length; index++) {
+    const line = diffLines[index]
+    if (line.type !== 'del') continue
+
+    const next = diffLines[index + 1]
+    if (next?.type === 'add' && next.newLine) {
+      const added = extractAddedMiddle(line.content, next.content, next.newLine)
+      if (added) ranges.push(added)
+    }
+  }
+
+  return ranges
+}
+
+export function buildInlineDeleteHighlights(
+  _oldText: string,
+  _newText: string
+): InlineDeleteHighlight[] {
+  return []
+}
+
+export function buildPureAdditionHighlightRanges(
+  oldText: string,
+  newText: string
+): DiffHighlightRange[] {
+  const diffLines = computeLineDiff(oldText.split('\n'), newText.split('\n'))
+  const ranges: DiffHighlightRange[] = []
+  let current: DiffHighlightRange | null = null
+
+  for (let index = 0; index < diffLines.length; index++) {
+    const line = diffLines[index]
+    if (line.type !== 'add' || !line.newLine) continue
+    if (index > 0 && diffLines[index - 1]?.type === 'del') continue
+
+    if (!current) {
+      current = { startLine: line.newLine, endLine: line.newLine }
+      continue
+    }
+
+    if (line.newLine === current.endLine + 1) {
+      current.endLine = line.newLine
+    } else {
+      ranges.push(current)
+      current = { startLine: line.newLine, endLine: line.newLine }
+    }
+  }
+
+  if (current) ranges.push(current)
+  return ranges
+}
+
+export function buildDeletedLineHighlights(
+  oldText: string,
+  newText: string
+): DeletedLineHighlight[] {
+  const diffLines = computeLineDiff(oldText.split('\n'), newText.split('\n'))
+  const highlights: DeletedLineHighlight[] = []
+
+  for (let index = 0; index < diffLines.length; index++) {
+    if (diffLines[index].type !== 'del') continue
+
+    const delRun: RawDiffLine[] = []
+    while (index < diffLines.length && diffLines[index].type === 'del') {
+      delRun.push(diffLines[index])
+      index++
+    }
+
+    let addCount = 0
+    for (let j = index; j < diffLines.length && diffLines[j].type === 'add'; j++) {
+      addCount++
+    }
+
+    if (addCount > 0) {
+      index--
+      continue
+    }
+
+    let afterLine = 0
+    for (let k = index - delRun.length; k >= 0; k--) {
+      const ctx = diffLines[k]
+      if (ctx.type === 'ctx' && ctx.newLine !== undefined) {
+        afterLine = ctx.newLine
+        break
+      }
+    }
+
+    for (const del of delRun) {
+      highlights.push({ afterLine, content: del.content })
+    }
+    index--
+  }
+
+  return highlights
+}
+
+export function buildModifiedLineHighlights(
+  oldText: string,
+  newText: string
+): DeletedLineHighlight[] {
+  const diffLines = computeLineDiff(oldText.split('\n'), newText.split('\n'))
+  const highlights: DeletedLineHighlight[] = []
+
+  for (let index = 0; index < diffLines.length; index++) {
+    if (diffLines[index].type !== 'del') continue
+
+    const delRun: RawDiffLine[] = []
+    while (index < diffLines.length && diffLines[index].type === 'del') {
+      delRun.push(diffLines[index])
+      index++
+    }
+
+    const addRun: RawDiffLine[] = []
+    let addIndex = index
+    while (addIndex < diffLines.length && diffLines[addIndex].type === 'add') {
+      addRun.push(diffLines[addIndex])
+      addIndex++
+    }
+
+    if (addRun.length === 0) {
+      index--
+      continue
+    }
+
+    const pairs = Math.min(delRun.length, addRun.length)
+    for (let pair = 0; pair < pairs; pair++) {
+      const addLine = addRun[pair]
+      if (!addLine.newLine) continue
+      highlights.push({
+        afterLine: Math.max(0, addLine.newLine - 1),
+        content: delRun[pair].content
+      })
+    }
+
+    for (let pair = pairs; pair < delRun.length; pair++) {
+      const anchor = addRun[pairs - 1]?.newLine ?? addRun[addRun.length - 1]?.newLine ?? 1
+      highlights.push({
+        afterLine: Math.max(0, anchor),
+        content: delRun[pair].content
+      })
+    }
+
+    index = addIndex - 1
+  }
+
+  return highlights
+}
+
+export function countDiffStats(oldText: string, newText: string): { additions: number; deletions: number } {
+  const pureAddLines = buildPureAdditionHighlightRanges(oldText, newText)
+  const additions =
+    pureAddLines.reduce((sum, range) => sum + (range.endLine - range.startLine + 1), 0) +
+    buildInlineDiffRanges(oldText, newText).length
+
+  const deletions =
+    buildDeletedLineHighlights(oldText, newText).length +
+    buildModifiedLineHighlights(oldText, newText).length
+
+  return { additions, deletions }
 }
 
 export function buildFileDiffPreview(oldText: string, newText: string): FileDiffPreview {

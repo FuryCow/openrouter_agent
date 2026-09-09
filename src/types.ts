@@ -49,7 +49,15 @@ export type {
   ProjectMemoryEntry,
   ProjectMemoryCategory,
   AgentRunStatus,
+  AgentRunOutcome,
   RunCheckpointSummary,
+  RunCheckpointFileDetail,
+  InlineDiffRange,
+  DeletedLineHighlight,
+  InlineDeleteHighlight,
+  TaskChecklistStepState,
+  TaskChecklistState,
+  ChatFileAttachment,
   ApprovedPlan,
   ApprovedPlanStep
 } from '../../electron/types'

@@ -5,6 +5,8 @@
   "revertRunTitle": "Revert {{count}} file(s) from last agent run",
   "retryLast": "Retry last",
   "attachImage": "Attach image",
+  "attachFile": "Attach file",
+  "attachmentTruncated": "truncated",
   "removeAttachment": "Remove attachment",
   "visionNotSupported": "Vision not supported by current model",
   "editMessagePlaceholder": "Edit message…",
@@ -18,6 +20,10 @@
   },
   "toast": {
     "onlyImages": "Only image files can be attached",
+    "unsupportedAttachment": "This file type cannot be attached. Use text or code files.",
+    "attachmentTooLarge": "File is too large to attach",
+    "attachmentReadFailed": "Failed to read attached file",
+    "maxAttachments": "Maximum 8 attachments per message",
     "noVision": "Current model does not support vision",
     "nothingToRevert": "Nothing to revert from the last run",
     "revertedFiles": "Reverted {{count}} file change(s) from last agent run",
@@ -132,5 +138,44 @@
   },
   "persistence": {
     "switched": "Chat switched to {{name}}"
+  },
+  "agentContext": {
+    "title": "Context for this message",
+    "count": "{{count}} file(s)",
+    "truncated": "truncated",
+    "truncatedTooltip": "{{path}} — preview truncated in context",
+    "remove": "Remove {{path}} from context",
+    "pinInContext": "Include in next message"
+  },
+  "agentRun": {
+    "checklistTitle": "Task checklist",
+    "terminalOutput": "Terminal output",
+    "status": {
+      "running": "Agent running…",
+      "awaitingApproval": "Awaiting approval",
+      "completed": "Run completed",
+      "error": "Run failed",
+      "aborted": "Run aborted",
+      "maxIterations": "Run stopped — step limit reached",
+      "step": "Step {{current}}/{{total}} — {{text}}"
+    }
+  },
+  "runChanges": {
+    "fileCount": "{{count}} Files",
+    "undoAll": "Undo all",
+    "review": "Review",
+    "heading": "File edits",
+    "reviewTitle": "Review {{count}} file edit(s) from last run",
+    "scopeNote": "File edits only — terminal and MCP changes are not reverted.",
+    "openAll": "Open all",
+    "revertAll": "Revert all",
+    "revertSelected": "Revert ({{count}})",
+    "toggleFile": "Select {{path}} for revert"
+  },
+  "runOutcome": {
+    "success": "Success",
+    "aborted": "Aborted",
+    "max_iterations": "Step limit",
+    "error": "Failed"
   }
 }

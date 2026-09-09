@@ -443,8 +443,16 @@ function registerIpc(): void {
     return agentService.getRunCheckpointSummary()
   })
 
+  ipcMain.handle('agent:getRunCheckpointDetails', async () => {
+    return agentService.getRunCheckpointDetails()
+  })
+
   ipcMain.handle('agent:restoreRunCheckpoint', async () => {
     return agentService.restoreRunCheckpoint()
+  })
+
+  ipcMain.handle('agent:restoreRunCheckpointPaths', async (_event, paths: string[]) => {
+    return agentService.restoreRunCheckpointPaths(paths)
   })
 
   ipcMain.handle('chat:load', (_event, mode: string, workspacePath?: string | null) => {

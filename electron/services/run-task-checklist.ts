@@ -44,4 +44,8 @@ export class RunTaskChecklist {
 
     return [header, ...lines].filter(Boolean).join('\n')
   }
+
+  getSteps(): TaskChecklistStep[] {
+    return [...this.steps]
+  }
 }

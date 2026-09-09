@@ -5,10 +5,12 @@ import type {
   ToolCallInfo,
   ChatMode,
   AgentRunAnalytics,
+  AgentRunOutcome,
   ApiChatMessage,
   ToolApprovalRequest,
   MemorySuggestRequest,
-  MemorySuggestEntry
+  MemorySuggestEntry,
+  ChatFileAttachment
 } from '../types'
 import {
   appendTimelineChunk,
@@ -33,7 +35,12 @@ interface ChatState {
   loadMessages: (mode: ChatMode, messages: ChatMessage[]) => void
   setAllMessages: (messages: ChatMessage[]) => void
   getMessagesForMode: () => ChatMessage[]
-  addUserMessage: (content: string, mode?: ChatMode, images?: string[]) => void
+  addUserMessage: (
+    content: string,
+    mode?: ChatMode,
+    images?: string[],
+    attachedFiles?: ChatFileAttachment[]
+  ) => void
   appendStream: (chunk: string) => void
   appendReasoning: (chunk: string) => void
   flushStreamBuffer: () => void
@@ -47,7 +54,8 @@ interface ChatState {
     isError?: boolean,
     runAnalytics?: AgentRunAnalytics,
     interrupted?: boolean,
-    apiMessages?: ApiChatMessage[]
+    apiMessages?: ApiChatMessage[],
+    runOutcome?: AgentRunOutcome
   ) => void
   truncateAfterMessage: (messageId: string) => void
   updateUserMessage: (messageId: string, content: string) => void
@@ -105,7 +113,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return messages.filter((m) => m.mode === chatMode || !m.mode)
   },
 
-  addUserMessage: (content, mode, images) =>
+  addUserMessage: (content, mode, images, attachedFiles) =>
     set((s) => ({
       messages: [
         ...s.messages,
@@ -114,7 +122,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           role: 'user',
           content,
           mode: mode ?? s.chatMode,
-          images
+          images,
+          attachedFiles
         }
       ]
     })),
@@ -175,7 +184,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     scheduleStreamFlush(set)
   },
 
-  finalizeAssistantMessage: (content, timeline, isError, runAnalytics, interrupted, apiMessages) => {
+  finalizeAssistantMessage: (
+    content,
+    timeline,
+    isError,
+    runAnalytics,
+    interrupted,
+    apiMessages,
+    runOutcome
+  ) => {
     get().flushStreamBuffer()
     const { activeTimeline, chatMode } = get()
     const finalTimeline = mergeTimelineFromMessage(activeTimeline, {
@@ -219,7 +236,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           isError,
           interrupted,
           apiMessages,
-          runAnalytics
+          runAnalytics,
+          runOutcome
         }
       ],
       activeTimeline: [],

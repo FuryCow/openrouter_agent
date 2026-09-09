@@ -1,95 +1,102 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Terminal as TerminalIcon } from 'lucide-react'
-import { Terminal } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
-import '@xterm/xterm/css/xterm.css'
+import { Plus, Terminal as TerminalIcon, X } from 'lucide-react'
 import { useFileStore } from '@/stores/fileStore'
+import { useTerminalStore } from '@/stores/terminalStore'
 import { Button } from '../ui/button'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { scheduleInAnimationFrame } from '@/lib/animation-frame'
+import { cn } from '@/lib/utils'
+import { TerminalTabView, type TerminalTabHandle } from './TerminalTabView'
 
 export function TerminalPanel(): React.ReactElement {
   const { t } = useTranslation('layout')
   const containerRef = useRef<HTMLDivElement>(null)
-  const terminalRef = useRef<Terminal | null>(null)
-  const fitAddonRef = useRef<FitAddon | null>(null)
-  const termIdRef = useRef<string | null>(null)
+  const handlesRef = useRef<Map<string, TerminalTabHandle>>(new Map())
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const terminalOpen = useSettingsStore((s) => s.terminalOpen)
   const setTerminalOpen = useSettingsStore((s) => s.setTerminalOpen)
+  const tabs = useTerminalStore((s) => s.tabs)
+  const activeTabId = useTerminalStore((s) => s.activeTabId)
+  const ensureInitialTab = useTerminalStore((s) => s.ensureInitialTab)
+  const addTab = useTerminalStore((s) => s.addTab)
+  const closeTab = useTerminalStore((s) => s.closeTab)
+  const setActiveTab = useTerminalStore((s) => s.setActiveTab)
+  const renameFromFirstCommand = useTerminalStore((s) => s.renameFromFirstCommand)
 
   useEffect(() => {
-    if (!containerRef.current || !terminalOpen) return
-
-    const term = new Terminal({
-      fontFamily: "'JetBrains Mono', monospace",
-      fontSize: 13,
-      theme: {
-        background: '#0a0a0f',
-        foreground: '#e4e4e7',
-        cursor: '#8b5cf6',
-        selectionBackground: '#6366f144',
-        black: '#18181b',
-        red: '#ef4444',
-        green: '#22c55e',
-        yellow: '#eab308',
-        blue: '#3b82f6',
-        magenta: '#a855f7',
-        cyan: '#06b6d4',
-        white: '#e4e4e7'
-      },
-      cursorBlink: true,
-      scrollback: 5000
-    })
-
-    const fitAddon = new FitAddon()
-    term.loadAddon(fitAddon)
-    term.open(containerRef.current)
-    fitAddon.fit()
-
-    terminalRef.current = term
-    fitAddonRef.current = fitAddon
-
-    let unsubData: (() => void) | undefined
-
-    const init = async (): Promise<void> => {
-      const id = await window.api.terminal.create(workingDirectory || undefined)
-      termIdRef.current = id
-
-      unsubData = window.api.terminal.onData((termId, data) => {
-        if (termId === id) term.write(data)
-      })
-
-      term.onData((data) => {
-        window.api.terminal.write(id, data)
-      })
-
-      term.onResize(({ cols, rows }) => {
-        window.api.terminal.resize(id, cols, rows)
-      })
+    if (terminalOpen) {
+      ensureInitialTab(workingDirectory)
     }
+  }, [terminalOpen, workingDirectory, ensureInitialTab])
 
-    init()
+  const fitActiveTerminal = useCallback((): void => {
+    if (!activeTabId) return
+    handlesRef.current.get(activeTabId)?.fitAddon.fit()
+  }, [activeTabId])
+
+  const handleReady = useCallback((tabId: string, handle: TerminalTabHandle) => {
+    handlesRef.current.set(tabId, handle)
+    if (tabId === useTerminalStore.getState().activeTabId) {
+      scheduleInAnimationFrame(() => handle.fitAddon.fit())
+    }
+  }, [])
+
+  const handleDispose = useCallback((tabId: string) => {
+    handlesRef.current.delete(tabId)
+  }, [])
+
+  const handleFirstCommand = useCallback(
+    (tabId: string, command: string) => {
+      renameFromFirstCommand(tabId, command)
+    },
+    [renameFromFirstCommand]
+  )
+
+  const handleCloseTab = useCallback(
+    (tabId: string) => {
+      const result = closeTab(tabId)
+      if (result === 'hide-panel') {
+        setTerminalOpen(false)
+      }
+    },
+    [closeTab, setTerminalOpen]
+  )
+
+  useEffect(() => {
+    if (!terminalOpen) return
+
+    return window.api.terminal.onData((sessionId, data) => {
+      for (const handle of handlesRef.current.values()) {
+        if (handle.sessionId === sessionId) {
+          handle.term.write(data)
+          break
+        }
+      }
+    })
+  }, [terminalOpen])
+
+  useEffect(() => {
+    if (!terminalOpen) return
+    fitActiveTerminal()
+  }, [activeTabId, terminalOpen, fitActiveTerminal])
+
+  useEffect(() => {
+    if (!terminalOpen || !containerRef.current) return
 
     const scheduleFit = (): void => {
-      scheduleInAnimationFrame(() => fitAddon.fit())
+      scheduleInAnimationFrame(fitActiveTerminal)
     }
-    window.addEventListener('resize', scheduleFit)
 
+    window.addEventListener('resize', scheduleFit)
     const resizeObserver = new ResizeObserver(scheduleFit)
     resizeObserver.observe(containerRef.current)
 
     return () => {
       window.removeEventListener('resize', scheduleFit)
       resizeObserver.disconnect()
-      unsubData?.()
-      if (termIdRef.current) {
-        window.api.terminal.destroy(termIdRef.current)
-      }
-      term.dispose()
     }
-  }, [terminalOpen, workingDirectory])
+  }, [terminalOpen, fitActiveTerminal])
 
   if (!terminalOpen) {
     return (
@@ -110,22 +117,97 @@ export function TerminalPanel(): React.ReactElement {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden border-t border-white/5 bg-background">
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-1">
-        <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-          <TerminalIcon className="h-3 w-3" />
-          {t('status.terminal')}
+      <div className="flex items-stretch border-b border-white/5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-2 py-1.5">
+          {tabs.map((tab) => {
+            const active = tab.id === activeTabId
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                onMouseDown={(event) => {
+                  if (event.button !== 1) return
+                  event.preventDefault()
+                  handleCloseTab(tab.id)
+                }}
+                title={tab.title}
+                className={cn(
+                  'group flex h-7 max-w-[220px] min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-1.5 text-left transition-all',
+                  active
+                    ? 'border-indigo-500/25 bg-gradient-to-r from-indigo-500/10 via-violet-500/10 to-indigo-500/5 shadow-[0_0_20px_-6px_rgba(99,102,241,0.55)]'
+                    : 'border-white/10 bg-white/[0.02] hover:border-indigo-400/25 hover:bg-indigo-500/[0.06]'
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] ring-1 ring-inset',
+                    active
+                      ? 'bg-gradient-to-br from-indigo-500/30 to-violet-500/20 ring-indigo-400/30'
+                      : 'bg-white/[0.04] ring-white/10 group-hover:ring-indigo-400/20'
+                  )}
+                >
+                  <TerminalIcon
+                    className={cn('h-2.5 w-2.5', active ? 'text-indigo-200' : 'text-zinc-500')}
+                  />
+                </span>
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-[11px] font-semibold tracking-wide',
+                    active ? 'text-zinc-100' : 'text-zinc-500 group-hover:text-zinc-300'
+                  )}
+                >
+                  {tab.title}
+                </span>
+                <X
+                  className="h-3 w-3 shrink-0 text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-400"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleCloseTab(tab.id)
+                  }}
+                />
+              </button>
+            )
+          })}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-5 text-[10px] text-zinc-600 hover:text-zinc-400"
-          onClick={() => setTerminalOpen(false)}
-          title={t('terminal.hideTooltip')}
-        >
-          {t('terminal.hide')}
-        </Button>
+
+        <div className="flex shrink-0 items-center gap-1 border-l border-white/5 px-2 py-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 shrink-0 rounded-md border border-white/10 p-0 text-zinc-500 hover:border-indigo-400/25 hover:bg-indigo-500/[0.06] hover:text-zinc-300"
+            onClick={() => addTab(workingDirectory)}
+            title={t('terminal.newTabTooltip')}
+            aria-label={t('terminal.newTab')}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 rounded-md border border-transparent px-2 text-[10px] text-zinc-600 hover:border-white/10 hover:bg-white/[0.04] hover:text-zinc-400"
+            onClick={() => setTerminalOpen(false)}
+            title={t('terminal.hideTooltip')}
+          >
+            {t('terminal.hide')}
+          </Button>
+        </div>
       </div>
-      <div ref={containerRef} className="min-h-0 flex-1 overflow-hidden p-1" />
+
+      <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden">
+        {tabs.map((tab) => (
+          <TerminalTabView
+            key={tab.id}
+            tabId={tab.id}
+            cwd={tab.cwd}
+            isActive={tab.id === activeTabId}
+            onReady={handleReady}
+            onDispose={handleDispose}
+            onFirstCommand={handleFirstCommand}
+          />
+        ))}
+      </div>
     </div>
   )
 }

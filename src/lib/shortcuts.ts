@@ -12,6 +12,7 @@ const SHORTCUT_KEYS = [
   'quickOpen',
   'settings',
   'terminal',
+  'newTerminal',
   'list'
 ] as const
 
@@ -22,6 +23,7 @@ const SHORTCUT_KEY_LABELS: Record<(typeof SHORTCUT_KEYS)[number], string> = {
   quickOpen: 'Ctrl + P',
   settings: 'Ctrl + L',
   terminal: 'Ctrl + `',
+  newTerminal: 'Ctrl + Shift + `',
   list: 'Ctrl + /'
 }
 

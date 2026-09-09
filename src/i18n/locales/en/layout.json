@@ -3,6 +3,22 @@
   "titleBar": {
     "settings": "Settings"
   },
+  "commandPalette": {
+    "triggerPlaceholder": "Search files and commands…",
+    "inputPlaceholder": "Search files and commands (prefix > for commands)",
+    "openTooltip": "Open command palette (Ctrl+P)",
+    "noResults": "No matching results",
+    "recentlyOpened": "recently opened",
+    "commands": {
+      "files": "Go to File",
+      "filesHint": "Open a file in the editor",
+      "settings": "Open Settings",
+      "shortcuts": "Keyboard Shortcuts",
+      "terminal": "Toggle Terminal",
+      "newTerminal": "New Terminal Tab",
+      "openFolder": "Open Project Folder"
+    }
+  },
   "workspace": {
     "noFolder": "No folder open",
     "openProjectTitle": "Open project folder",
@@ -27,6 +43,7 @@
     "quickOpen": "Quick open file",
     "settings": "Settings",
     "terminal": "Show / hide terminal",
+    "newTerminal": "New terminal tab",
     "list": "Keyboard shortcuts list"
   },
   "editor": {
@@ -84,7 +101,10 @@
     "show": "Show terminal",
     "showTooltip": "Show terminal (Ctrl+`)",
     "hide": "Hide",
-    "hideTooltip": "Hide terminal (Ctrl+`)"
+    "hideTooltip": "Hide terminal (Ctrl+`)",
+    "newTab": "New terminal",
+    "newTabTooltip": "New terminal (Ctrl+Shift+`)",
+    "closeTab": "Close terminal tab"
   },
   "models": {
     "selectModel": "Select model",

@@ -15,6 +15,7 @@ import {
   type ContextMenuItem
 } from '@/components/explorer/ExplorerContextMenu'
 import { useEditorStore } from '@/stores/editorStore'
+import { useAgentContextStore } from '@/stores/agentContextStore'
 import { buildEditorFileStats } from '@/lib/editorFileStats'
 import { setupMonacoEditorFeatures, registerResolveInChatEditorActions } from '@/lib/monacoEditorSetup'
 
@@ -32,11 +33,62 @@ function pathsMatch(a: string, b: string): boolean {
   return normalizePath(a) === normalizePath(b)
 }
 
+function diffDecorationOptions(
+  monaco: typeof import('monaco-editor'),
+  kind: 'add' | 'del'
+): editor.IModelDecorationOptions {
+  const color = kind === 'add' ? '#34d399' : '#f87171'
+  return {
+    minimap: {
+      color,
+      position: monaco.editor.MinimapPosition.Inline
+    },
+    overviewRuler: {
+      color,
+      position: monaco.editor.OverviewRulerLane.Left
+    }
+  }
+}
+
+function buildDeletedLineViewZoneDom(
+  editorInstance: editor.IStandaloneCodeEditor,
+  monaco: typeof import('monaco-editor'),
+  content: string
+): HTMLDivElement {
+  const lineHeight = editorInstance.getOption(monaco.editor.EditorOption.lineHeight)
+  const fontSize = editorInstance.getOption(monaco.editor.EditorOption.fontSize)
+  const fontFamily = editorInstance.getOption(monaco.editor.EditorOption.fontFamily)
+  const { contentLeft, lineNumbersWidth, glyphMarginWidth } = editorInstance.getLayoutInfo()
+  const gutterWidth = glyphMarginWidth + lineNumbersWidth
+
+  const domNode = document.createElement('div')
+  domNode.className = 'file-diff-viewzone-deleted'
+  domNode.style.setProperty('--diff-line-height', `${lineHeight}px`)
+  domNode.style.setProperty('--diff-font-size', `${fontSize}px`)
+  domNode.style.setProperty('--diff-font-family', fontFamily)
+  domNode.style.setProperty('--diff-content-left', `${contentLeft}px`)
+  domNode.style.setProperty('--diff-gutter-width', `${gutterWidth}px`)
+  domNode.style.height = `${lineHeight}px`
+  domNode.style.minHeight = `${lineHeight}px`
+
+  const marker = document.createElement('span')
+  marker.className = 'file-diff-viewzone-marker'
+  marker.textContent = '−'
+
+  const text = document.createElement('span')
+  text.className = 'file-diff-viewzone-text'
+  text.textContent = content
+
+  domNode.append(marker, text)
+  return domNode
+}
+
 function applyEditorReveal(
   editorInstance: editor.IStandaloneCodeEditor,
   monaco: typeof import('monaco-editor'),
   request: EditorRevealRequest,
-  decorationIdsRef: React.MutableRefObject<string[]>
+  decorationIdsRef: React.MutableRefObject<string[]>,
+  viewZoneIdsRef: React.MutableRefObject<string[]>
 ): void {
   editorInstance.revealLineInCenter(request.scrollToLine)
 
@@ -44,22 +96,97 @@ function applyEditorReveal(
     editorInstance.deltaDecorations(decorationIdsRef.current, [])
   }
 
-  decorationIdsRef.current = editorInstance.deltaDecorations(
-    [],
-    request.highlightRanges.map((range) => ({
-      range: new monaco.Range(range.startLine, 1, range.endLine, 1),
+  editorInstance.changeViewZones((accessor) => {
+    for (const id of viewZoneIdsRef.current) {
+      accessor.removeZone(id)
+    }
+    viewZoneIdsRef.current = []
+
+    const previewLines = [
+      ...(request.deletedLines ?? []),
+      ...(request.modifiedLines ?? [])
+    ].sort((a, b) => a.afterLine - b.afterLine || a.content.localeCompare(b.content))
+
+    for (const preview of previewLines) {
+      const domNode = buildDeletedLineViewZoneDom(editorInstance, monaco, preview.content)
+
+      const zoneId = accessor.addZone({
+        afterLineNumber: Math.max(0, preview.afterLine),
+        heightInLines: 1,
+        domNode,
+        suppressMouseDown: true
+      })
+      viewZoneIdsRef.current.push(zoneId)
+    }
+  })
+
+  const decorations: editor.IModelDeltaDecoration[] = []
+
+  for (const deleted of request.deletedLines ?? []) {
+    const markerLine = Math.max(1, deleted.afterLine + 1)
+    decorations.push({
+      range: new monaco.Range(markerLine, 1, markerLine, 1),
+      options: diffDecorationOptions(monaco, 'del')
+    })
+  }
+
+  for (const range of request.highlightRanges) {
+    for (let line = range.startLine; line <= range.endLine; line++) {
+      decorations.push({
+        range: new monaco.Range(line, 1, line, 1),
+        options: {
+          isWholeLine: true,
+          className: 'file-diff-highlight-line',
+          linesDecorationsClassName: 'file-diff-highlight-gutter',
+          ...diffDecorationOptions(monaco, 'add')
+        }
+      })
+    }
+  }
+
+  for (const inline of request.inlineRanges ?? []) {
+    decorations.push({
+      range: new monaco.Range(
+        inline.line,
+        inline.startColumn,
+        inline.line,
+        inline.endColumn
+      ),
       options: {
-        isWholeLine: true,
-        className: 'file-diff-highlight-line',
-        linesDecorationsClassName: 'file-diff-highlight-gutter'
+        inlineClassName: 'file-diff-inline-add',
+        className: 'file-diff-inline-add-line',
+        ...diffDecorationOptions(monaco, 'add')
       }
-    }))
-  )
+    })
+  }
+
+  for (const removed of request.inlineDeleteHighlights ?? []) {
+    decorations.push({
+      range: new monaco.Range(
+        removed.line,
+        removed.insertColumn,
+        removed.line,
+        removed.insertColumn
+      ),
+      options: {
+        before: {
+          content: removed.removedText,
+          inlineClassName: 'file-diff-inline-del',
+          cursorStops: monaco.editor.InjectedTextCursorStops.None
+        },
+        linesDecorationsClassName: 'file-diff-deleted-gutter',
+        ...diffDecorationOptions(monaco, 'del')
+      }
+    })
+  }
+
+  decorationIdsRef.current = editorInstance.deltaDecorations([], decorations)
 }
 
 export function CodeEditor(): React.ReactElement {
   const { t } = useTranslation('layout')
   const { t: tCommon } = useTranslation('common')
+  const { t: tChat } = useTranslation('chat')
   const tabs = useFileStore((s) => s.tabs)
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const activeTabPath = useFileStore((s) => s.activeTabPath)
@@ -77,6 +204,7 @@ export function CodeEditor(): React.ReactElement {
   const monacoEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const monacoApiRef = useRef<typeof import('monaco-editor') | null>(null)
   const diffDecorationIdsRef = useRef<string[]>([])
+  const diffViewZoneIdsRef = useRef<string[]>([])
   const revealClearTimerRef = useRef<number | null>(null)
   const editorStatsDisposablesRef = useRef<Array<{ dispose: () => void }>>([])
   const resolveInChatDisposableRef = useRef<{ dispose: () => void } | null>(null)
@@ -126,8 +254,10 @@ export function CodeEditor(): React.ReactElement {
     if (!editorInstance || !monaco || !pending || !activePath) return false
     if (!pathsMatch(activePath, pending.path)) return false
 
-    applyEditorReveal(editorInstance, monaco, pending, diffDecorationIdsRef)
+    applyEditorReveal(editorInstance, monaco, pending, diffDecorationIdsRef, diffViewZoneIdsRef)
     clearEditorReveal()
+
+    if (pending.persistent) return true
 
     if (revealClearTimerRef.current !== null) {
       window.clearTimeout(revealClearTimerRef.current)
@@ -137,6 +267,12 @@ export function CodeEditor(): React.ReactElement {
         editorInstance.deltaDecorations(diffDecorationIdsRef.current, [])
         diffDecorationIdsRef.current = []
       }
+      editorInstance.changeViewZones((accessor) => {
+        for (const id of diffViewZoneIdsRef.current) {
+          accessor.removeZone(id)
+        }
+        diffViewZoneIdsRef.current = []
+      })
       revealClearTimerRef.current = null
     }, 10000)
 
@@ -187,6 +323,13 @@ export function CodeEditor(): React.ReactElement {
 
       return [
         {
+          id: 'pin-context',
+          label: tChat('agentContext.pinInContext'),
+          onClick: () => {
+            useAgentContextStore.getState().pinPath(tabPath)
+          }
+        },
+        {
           id: 'close',
           label: t('editor.tabs.close'),
           onClick: () => closeTab(tabPath)
@@ -211,7 +354,7 @@ export function CodeEditor(): React.ReactElement {
         }
       ]
     },
-    [tabs, closeTab, closeTabsToLeftOf, closeTabsToRightOf, closeOtherTabs, t]
+    [tabs, closeTab, closeTabsToLeftOf, closeTabsToRightOf, closeOtherTabs, t, tChat]
   )
 
   return (
@@ -314,7 +457,7 @@ export function CodeEditor(): React.ReactElement {
               automaticLayout: true,
               fontSize: 13,
               fontFamily: "'JetBrains Mono', monospace",
-              minimap: { enabled: true },
+              minimap: { enabled: true, showSlider: 'always' },
               scrollBeyondLastLine: false,
               padding: { top: 12 },
               lineNumbers: 'on',

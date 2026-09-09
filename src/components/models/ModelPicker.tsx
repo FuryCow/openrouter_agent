@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronDown, Eye, Loader2, RefreshCw, Wrench } from 'lucide-react'
+import { Check, ChevronDown, Eye, Loader2, RefreshCw, Sparkles, Wrench } from 'lucide-react'
 import * as Popover from '@radix-ui/react-popover'
 import { Button } from '../ui/button'
 import { ScrollArea } from '../ui/scroll-area'
@@ -174,25 +174,64 @@ export function ModelPicker({
         <Button
           variant="secondary"
           className={cn(
-            'justify-between gap-2 border-white/10 bg-white/5 font-normal',
-            compact ? 'h-auto min-h-8 min-w-56 max-w-80 px-2.5 py-1 text-xs' : 'h-10 w-full px-3 text-sm',
+            'justify-between gap-2 font-normal shadow-none transition-all',
+            compact
+              ? [
+                  'h-8 min-h-8 max-w-[18rem] min-w-[11rem] rounded-md border border-indigo-500/20 px-2 py-0',
+                  'bg-gradient-to-r from-indigo-500/10 via-violet-500/10 to-indigo-500/5',
+                  'hover:border-indigo-400/30 hover:from-indigo-500/15 hover:brightness-110',
+                  'data-[state=open]:border-indigo-400/35 data-[state=open]:shadow-[0_0_18px_-6px_rgba(99,102,241,0.5)]',
+                  'focus-visible:ring-1 focus-visible:ring-indigo-500/30 focus-visible:ring-offset-0'
+                ]
+              : 'h-10 w-full border-white/10 bg-white/5 px-3 text-sm',
             className
           )}
         >
-          <div className="min-w-0 truncate text-left">
-            <div className="truncate">{selected?.name || value || t('models.selectModel')}</div>
+          {compact && (
+            <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] bg-gradient-to-br from-indigo-500/30 to-violet-500/20 ring-1 ring-inset ring-indigo-400/30">
+              <Sparkles className="h-2.5 w-2.5 text-indigo-200" />
+            </span>
+          )}
+          <div
+            className={cn(
+              'min-w-0 flex-1 text-left leading-tight',
+              compact ? 'overflow-visible' : 'truncate'
+            )}
+          >
+            <div
+              className={cn(
+                'truncate',
+                compact ? 'text-[11px] font-semibold tracking-wide text-zinc-100' : 'text-sm'
+              )}
+            >
+              {selected?.name || value || t('models.selectModel')}
+            </div>
             {selectedPricing && (
-              <div className="truncate font-mono text-[9px] text-emerald-400/80">{selectedPricing}</div>
+              <div
+                className={cn(
+                  'whitespace-nowrap font-mono leading-none',
+                  compact ? 'mt-0.5 text-[11px] text-emerald-400/80' : 'truncate text-[9px] text-emerald-400/80'
+                )}
+              >
+                {selectedPricing}
+              </div>
             )}
           </div>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 shrink-0 text-zinc-500 transition-transform duration-200',
+              open && 'rotate-180'
+            )}
+          />
         </Button>
       </Popover.Trigger>
 
       <Popover.Portal>
         <Popover.Content
-          align={compact ? 'center' : 'start'}
-          sideOffset={6}
+          align={compact ? 'end' : 'start'}
+          side="bottom"
+          sideOffset={8}
+          collisionPadding={16}
           className="z-50 w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-surface p-3 shadow-2xl backdrop-blur-xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >

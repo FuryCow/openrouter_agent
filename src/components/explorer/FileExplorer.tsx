@@ -16,6 +16,7 @@ import { EmptyStateShell } from '@/components/ui/EmptyStateShell'
 import { loadFileForEditor } from '@/lib/loadFileForEditor'
 import { useFileStore } from '@/stores/fileStore'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { useAgentContextStore } from '@/stores/agentContextStore'
 import { useToastStore } from '@/stores/toastStore'
 import { getFileName, cn } from '@/lib/utils'
 import type { DirEntry } from '@/types'
@@ -146,6 +147,7 @@ interface NamePromptState {
 export function FileExplorer(): React.ReactElement {
   const { t } = useTranslation('explorer')
   const { t: tCommon } = useTranslation('common')
+  const { t: tChat } = useTranslation('chat')
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const setWorkingDirectory = useFileStore((s) => s.setWorkingDirectory)
   const openFile = useFileStore((s) => s.openFile)
@@ -300,6 +302,14 @@ export function FileExplorer(): React.ReactElement {
         label: tCommon('actions.open'),
         onClick: () => {
           void handleFileClick(entry.path)
+        }
+      })
+      items.push({
+        id: 'pin-context',
+        label: tChat('agentContext.pinInContext'),
+        onClick: () => {
+          useAgentContextStore.getState().pinPath(entry.path)
+          addToast(tChat('agentContext.pinInContext'), 'success')
         }
       })
     }

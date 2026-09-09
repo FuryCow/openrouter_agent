@@ -87,6 +87,66 @@ body {
   margin-left: 4px;
 }
 
+.monaco-editor .file-diff-deleted-gutter {
+  background-color: rgba(248, 113, 113, 0.75);
+  width: 3px !important;
+  margin-left: 4px;
+}
+
+.monaco-editor .file-diff-inline-add,
+.monaco-editor .file-diff-inline-add-line {
+  background-color: rgba(52, 211, 153, 0.22) !important;
+  border-radius: 2px;
+}
+
+.monaco-editor .file-diff-inline-del {
+  color: rgba(248, 113, 113, 0.95) !important;
+  background-color: rgba(248, 113, 113, 0.18) !important;
+  background-image: linear-gradient(
+    transparent calc(50% - 0.5px),
+    rgba(248, 113, 113, 0.72) calc(50% - 0.5px),
+    rgba(248, 113, 113, 0.72) calc(50% + 0.5px),
+    transparent calc(50% + 0.5px)
+  ) !important;
+  border-radius: 2px;
+}
+
+.monaco-editor .file-diff-viewzone-deleted {
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  padding-left: calc(var(--diff-content-left, 64px) - var(--diff-gutter-width, 52px));
+  font-family: var(--diff-font-family, 'JetBrains Mono', monospace);
+  font-size: var(--diff-font-size, 13px);
+  line-height: var(--diff-line-height, 19px);
+  background-color: rgba(248, 113, 113, 0.1);
+}
+
+.monaco-editor .file-diff-viewzone-marker {
+  flex: 0 0 var(--diff-gutter-width, 52px);
+  box-sizing: border-box;
+  padding-right: 0.35rem;
+  color: rgba(248, 113, 113, 0.9);
+  text-align: right;
+  user-select: none;
+}
+
+.monaco-editor .file-diff-viewzone-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: rgba(252, 165, 165, 0.95);
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background-image: linear-gradient(
+    transparent calc(50% - 0.5px),
+    rgba(248, 113, 113, 0.72) calc(50% - 0.5px),
+    rgba(248, 113, 113, 0.72) calc(50% + 0.5px),
+    transparent calc(50% + 0.5px)
+  );
+}
+
 .chat-markdown {
   word-break: break-word;
 }
