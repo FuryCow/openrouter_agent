@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   CheckCircle2,
   XCircle,
@@ -17,9 +18,14 @@ import type { TimelineItem, ToolCallInfo, AgentRunOutcome, ChatFileAttachment } 
 import { cn, getFileName } from '@/lib/utils'
 import { FileIcon } from '@/components/ui/FileIcon'
 import { resolveMessageTimeline, segmentTimeline, type TimelineToolItem } from '@/lib/timeline'
+import {
+  buildToolSummarySegments,
+  formatCompactToolSummaryLabel,
+  resolveToolFilePath,
+  type ToolSummarySegment
+} from '@/lib/toolGroupSummary'
 import { MarkdownContent } from './MarkdownContent'
 import { DiffView } from './DiffView'
-import { parseToolFilePath } from '@/lib/parseDiff'
 import { FilePathLink } from './FilePathLink'
 import { ToolCallDetailView } from './ToolCallDetailView'
 import { ChatImagePreview } from './ChatImagePreview'
@@ -65,14 +71,6 @@ function ExpandChevron({ expanded }: { expanded: boolean }): React.ReactElement 
       )}
     />
   )
-}
-
-function resolveToolFilePath(toolCall: ToolCallInfo): string | undefined {
-  if (toolCall.filePath) return toolCall.filePath
-  if (FILE_CHANGE_TOOLS.has(toolCall.name)) {
-    return parseToolFilePath(toolCall.name, toolCall.arguments)
-  }
-  return undefined
 }
 
 export const ToolCallCard = memo(function ToolCallCard({
@@ -367,6 +365,41 @@ function ToolRunGroup({
   )
 }
 
+function ToolSummarySegmentContent({
+  segment,
+  t
+}: {
+  segment: ToolSummarySegment
+  t: TFunction<'chat'>
+}): React.ReactElement {
+  if (segment.kind === 'compact') {
+    return (
+      <>
+        <ToolTypeIcon toolName={segment.toolName} className="h-3.5 w-3.5" />
+        <span className="text-zinc-400">
+          {formatCompactToolSummaryLabel(segment.toolName, segment.count, segment.filePath, t)}
+        </span>
+      </>
+    )
+  }
+
+  const filePath = resolveToolFilePath(segment.item.toolCall)
+  return (
+    <>
+      <ToolTypeIcon toolName={segment.item.toolCall.name} className="h-3.5 w-3.5" />
+      {filePath ? (
+        <FilePathLink
+          path={filePath}
+          fileDiff={segment.item.toolCall.fileDiff}
+          className="text-xs"
+        />
+      ) : (
+        <span className="text-zinc-400">{getToolDisplayLabel(segment.item.toolCall)}</span>
+      )}
+    </>
+  )
+}
+
 const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
   tools,
   expanded,
@@ -385,6 +418,7 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
     ? tools[0].toolCall.name
     : null
   const compactLabels = shouldCompactToolGroupLabels(tools)
+  const summarySegments = useMemo(() => buildToolSummarySegments(tools), [tools])
   const title =
     sharedToolName && sharedToolName !== 'preparing'
       ? sharedToolName
@@ -412,24 +446,12 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
         </div>
         {!compactLabels && (
           <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-relaxed">
-            {tools.map((item, index) => {
-              const filePath = resolveToolFilePath(item.toolCall)
-              return (
-                <span key={item.id} className="inline-flex items-center gap-1">
-                  {index > 0 && <span className="text-zinc-600">·</span>}
-                  <ToolTypeIcon toolName={item.toolCall.name} className="h-3.5 w-3.5" />
-                  {filePath ? (
-                    <FilePathLink
-                      path={filePath}
-                      fileDiff={item.toolCall.fileDiff}
-                      className="text-xs"
-                    />
-                  ) : (
-                    <span className="text-zinc-400">{getToolDisplayLabel(item.toolCall)}</span>
-                  )}
-                </span>
-              )
-            })}
+            {summarySegments.map((segment, index) => (
+              <span key={segment.key} className="inline-flex items-center gap-1">
+                {index > 0 && <span className="text-zinc-600">·</span>}
+                <ToolSummarySegmentContent segment={segment} t={t} />
+              </span>
+            ))}
           </div>
         )}
       </div>

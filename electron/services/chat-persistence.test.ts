@@ -51,4 +51,21 @@ describe('chat-persistence', () => {
     expect(loaded[0].id).toBe('legacy')
     expect(readFileSync(join(chatRoot, '_legacy', 'agent.json'), 'utf-8')).toContain('legacy')
   })
+
+  it('migrates legacy bucket chats into an empty workspace bucket', async () => {
+    const { loadChatMessages } = await import('./chat-persistence')
+    const chatRoot = join(globalThis.__chatUserData, 'chats')
+    const legacyBucketDir = join(chatRoot, '_legacy')
+    mkdirSync(legacyBucketDir, { recursive: true })
+    writeFileSync(
+      join(legacyBucketDir, 'agent.json'),
+      JSON.stringify([{ id: 'bucket', role: 'user', content: 'from bucket', mode: 'agent' }])
+    )
+
+    const workspace = join(tmpdir(), 'project-c')
+    const loaded = await loadChatMessages('agent', workspace)
+
+    expect(loaded).toHaveLength(1)
+    expect(loaded[0].id).toBe('bucket')
+  })
 })

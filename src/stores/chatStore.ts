@@ -22,7 +22,9 @@ import { useTokenUsageStore } from './tokenUsageStore'
 
 let streamBuffer = { text: '', reasoning: '' }
 const toolProgressBuffer = new Map<string, ToolCallInfo>()
-let flushRaf: number | null = null
+let flushTimer: ReturnType<typeof setTimeout> | null = null
+const STREAM_FLUSH_MS = 100
+const MAX_STREAMING_REASONING_CHARS = 250_000
 
 interface ChatState {
   chatMode: ChatMode
@@ -67,13 +69,16 @@ interface ChatState {
 function scheduleStreamFlush(
   set: (fn: (s: ChatState) => Partial<ChatState>) => void
 ): void {
-  if (flushRaf !== null) return
-  flushRaf = requestAnimationFrame(() => {
-    flushRaf = null
-    const { text, reasoning } = streamBuffer
+  if (flushTimer !== null) return
+  flushTimer = setTimeout(() => {
+    flushTimer = null
+    let { text, reasoning } = streamBuffer
     streamBuffer = { text: '', reasoning: '' }
     const pendingTools = [...toolProgressBuffer.values()]
     toolProgressBuffer.clear()
+    if (reasoning.length > MAX_STREAMING_REASONING_CHARS) {
+      reasoning = reasoning.slice(0, MAX_STREAMING_REASONING_CHARS)
+    }
     if (!text && !reasoning && pendingTools.length === 0) return
 
     set((s) => {
@@ -85,7 +90,7 @@ function scheduleStreamFlush(
       }
       return { activeTimeline: timeline }
     })
-  })
+  }, STREAM_FLUSH_MS)
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -139,14 +144,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   flushStreamBuffer: () => {
-    if (flushRaf !== null) {
-      cancelAnimationFrame(flushRaf)
-      flushRaf = null
+    if (flushTimer !== null) {
+      clearTimeout(flushTimer)
+      flushTimer = null
     }
-    const { text, reasoning } = streamBuffer
+    let { text, reasoning } = streamBuffer
     streamBuffer = { text: '', reasoning: '' }
     const pendingTools = [...toolProgressBuffer.values()]
     toolProgressBuffer.clear()
+    if (reasoning.length > MAX_STREAMING_REASONING_CHARS) {
+      reasoning = reasoning.slice(0, MAX_STREAMING_REASONING_CHARS)
+    }
     if (!text && !reasoning && pendingTools.length === 0) return
 
     set((s) => {
@@ -163,9 +171,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearStream: () => {
     streamBuffer = { text: '', reasoning: '' }
     toolProgressBuffer.clear()
-    if (flushRaf !== null) {
-      cancelAnimationFrame(flushRaf)
-      flushRaf = null
+    if (flushTimer !== null) {
+      clearTimeout(flushTimer)
+      flushTimer = null
     }
     set({ activeTimeline: [] })
   },

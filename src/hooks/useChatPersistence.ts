@@ -21,6 +21,7 @@ async function loadWorkspaceChats(workspace: string | null): Promise<ChatMessage
 export function useChatPersistence(): void {
   const { t } = useTranslation('chat')
   const hydrated = useSettingsStore((s) => s.hydrated)
+  const settingsWorkingDirectory = useSettingsStore((s) => s.settings.workingDirectory)
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const prevWorkspaceRef = useRef<string | null | undefined>(undefined)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -53,27 +54,35 @@ export function useChatPersistence(): void {
   useEffect(() => {
     if (!hydrated) return
 
+    const settingsWorkspace = settingsWorkingDirectory?.trim() || null
+    if (workingDirectory === null && settingsWorkspace !== null) {
+      return
+    }
+    const workspace = workingDirectory ?? settingsWorkspace
+
     const prev = prevWorkspaceRef.current
     if (prev === undefined) {
-      prevWorkspaceRef.current = workingDirectory
-      void loadWorkspace(workingDirectory, false).then(() => {
+      prevWorkspaceRef.current = workspace
+      void loadWorkspace(workspace, false).then(() => {
         initializedRef.current = true
       })
       return
     }
 
-    if (prev === workingDirectory) return
+    if (prev === workspace) return
 
     void (async () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current)
         saveTimerRef.current = null
       }
-      await flushSave(prev)
-      prevWorkspaceRef.current = workingDirectory
-      await loadWorkspace(workingDirectory, true)
+      if (initializedRef.current) {
+        await flushSave(prev)
+      }
+      prevWorkspaceRef.current = workspace
+      await loadWorkspace(workspace, true)
     })()
-  }, [hydrated, workingDirectory, flushSave, loadWorkspace])
+  }, [hydrated, workingDirectory, settingsWorkingDirectory, flushSave, loadWorkspace])
 
   useEffect(() => {
     if (!hydrated) return

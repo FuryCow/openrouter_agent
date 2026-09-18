@@ -39,7 +39,7 @@ export function AgentRunPanel(): React.ReactElement | null {
     [runStatus, checklist, t]
   )
 
-  const showChecklist = Boolean(checklist && checklist.length > 0)
+  const showChecklist = Array.isArray(checklist) && checklist.length > 0
   const showPanel =
     chatMode === 'agent' &&
     (isStreaming || showChecklist || statusLine || lastTerminalOutput)

@@ -3,7 +3,7 @@ import type { AgentRunStatus, TaskChecklistStepState } from '@/types'
 export function getActiveChecklistStep(
   steps: TaskChecklistStepState[] | null | undefined
 ): { index: number; step: TaskChecklistStepState } | null {
-  if (!steps || steps.length === 0) return null
+  if (!Array.isArray(steps) || steps.length === 0) return null
 
   const inProgressIndex = steps.findIndex((step) => step.status === 'in_progress')
   if (inProgressIndex >= 0) {

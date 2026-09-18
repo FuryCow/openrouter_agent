@@ -26,7 +26,7 @@ import { CommandPalette } from './components/layout/CommandPalette'
 import { ShortcutsModal } from './components/layout/ShortcutsModal'
 import { useUiStore } from './stores/uiStore'
 import { useTerminalStore } from './stores/terminalStore'
-import { isImagePath } from './lib/utils'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 
 function ResizeHandle({ direction }: { direction: 'horizontal' | 'vertical' }): React.ReactElement {
   return (
@@ -163,7 +163,9 @@ export default function App(): React.ReactElement {
 
           <Panel defaultSize={30} minSize={20} maxSize={45} className="min-h-0">
             <div className="h-full min-h-0 overflow-hidden">
-              <ChatPanel />
+              <ErrorBoundary>
+                <ChatPanel />
+              </ErrorBoundary>
             </div>
           </Panel>
         </PanelGroup>

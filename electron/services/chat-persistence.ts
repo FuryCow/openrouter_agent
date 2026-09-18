@@ -57,6 +57,36 @@ async function migrateLegacyGlobalChats(workspacePath: string): Promise<void> {
   }
 }
 
+async function migrateLegacyBucketChats(workspacePath: string): Promise<void> {
+  const targetDir = workspaceChatDir(workspacePath)
+  await mkdir(targetDir, { recursive: true })
+
+  for (const mode of MODES) {
+    const target = join(targetDir, `${mode}.json`)
+    if (await fileExists(target)) {
+      try {
+        const existingRaw = await readFile(target, 'utf-8')
+        const existing = JSON.parse(existingRaw) as unknown
+        if (Array.isArray(existing) && existing.length > 0) continue
+      } catch {
+        // Fall through and try legacy bucket migration.
+      }
+    }
+
+    const legacyBucket = join(chatRoot(), LEGACY_BUCKET, `${mode}.json`)
+    if (!(await fileExists(legacyBucket))) continue
+
+    try {
+      const raw = await readFile(legacyBucket, 'utf-8')
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed) || parsed.length === 0) continue
+      await writeFile(target, raw, 'utf-8')
+    } catch {
+      // Ignore invalid legacy bucket files.
+    }
+  }
+}
+
 export async function loadChatMessages(
   mode: ChatMode,
   workspacePath?: string | null
@@ -64,6 +94,7 @@ export async function loadChatMessages(
   const workspace = workspacePath?.trim() || null
   if (workspace) {
     await migrateLegacyGlobalChats(workspace)
+    await migrateLegacyBucketChats(workspace)
   }
 
   try {

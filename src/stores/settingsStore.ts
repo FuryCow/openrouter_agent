@@ -90,8 +90,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       const settings = await window.api.settings.get()
       await setAppLocale(settings.locale ?? 'en')
-      set({ settings, hydrated: true })
       useFileStore.getState().setWorkingDirectory(settings.workingDirectory || null)
+      set({ settings, hydrated: true })
       await get().loadModels()
     } catch {
       set({ hydrated: true })

@@ -27,7 +27,8 @@ export const useAgentRunStore = create<AgentRunState>((set) => ({
   setRunStatus: (runStatus) => set({ runStatus }),
   setCheckpoint: (checkpoint) => set({ checkpoint }),
   clearCheckpoint: () => set({ checkpoint: null, changesPanelDismissed: false }),
-  setChecklist: (checklist) => set({ checklist }),
+  setChecklist: (checklist) =>
+    set({ checklist: Array.isArray(checklist) ? checklist : null }),
   setLastTerminalOutput: (lastTerminalOutput) => set({ lastTerminalOutput }),
   dismissChangesPanel: () => set({ changesPanelDismissed: true }),
   showChangesPanel: () => set({ changesPanelDismissed: false }),

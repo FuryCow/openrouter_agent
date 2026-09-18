@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut } from 'electron'
 import { join, dirname } from 'path'
 import { existsSync, readFileSync } from 'fs'
 import Store from 'electron-store'
@@ -61,6 +61,7 @@ const store = new Store<{ settings: AppSettings }>({
 })
 
 let mainWindow: BrowserWindow | null = null
+let rendererAlive = true
 let closeConfirmed = false
 let closeFlushTimer: ReturnType<typeof setTimeout> | null = null
 const codebaseIndexer = new CodebaseIndexer()
@@ -142,6 +143,25 @@ function createWindow(): void {
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
+  mainWindow.webContents.on('render-process-gone', () => {
+    rendererAlive = false
+    agentService.abort()
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    mainWindow.webContents.reload()
+  })
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    rendererAlive = true
+  })
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    if (!input.control && !input.meta) return
+    if (!input.shift || input.key.toLowerCase() !== 'i') return
+    event.preventDefault()
+    mainWindow?.webContents.toggleDevTools()
+  })
+
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -154,12 +174,23 @@ function getWindow(): BrowserWindow {
   return mainWindow
 }
 
+function canSendToRenderer(): boolean {
+  if (!rendererAlive) return false
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  const contents = mainWindow.webContents
+  if (contents.isDestroyed() || contents.isCrashed()) return false
+  return true
+}
+
 function sendToRenderer(channel: string, ...args: unknown[]): void {
-  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (!canSendToRenderer()) {
+    if (agentService.isRunning) agentService.abort()
+    return
+  }
   try {
-    mainWindow.webContents.send(channel, ...args)
+    mainWindow!.webContents.send(channel, ...args)
   } catch {
-    // Window was destroyed during shutdown
+    if (agentService.isRunning) agentService.abort()
   }
 }
 
@@ -632,6 +663,12 @@ app.whenReady().then(() => {
 
   registerIpc()
   createWindow()
+
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    mainWindow.webContents.toggleDevTools()
+  })
+
   applyIndexSettings(settings)
   void mcpManager.initialize().catch((err) => {
     console.error('[MCP] Failed to initialize:', err)
@@ -659,5 +696,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  globalShortcut.unregisterAll()
   shutdownApp()
 })

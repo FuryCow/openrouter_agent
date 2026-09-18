@@ -34,9 +34,18 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   activeTabId: null,
 
   ensureInitialTab: (cwd) => {
-    if (get().tabs.length > 0) return
-    const tab = buildTab(cwd)
-    set({ tabs: [tab], activeTabId: tab.id })
+    const state = get()
+    if (state.tabs.length === 0) {
+      const tab = buildTab(cwd)
+      set({ tabs: [tab], activeTabId: tab.id })
+      return
+    }
+
+    // Initial tab may have been created before workspace settings loaded (cwd was null).
+    if (state.tabs.length === 1 && state.tabs[0].cwd === null && cwd !== null) {
+      const tab = state.tabs[0]
+      set({ tabs: [{ ...tab, cwd }], activeTabId: tab.id })
+    }
   },
 
   addTab: (cwd) => {

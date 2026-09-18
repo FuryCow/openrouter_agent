@@ -14,6 +14,7 @@ export function TerminalPanel(): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const handlesRef = useRef<Map<string, TerminalTabHandle>>(new Map())
   const workingDirectory = useFileStore((s) => s.workingDirectory)
+  const hydrated = useSettingsStore((s) => s.hydrated)
   const terminalOpen = useSettingsStore((s) => s.terminalOpen)
   const setTerminalOpen = useSettingsStore((s) => s.setTerminalOpen)
   const tabs = useTerminalStore((s) => s.tabs)
@@ -25,10 +26,9 @@ export function TerminalPanel(): React.ReactElement {
   const renameFromFirstCommand = useTerminalStore((s) => s.renameFromFirstCommand)
 
   useEffect(() => {
-    if (terminalOpen) {
-      ensureInitialTab(workingDirectory)
-    }
-  }, [terminalOpen, workingDirectory, ensureInitialTab])
+    if (!terminalOpen || !hydrated) return
+    ensureInitialTab(workingDirectory)
+  }, [terminalOpen, hydrated, workingDirectory, ensureInitialTab])
 
   const fitActiveTerminal = useCallback((): void => {
     if (!activeTabId) return

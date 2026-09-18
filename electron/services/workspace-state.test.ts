@@ -20,5 +20,6 @@ describe('getWorkspaceState', () => {
     const state = getWorkspaceState(dir)
     expect(state.isGitRepo).toBe(true)
     expect(state.formatted).toContain('Branch:')
+    expect(state.lastCommit).toBeUndefined()
   })
 })

@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.5] — 2026-09-18
+
+### Stability & resilience
+
+- **Error boundary:** Chat panel wrapped in `ErrorBoundary` so a render crash does not blank the whole app.
+- **Renderer recovery:** Main process reloads the window on `render-process-gone` and aborts in-flight agent runs when IPC to the renderer is unsafe.
+- **DevTools:** `Ctrl+Shift+I` / `Cmd+Shift+I` toggles DevTools from the main process.
+
+### Chat & persistence
+
+- **Workspace hydration:** Chat and terminal wait for settings hydration before loading workspace-scoped state; fixes empty chat on startup.
+- **Legacy migration:** Workspace buckets now inherit chats from the `_legacy` bucket when empty.
+- **Streaming:** Stream flush uses a 100ms timer instead of `requestAnimationFrame`; caps reasoning text at 250k chars during streaming.
+
+### Tool UI
+
+- **Compact summaries:** Repeated tool calls on the same file collapse into labels like `Write · foo.ts × 5` in message headers.
+
+### Terminal & git context
+
+- **Terminal fit:** `safeFit` guards xterm `fit()` against zero-size or disposed viewports.
+- **Initial tab cwd:** First terminal tab picks up the workspace directory once settings load.
+- **Empty git repos:** Workspace state handles repos with no commits yet (branch without `HEAD`).
+
+### Tests
+
+- Added coverage for terminal store cwd hydration, tool group summaries, and legacy bucket chat migration.
+
+---
+
 ## [0.9.4] — 2026-09-09
 
 ### Agent UX & review

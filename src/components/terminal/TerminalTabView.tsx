@@ -46,6 +46,16 @@ function createTerminal(): { term: Terminal; fitAddon: FitAddon } {
   return { term, fitAddon }
 }
 
+function safeFit(fitAddon: FitAddon | null, container: HTMLElement | null | undefined): void {
+  if (!fitAddon || !container) return
+  if (container.clientWidth <= 0 || container.clientHeight <= 0) return
+  try {
+    fitAddon.fit()
+  } catch {
+    // xterm throws when the viewport has zero size or was disposed
+  }
+}
+
 export function TerminalTabView({
   tabId,
   cwd,
@@ -96,7 +106,7 @@ export function TerminalTabView({
       })
 
       if (isActive) {
-        fitAddon.fit()
+        safeFit(fitAddon, container)
       }
     }
 
@@ -115,7 +125,7 @@ export function TerminalTabView({
 
   useEffect(() => {
     if (!isActive) return
-    fitAddonRef.current?.fit()
+    safeFit(fitAddonRef.current, containerRef.current)
   }, [isActive])
 
   return (

@@ -19,11 +19,24 @@ function runGit(cwd: string, args: string[]): string | null {
       cwd,
       encoding: 'utf8',
       timeout: GIT_TIMEOUT_MS,
-      windowsHide: true
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore']
     }).trim()
   } catch {
     return null
   }
+}
+
+function isGitRepository(workspacePath: string): boolean {
+  if (runGit(workspacePath, ['rev-parse', '--is-inside-work-tree']) === 'true') {
+    return true
+  }
+  const gitDir = join(workspacePath, '.git')
+  return existsSync(gitDir)
+}
+
+function hasGitCommits(workspacePath: string): boolean {
+  return runGit(workspacePath, ['rev-parse', '--verify', 'HEAD']) !== null
 }
 
 function formatWorkspaceState(snapshot: Omit<WorkspaceStateSnapshot, 'formatted'>): string {
@@ -35,6 +48,8 @@ function formatWorkspaceState(snapshot: Omit<WorkspaceStateSnapshot, 'formatted'
   lines.push(`Branch: ${snapshot.branch ?? 'unknown'}`)
   if (snapshot.lastCommit) {
     lines.push(`Last commit: ${snapshot.lastCommit}`)
+  } else if (!snapshot.lastCommit && snapshot.branch) {
+    lines.push('Last commit: none yet (empty repository)')
   }
   if (snapshot.dirtyFiles.length === 0) {
     lines.push('Working tree: clean')
@@ -57,20 +72,23 @@ export function getWorkspaceState(workspacePath: string): WorkspaceStateSnapshot
     }
   }
 
-  const gitDir = join(workspacePath, '.git')
-  const isGitRepo = existsSync(gitDir) || existsSync(join(workspacePath, '.git', 'HEAD'))
-
-  if (!isGitRepo) {
+  if (!isGitRepository(workspacePath)) {
     const snapshot = { isGitRepo: false, dirtyFiles: [] as string[] }
     return { ...snapshot, formatted: formatWorkspaceState(snapshot) }
   }
 
-  const branch =
-    runGit(workspacePath, ['rev-parse', '--abbrev-ref', 'HEAD']) ??
-    runGit(workspacePath, ['branch', '--show-current']) ??
-    undefined
+  const hasCommits = hasGitCommits(workspacePath)
+  const branch = hasCommits
+    ? (runGit(workspacePath, ['rev-parse', '--abbrev-ref', 'HEAD']) ??
+      runGit(workspacePath, ['branch', '--show-current']) ??
+      undefined)
+    : (runGit(workspacePath, ['symbolic-ref', '--short', 'HEAD']) ??
+      runGit(workspacePath, ['branch', '--show-current']) ??
+      undefined)
 
-  const lastCommit = runGit(workspacePath, ['log', '-1', '--oneline']) ?? undefined
+  const lastCommit = hasCommits
+    ? (runGit(workspacePath, ['log', '-1', '--oneline']) ?? undefined)
+    : undefined
 
   const statusRaw = runGit(workspacePath, ['status', '--porcelain'])
   const dirtyFiles: string[] = []
