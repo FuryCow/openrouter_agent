@@ -7,6 +7,7 @@ import {
   buildUserMessageWithAttachments,
   formatAttachedFilesForSystemPrompt
 } from '../lib/attached-files'
+import { isEligibleAgentHistoryMessage } from '../lib/chat-history'
 
 const READ_ONLY_TOOL_NAMES = new Set([
   'read_file',
@@ -52,16 +53,7 @@ export function filterHistoryForApi(history: ChatMessage[], mode: ChatMode): Cha
   return history
     .filter((m) => {
       if (m.mode && m.mode !== mode) return false
-      if (m.role !== 'user' && m.role !== 'assistant') return false
-      if (m.isError) return false
-      if (!m.content?.trim()) return false
-      if (
-        m.role === 'assistant' &&
-        (m.content.startsWith('Error:') || m.content.startsWith('⚠️'))
-      ) {
-        return false
-      }
-      return true
+      return isEligibleAgentHistoryMessage(m)
     })
     .slice(-30)
 }

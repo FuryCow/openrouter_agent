@@ -10,6 +10,7 @@ import { buildAgentContextFiles, buildAgentOpenFilesPayload } from '../lib/agent
 import { isImagePath } from '../lib/utils'
 import { getChatModeConfig } from '../lib/chatModes'
 import { getT } from '../i18n/t'
+import { isEligibleAgentHistoryMessage } from '../../electron/lib/chat-history'
 
 function buildImplementPlanPrompt(planContent: string, originalTask?: string): string {
   const t = getT('chat')
@@ -84,10 +85,7 @@ export function useAgent(): {
       const history = useChatStore
         .getState()
         .messages.filter(
-          (m) =>
-            (m.mode === mode || !m.mode) &&
-            m.role !== 'tool' &&
-            !m.isError
+          (m) => (m.mode === mode || !m.mode) && isEligibleAgentHistoryMessage(m)
         )
         .slice(0, -1)
 
@@ -131,17 +129,8 @@ export function useAgent(): {
   }
 
   const abort = (): void => {
+    if (!useChatStore.getState().isStreaming) return
     window.api.agent.abort()
-    const tChat = getT('chat')
-    const { setStreaming, finalizeAssistantMessage, activeTimeline } = useChatStore.getState()
-    setStreaming(false)
-    finalizeAssistantMessage(
-      tChat('agent.aborted'),
-      activeTimeline.length > 0 ? [...activeTimeline] : undefined,
-      true,
-      undefined,
-      true
-    )
   }
 
   const retryLast = async (): Promise<void> => {

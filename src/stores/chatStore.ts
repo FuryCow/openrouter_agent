@@ -215,7 +215,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ? content.trim() || 'Request failed'
       : legacy.content || content.trim()
 
-    if (!finalContent && finalTimeline.length === 0 && !isError) return
+    if (!finalContent && finalTimeline.length === 0 && !isError && !apiMessages?.length && !interrupted) {
+      return
+    }
 
     if (isError && finalContent) {
       const hasErrorText = finalTimeline.some(

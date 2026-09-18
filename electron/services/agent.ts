@@ -568,13 +568,15 @@ export class AgentService {
       timeline: TimelineItem[]
     ): Promise<void> => {
       const run = await finishRun(status, iterations, error)
-      const errorNote = `⚠️ ${error}`
+      const interrupted = status === 'aborted' || status === 'max_iterations'
       const timelineCopy = [...timeline]
-      timelineCopy.push({
-        id: `error-${Date.now()}`,
-        type: 'text',
-        content: errorNote
-      })
+      if (!interrupted) {
+        timelineCopy.push({
+          id: `error-${Date.now()}`,
+          type: 'text',
+          content: `⚠️ ${error}`
+        })
+      }
       const apiMessages: ApiChatMessage[] = messages
         .slice(runApiStartIndex)
         .map((m) => ({
@@ -590,11 +592,11 @@ export class AgentService {
         message: {
           id: `msg-${Date.now()}`,
           role: 'assistant',
-          content: errorNote,
-          timeline: timelineCopy,
-          apiMessages,
-          interrupted: true,
-          isError: true,
+          content: interrupted ? '' : `⚠️ ${error}`,
+          timeline: timelineCopy.length > 0 ? timelineCopy : undefined,
+          apiMessages: apiMessages.length > 0 ? apiMessages : undefined,
+          interrupted,
+          isError: !interrupted,
           runAnalytics: run,
           runOutcome: status
         }
@@ -765,15 +767,12 @@ export class AgentService {
       }
 
       if (!analyticsClosed && signal.aborted) {
-        await finishRun('aborted', iterations)
         this.emitRunStatus(emit, 'aborted')
         if (this.runCheckpoint.hasChanges()) {
           this.lastCheckpoint = this.runCheckpoint
           this.emitCheckpointUpdated(emit)
         }
-        if (timeline.length > 0) {
-          await emitInterrupted('Run aborted.', 'aborted', timeline)
-        }
+        await emitInterrupted('Run aborted.', 'aborted', timeline)
       }
 
       if (!analyticsClosed && Number.isFinite(maxIterations) && iterations >= maxIterations) {
@@ -804,15 +803,12 @@ export class AgentService {
           })
         }
       } else if (!analyticsClosed) {
-        await finishRun('aborted', iterations)
         this.emitRunStatus(emit, 'aborted')
         if (this.runCheckpoint.hasChanges()) {
           this.lastCheckpoint = this.runCheckpoint
           this.emitCheckpointUpdated(emit)
         }
-        if (timeline.length > 0) {
-          await emitInterrupted('Run aborted.', 'aborted', timeline)
-        }
+        await emitInterrupted('Run aborted.', 'aborted', timeline)
       }
     } finally {
       this.running = false

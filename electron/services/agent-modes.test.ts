@@ -37,6 +37,32 @@ describe('agent-modes history', () => {
     expect(filterHistoryForApi(history, 'agent')).toHaveLength(1)
   })
 
+  it('keeps interrupted runs with apiMessages in history', () => {
+    const history: ChatMessage[] = [
+      { id: '1', role: 'user', content: 'fix tests' },
+      {
+        id: '2',
+        role: 'assistant',
+        content: '',
+        interrupted: true,
+        runOutcome: 'aborted',
+        apiMessages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              { id: 'c1', type: 'function', function: { name: 'read_file', arguments: '{}' } }
+            ]
+          },
+          { role: 'tool', content: 'file', tool_call_id: 'c1', name: 'read_file' }
+        ]
+      }
+    ]
+    const filtered = filterHistoryForApi(history, 'agent')
+    expect(filtered).toHaveLength(2)
+    expect(expandHistoryForApi(filtered, 'agent')).toHaveLength(3)
+  })
+
   it('expands apiMessages when present', () => {
     const history: ChatMessage[] = [
       {
