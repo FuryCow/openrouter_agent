@@ -608,13 +608,15 @@ export class AgentService {
         iterations++
         if (signal.aborted) break
 
-        const iterationsRemaining = maxIterations - iterations
-        if (shouldEmitIterationWarning(iterationsRemaining)) {
-          emit({
-            type: 'iteration_warning',
-            iterationsRemaining,
-            error: `Only ${iterationsRemaining} tool step(s) remaining before the run limit.`
-          })
+        if (Number.isFinite(maxIterations)) {
+          const iterationsRemaining = maxIterations - iterations
+          if (shouldEmitIterationWarning(iterationsRemaining)) {
+            emit({
+              type: 'iteration_warning',
+              iterationsRemaining,
+              error: `Only ${iterationsRemaining} tool step(s) remaining before the run limit.`
+            })
+          }
         }
 
         let streamedContent = ''
@@ -774,7 +776,7 @@ export class AgentService {
         }
       }
 
-      if (!analyticsClosed && iterations >= maxIterations) {
+      if (!analyticsClosed && Number.isFinite(maxIterations) && iterations >= maxIterations) {
         const error = `Agent reached the maximum number of tool steps (${maxIterations}).`
         this.emitRunStatus(emit, 'max_iterations')
         if (this.runCheckpoint.hasChanges()) {

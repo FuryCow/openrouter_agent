@@ -57,7 +57,7 @@ describe('agent-modes history', () => {
 
 describe('agent-modes limits and tools', () => {
   it('uses raised iteration limits', () => {
-    expect(getMaxIterations('agent')).toBe(50)
+    expect(getMaxIterations('agent')).toBe(Number.POSITIVE_INFINITY)
     expect(getMaxIterations('planner')).toBe(25)
     expect(getMaxIterations('ask')).toBe(1)
   })

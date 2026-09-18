@@ -40,7 +40,7 @@ export function getMaxIterations(mode: ChatMode): number {
       return 25
     case 'agent':
     default:
-      return 50
+      return Number.POSITIVE_INFINITY
   }
 }
 
