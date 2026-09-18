@@ -10,7 +10,10 @@ import { buildAgentContextFiles, buildAgentOpenFilesPayload } from '../lib/agent
 import { isImagePath } from '../lib/utils'
 import { getChatModeConfig } from '../lib/chatModes'
 import { getT } from '../i18n/t'
-import { isEligibleAgentHistoryMessage } from '../../electron/lib/chat-history'
+import {
+  isEligibleAgentHistoryMessage,
+  stripStaleInterruptedApiContext
+} from '../../electron/lib/chat-history'
 
 function buildImplementPlanPrompt(planContent: string, originalTask?: string): string {
   const t = getT('chat')
@@ -63,6 +66,10 @@ export function useAgent(): {
       useToastStore.getState().addToast(tErrors('agent.noWorkspace'), 'error')
       return
     }
+
+    useChatStore.setState({
+      messages: stripStaleInterruptedApiContext(useChatStore.getState().messages)
+    })
 
     if (!options?.skipUserMessage) {
       addUserMessage(message, mode, options?.images, options?.attachedFiles)

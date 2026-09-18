@@ -37,7 +37,7 @@ describe('agent-modes history', () => {
     expect(filterHistoryForApi(history, 'agent')).toHaveLength(1)
   })
 
-  it('keeps interrupted runs with apiMessages in history', () => {
+  it('keeps interrupted tool context without duplicating the user prompt', () => {
     const history: ChatMessage[] = [
       { id: '1', role: 'user', content: 'fix tests' },
       {
@@ -60,7 +60,9 @@ describe('agent-modes history', () => {
     ]
     const filtered = filterHistoryForApi(history, 'agent')
     expect(filtered).toHaveLength(2)
-    expect(expandHistoryForApi(filtered, 'agent')).toHaveLength(3)
+    const expanded = expandHistoryForApi(filtered, 'agent')
+    expect(expanded).toHaveLength(3)
+    expect(expanded.filter((message) => message.role === 'user')).toHaveLength(1)
   })
 
   it('expands apiMessages when present', () => {

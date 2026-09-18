@@ -18,6 +18,7 @@ import {
 } from './workspace-safety'
 import { AppError, AppErrorCode, getAppErrorPayload } from '../lib/app-errors'
 import { shouldEmitIterationWarning } from '../lib/agent-run-guards'
+import { retainToolApiMessagesOnly } from '../lib/chat-history'
 import {
   buildSystemPrompt,
   getMaxIterations,
@@ -577,15 +578,15 @@ export class AgentService {
           content: `⚠️ ${error}`
         })
       }
-      const apiMessages: ApiChatMessage[] = messages
-        .slice(runApiStartIndex)
-        .map((m) => ({
+      const apiMessages = retainToolApiMessagesOnly(
+        messages.slice(runApiStartIndex).map((m) => ({
           role: m.role as ApiChatMessage['role'],
           content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
           tool_calls: m.tool_calls,
           tool_call_id: m.tool_call_id,
           name: m.name
         }))
+      )
 
       emit({
         type: 'done',

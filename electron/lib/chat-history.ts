@@ -1,7 +1,22 @@
-import type { ChatMessage } from '../types'
+import type { ApiChatMessage, ChatMessage } from '../types'
+
+export function retainToolApiMessagesOnly(apiMessages: ApiChatMessage[]): ApiChatMessage[] {
+  return apiMessages.filter((message) => message.role === 'assistant' || message.role === 'tool')
+}
 
 export function hasRetainedApiContext(message: ChatMessage): boolean {
   return Boolean(message.apiMessages && message.apiMessages.length > 0 && message.interrupted)
+}
+
+/** Drop tool context from older interrupted runs; keep only on the latest chat message. */
+export function stripStaleInterruptedApiContext(messages: ChatMessage[]): ChatMessage[] {
+  const lastIdx = messages.length - 1
+  return messages.map((message, index) => {
+    if (!message.interrupted || !message.apiMessages?.length || index === lastIdx) {
+      return message
+    }
+    return { ...message, apiMessages: undefined }
+  })
 }
 
 export function isEligibleAgentHistoryMessage(message: ChatMessage): boolean {
