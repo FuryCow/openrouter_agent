@@ -57,22 +57,32 @@ async function migrateLegacyGlobalChats(workspacePath: string): Promise<void> {
   }
 }
 
-async function migrateLegacyBucketChats(workspacePath: string): Promise<void> {
+async function workspaceBucketIsEmpty(workspacePath: string): Promise<boolean> {
+  for (const mode of MODES) {
+    const target = join(workspaceChatDir(workspacePath), `${mode}.json`)
+    if (!(await fileExists(target))) continue
+    try {
+      const existingRaw = await readFile(target, 'utf-8')
+      const existing = JSON.parse(existingRaw) as unknown
+      if (Array.isArray(existing) && existing.length > 0) return false
+    } catch {
+      return false
+    }
+  }
+  return true
+}
+
+/** ponytail: _legacy is global — import once, never copy into every empty workspace */
+async function migrateLegacyBucketOnce(workspacePath: string): Promise<void> {
+  const markerPath = join(chatRoot(), LEGACY_BUCKET, '.migrated-to')
+  if (await fileExists(markerPath)) return
+  if (!(await workspaceBucketIsEmpty(workspacePath))) return
+
   const targetDir = workspaceChatDir(workspacePath)
   await mkdir(targetDir, { recursive: true })
 
+  let imported = false
   for (const mode of MODES) {
-    const target = join(targetDir, `${mode}.json`)
-    if (await fileExists(target)) {
-      try {
-        const existingRaw = await readFile(target, 'utf-8')
-        const existing = JSON.parse(existingRaw) as unknown
-        if (Array.isArray(existing) && existing.length > 0) continue
-      } catch {
-        // Fall through and try legacy bucket migration.
-      }
-    }
-
     const legacyBucket = join(chatRoot(), LEGACY_BUCKET, `${mode}.json`)
     if (!(await fileExists(legacyBucket))) continue
 
@@ -80,10 +90,15 @@ async function migrateLegacyBucketChats(workspacePath: string): Promise<void> {
       const raw = await readFile(legacyBucket, 'utf-8')
       const parsed = JSON.parse(raw) as unknown
       if (!Array.isArray(parsed) || parsed.length === 0) continue
-      await writeFile(target, raw, 'utf-8')
+      await writeFile(join(targetDir, `${mode}.json`), raw, 'utf-8')
+      imported = true
     } catch {
       // Ignore invalid legacy bucket files.
     }
+  }
+
+  if (imported) {
+    await writeFile(markerPath, hashWorkspacePath(workspacePath), 'utf-8')
   }
 }
 
@@ -94,7 +109,7 @@ export async function loadChatMessages(
   const workspace = workspacePath?.trim() || null
   if (workspace) {
     await migrateLegacyGlobalChats(workspace)
-    await migrateLegacyBucketChats(workspace)
+    await migrateLegacyBucketOnce(workspace)
   }
 
   try {

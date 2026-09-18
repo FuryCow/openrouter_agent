@@ -52,7 +52,7 @@ describe('chat-persistence', () => {
     expect(readFileSync(join(chatRoot, '_legacy', 'agent.json'), 'utf-8')).toContain('legacy')
   })
 
-  it('migrates legacy bucket chats into an empty workspace bucket', async () => {
+  it('migrates legacy bucket chats only into the first empty workspace', async () => {
     const { loadChatMessages } = await import('./chat-persistence')
     const chatRoot = join(globalThis.__chatUserData, 'chats')
     const legacyBucketDir = join(chatRoot, '_legacy')
@@ -62,10 +62,14 @@ describe('chat-persistence', () => {
       JSON.stringify([{ id: 'bucket', role: 'user', content: 'from bucket', mode: 'agent' }])
     )
 
-    const workspace = join(tmpdir(), 'project-c')
-    const loaded = await loadChatMessages('agent', workspace)
+    const workspaceA = join(tmpdir(), 'project-c')
+    const workspaceB = join(tmpdir(), 'project-d')
+    const loadedA = await loadChatMessages('agent', workspaceA)
+    const loadedB = await loadChatMessages('agent', workspaceB)
 
-    expect(loaded).toHaveLength(1)
-    expect(loaded[0].id).toBe('bucket')
+    expect(loadedA).toHaveLength(1)
+    expect(loadedA[0].id).toBe('bucket')
+    expect(loadedB).toHaveLength(0)
+    expect(readFileSync(join(legacyBucketDir, '.migrated-to'), 'utf-8').length).toBeGreaterThan(0)
   })
 })

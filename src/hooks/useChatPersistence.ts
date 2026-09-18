@@ -13,6 +13,16 @@ import {
 
 const SAVE_DEBOUNCE_MS = 400
 
+function currentPersistenceWorkspace(): string | null | undefined {
+  const hydrated = useSettingsStore.getState().hydrated
+  if (!hydrated) return undefined
+  return resolvePersistenceWorkspace(
+    hydrated,
+    useFileStore.getState().workingDirectory,
+    useSettingsStore.getState().settings.workingDirectory
+  )
+}
+
 async function loadWorkspaceChats(workspace: string | null): Promise<ChatMessage[]> {
   const allMessages: ChatMessage[] = []
   for (const mode of CHAT_PERSISTENCE_MODES) {
@@ -94,7 +104,8 @@ export function useChatPersistence(): void {
 
     const unsubscribe = useChatStore.subscribe(() => {
       if (!initializedRef.current) return
-      const workspace = useFileStore.getState().workingDirectory
+      const workspace = currentPersistenceWorkspace()
+      if (workspace === undefined) return
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
         void flushSave(workspace)
@@ -116,7 +127,9 @@ export function useChatPersistence(): void {
         clearTimeout(saveTimerRef.current)
         saveTimerRef.current = null
       }
-      await flushSave(useFileStore.getState().workingDirectory)
+      const workspace = currentPersistenceWorkspace()
+      if (workspace === undefined) return
+      await flushSave(workspace)
     }
 
     const onVisibility = (): void => {
