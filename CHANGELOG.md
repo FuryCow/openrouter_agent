@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.1] — 2026-09-18
+
+First alpha after full stability audit. AI SDK migration is **not** included.
+
+### Stability audit
+
+- **Error boundaries:** Explorer, editor, and terminal panels wrapped in `ErrorBoundary` (chat already protected).
+- **Workspace hydration:** Shared `resolveWorkspacePath` / `resolvePersistenceWorkspace` guards for chat and terminal startup races.
+- **Main process:** `unhandledRejection` handler aborts in-flight agent runs instead of failing silently.
+- **Ctrl+S fix:** Restored missing `isImagePath` import in `App.tsx`.
+
+### Test coverage (+28 tests)
+
+- `chatStore` streaming flush, reasoning cap, tool buffer
+- OpenRouter SSE parser (`openrouter-sse`), API error formatting, retry guards
+- Settings hydration order, persistence workspace resolution
+- `agentRunStore` checklist guards, terminal service lifecycle
+- HTTP network errors, model sort, debounced path collector
+
+### CI
+
+- `npm run build` added to PR/push CI workflow.
+
+### Docs
+
+- `docs/audit-1.0a-checklist.md` — module matrix and manual QA tracker
+- `docs/audit-1.0a-bugs.md` — audit bug log (0 open P0/P1)
+
+---
+
 ## [0.9.5] — 2026-09-18
 
 ### Stability & resilience

@@ -1,6 +1,6 @@
 import { net } from 'electron'
 
-function formatNetworkError(error: unknown): Error {
+export function formatNetworkError(error: unknown): Error {
   if (error instanceof Error) {
     const cause = error.cause as (Error & { code?: string }) | undefined
     const parts: string[] = []

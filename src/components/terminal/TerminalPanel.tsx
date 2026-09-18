@@ -5,6 +5,7 @@ import { useFileStore } from '@/stores/fileStore'
 import { useTerminalStore } from '@/stores/terminalStore'
 import { Button } from '../ui/button'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { resolveWorkspacePath } from '@/lib/workspaceReady'
 import { scheduleInAnimationFrame } from '@/lib/animation-frame'
 import { cn } from '@/lib/utils'
 import { TerminalTabView, type TerminalTabHandle } from './TerminalTabView'
@@ -15,6 +16,7 @@ export function TerminalPanel(): React.ReactElement {
   const handlesRef = useRef<Map<string, TerminalTabHandle>>(new Map())
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const hydrated = useSettingsStore((s) => s.hydrated)
+  const settingsWorkingDirectory = useSettingsStore((s) => s.settings.workingDirectory)
   const terminalOpen = useSettingsStore((s) => s.terminalOpen)
   const setTerminalOpen = useSettingsStore((s) => s.setTerminalOpen)
   const tabs = useTerminalStore((s) => s.tabs)
@@ -26,9 +28,11 @@ export function TerminalPanel(): React.ReactElement {
   const renameFromFirstCommand = useTerminalStore((s) => s.renameFromFirstCommand)
 
   useEffect(() => {
-    if (!terminalOpen || !hydrated) return
-    ensureInitialTab(workingDirectory)
-  }, [terminalOpen, hydrated, workingDirectory, ensureInitialTab])
+    if (!terminalOpen) return
+    const cwd = resolveWorkspacePath(hydrated, workingDirectory, settingsWorkingDirectory)
+    if (cwd === undefined) return
+    ensureInitialTab(cwd)
+  }, [terminalOpen, hydrated, workingDirectory, settingsWorkingDirectory, ensureInitialTab])
 
   const fitActiveTerminal = useCallback((): void => {
     if (!activeTabId) return

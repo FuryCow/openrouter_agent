@@ -2,6 +2,14 @@ import type { AppSettings, ModelInfo, TokenUsage } from '../types'
 import { AppError, AppErrorCode } from '../lib/app-errors'
 import { fetchAgentVisionModels } from './models'
 import { apiFetch } from './http'
+import { isRetryableOpenRouterError } from '../lib/agent-run-guards'
+import {
+  extractReasoningFromDelta,
+  mergeToolCallDelta,
+  parseSseDataLine,
+  splitSseBuffer,
+  type SseStreamChunk
+} from '../lib/openrouter-sse'
 
 const API_BASE = 'https://openrouter.ai/api/v1'
 
@@ -45,7 +53,7 @@ export interface StreamResult {
   usage?: TokenUsage
 }
 
-function formatApiError(payload: unknown): string {
+export function formatApiError(payload: unknown): string {
   if (!payload || typeof payload !== 'object') {
     return 'OpenRouter request failed'
   }
@@ -101,25 +109,6 @@ function formatApiError(payload: unknown): string {
   return parts.join(' — ')
 }
 
-function extractReasoningFromDelta(delta: {
-  reasoning?: string
-  reasoning_details?: Array<{ type?: string; text?: string; summary?: string }>
-}): string {
-  let fromDetails = ''
-
-  if (delta.reasoning_details?.length) {
-    for (const detail of delta.reasoning_details) {
-      const chunk = detail.text ?? detail.summary
-      if (chunk && chunk !== '[REDACTED]') {
-        fromDetails += chunk
-      }
-    }
-  }
-
-  if (fromDetails) return fromDetails
-  return delta.reasoning ?? ''
-}
-
 export class OpenRouterClient {
   constructor(private settings: AppSettings) {}
 
@@ -156,7 +145,7 @@ export class OpenRouterClient {
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error))
         lastError = err
-        const retryable = /idle timeout|504/i.test(err.message)
+        const retryable = isRetryableOpenRouterError(err.message)
         if (attempt === 0 && retryable) {
           console.warn('[OpenRouter] Idle timeout, retrying request...')
           continue
@@ -240,37 +229,15 @@ export class OpenRouterClient {
       if (done) break
 
       buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
+      const split = splitSseBuffer(buffer)
+      buffer = split.remainder
 
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed.startsWith('data: ')) continue
-        const data = trimmed.slice(6)
-        if (data === '[DONE]') continue
+      for (const line of split.lines) {
+        const data = parseSseDataLine(line)
+        if (!data) continue
 
         try {
-          const parsed = JSON.parse(data) as {
-            error?: unknown
-            usage?: {
-              prompt_tokens?: number
-              completion_tokens?: number
-              total_tokens?: number
-            }
-            choices?: Array<{
-              finish_reason: string | null
-              delta: {
-                content?: string
-                reasoning?: string
-                reasoning_details?: Array<{ type?: string; text?: string }>
-                tool_calls?: Array<{
-                  index: number
-                  id?: string
-                  function?: { name?: string; arguments?: string }
-                }>
-              }
-            }>
-          }
+          const parsed = JSON.parse(data) as SseStreamChunk
 
           if (parsed.error) {
             throw new Error(formatApiError(parsed))
@@ -300,28 +267,8 @@ export class OpenRouterClient {
             onChunk?.(choice.delta.content)
           }
 
-          if (choice.delta.tool_calls) {
-            for (const tc of choice.delta.tool_calls) {
-              const existing = toolCallsMap.get(tc.index)
-              if (!existing) {
-                toolCallsMap.set(tc.index, {
-                  id: tc.id || `call_${tc.index}`,
-                  type: 'function',
-                  function: {
-                    name: tc.function?.name || '',
-                    arguments: tc.function?.arguments || ''
-                  }
-                })
-              } else {
-                if (tc.id) existing.id = tc.id
-                if (tc.function?.name) existing.function.name = tc.function.name
-                if (tc.function?.arguments)
-                  existing.function.arguments += tc.function.arguments
-              }
-
-              const current = toolCallsMap.get(tc.index)
-              if (current) onToolCallProgress?.(current)
-            }
+          for (const current of mergeToolCallDelta(toolCallsMap, choice.delta.tool_calls)) {
+            onToolCallProgress?.(current)
           }
         } catch (error) {
           if (error instanceof SyntaxError) continue

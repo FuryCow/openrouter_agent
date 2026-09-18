@@ -5,7 +5,11 @@ import { useChatStore } from '@/stores/chatStore'
 import { useFileStore } from '@/stores/fileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useToastStore } from '@/stores/toastStore'
-import { CHAT_PERSISTENCE_MODES, messagesForMode } from '@/lib/chatPersistenceCore'
+import {
+  CHAT_PERSISTENCE_MODES,
+  messagesForMode,
+  resolvePersistenceWorkspace
+} from '@/lib/chatPersistenceCore'
 
 const SAVE_DEBOUNCE_MS = 400
 
@@ -54,11 +58,12 @@ export function useChatPersistence(): void {
   useEffect(() => {
     if (!hydrated) return
 
-    const settingsWorkspace = settingsWorkingDirectory?.trim() || null
-    if (workingDirectory === null && settingsWorkspace !== null) {
-      return
-    }
-    const workspace = workingDirectory ?? settingsWorkspace
+    const workspace = resolvePersistenceWorkspace(
+      hydrated,
+      workingDirectory,
+      settingsWorkingDirectory
+    )
+    if (workspace === undefined) return
 
     const prev = prevWorkspaceRef.current
     if (prev === undefined) {

@@ -27,6 +27,7 @@ import { ShortcutsModal } from './components/layout/ShortcutsModal'
 import { useUiStore } from './stores/uiStore'
 import { useTerminalStore } from './stores/terminalStore'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
+import { isImagePath } from './lib/utils'
 
 function ResizeHandle({ direction }: { direction: 'horizontal' | 'vertical' }): React.ReactElement {
   return (
@@ -125,7 +126,9 @@ export default function App(): React.ReactElement {
       <div className="flex-1 overflow-hidden">
         <PanelGroup direction="horizontal">
           <Panel defaultSize={18} minSize={12} maxSize={30}>
-            <FileExplorer />
+            <ErrorBoundary>
+              <FileExplorer />
+            </ErrorBoundary>
           </Panel>
 
           <ResizeHandle direction="horizontal" />
@@ -139,7 +142,9 @@ export default function App(): React.ReactElement {
                 className="min-h-0"
               >
                 <div className="h-full min-h-0 overflow-hidden">
-                  <CodeEditor />
+                  <ErrorBoundary>
+                    <CodeEditor />
+                  </ErrorBoundary>
                 </div>
               </Panel>
 
@@ -153,7 +158,9 @@ export default function App(): React.ReactElement {
                 className="min-h-0"
               >
                 <div className="h-full min-h-0 overflow-hidden">
-                  <TerminalPanel />
+                  <ErrorBoundary>
+                    <TerminalPanel />
+                  </ErrorBoundary>
                 </div>
               </Panel>
             </PanelGroup>

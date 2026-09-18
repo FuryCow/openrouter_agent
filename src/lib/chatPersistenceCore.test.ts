@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from '@/types'
-import { messagesForMode } from './chatPersistenceCore'
+import { messagesForMode, resolvePersistenceWorkspace } from './chatPersistenceCore'
 
 describe('messagesForMode', () => {
   const messages: ChatMessage[] = [
@@ -13,5 +13,13 @@ describe('messagesForMode', () => {
     expect(messagesForMode(messages, 'agent').map((m) => m.id)).toEqual(['1', '3'])
     expect(messagesForMode(messages, 'ask').map((m) => m.id)).toEqual(['2'])
     expect(messagesForMode(messages, 'planner')).toEqual([])
+  })
+})
+
+describe('resolvePersistenceWorkspace', () => {
+  it('matches workspace hydration rules', () => {
+    expect(resolvePersistenceWorkspace(false, null, '/tmp')).toBeUndefined()
+    expect(resolvePersistenceWorkspace(true, null, '/tmp')).toBeUndefined()
+    expect(resolvePersistenceWorkspace(true, '/tmp/a', '/tmp/b')).toBe('/tmp/a')
   })
 })

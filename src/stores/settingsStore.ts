@@ -5,6 +5,7 @@ import { isStaleModelCatalog } from '../lib/models'
 import type { SettingsSection } from '../lib/settingsSections'
 import { setAppLocale } from '../i18n'
 import { getT } from '../i18n/t'
+import { applyHydratedSettings } from '../lib/settingsHydration'
 
 interface SettingsState {
   settings: AppSettings
@@ -90,8 +91,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       const settings = await window.api.settings.get()
       await setAppLocale(settings.locale ?? 'en')
-      useFileStore.getState().setWorkingDirectory(settings.workingDirectory || null)
-      set({ settings, hydrated: true })
+      const hydratedSettings = applyHydratedSettings(
+        settings,
+        useFileStore.getState().setWorkingDirectory
+      )
+      set({ settings: hydratedSettings, hydrated: true })
       await get().loadModels()
     } catch {
       set({ hydrated: true })

@@ -647,6 +647,11 @@ function registerIpc(): void {
   })
 }
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] Unhandled rejection:', reason)
+  if (agentService.isRunning) agentService.abort()
+})
+
 app.whenReady().then(() => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.openrouter.agent')

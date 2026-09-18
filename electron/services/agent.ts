@@ -17,6 +17,7 @@ import {
   assertSafeTerminalCommand
 } from './workspace-safety'
 import { AppError, AppErrorCode, getAppErrorPayload } from '../lib/app-errors'
+import { shouldEmitIterationWarning } from '../lib/agent-run-guards'
 import {
   buildSystemPrompt,
   getMaxIterations,
@@ -608,7 +609,7 @@ export class AgentService {
         if (signal.aborted) break
 
         const iterationsRemaining = maxIterations - iterations
-        if (iterationsRemaining <= 3 && iterationsRemaining >= 0) {
+        if (shouldEmitIterationWarning(iterationsRemaining)) {
           emit({
             type: 'iteration_warning',
             iterationsRemaining,
