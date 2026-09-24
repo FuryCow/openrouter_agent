@@ -37,6 +37,7 @@ export interface ElectronAPI {
     readFile: (path: string) => Promise<string>
     readFileDataUrl: (path: string) => Promise<string>
     writeFile: (path: string, content: string) => Promise<void>
+    savePlannerPlan: (markdown: string, workspacePath?: string | null) => Promise<string>
     listDir: (path: string) => Promise<DirEntry[]>
     searchFiles: (query: string, root: string) => Promise<SearchResult[]>
     createFile: (parentDir: string, name: string) => Promise<string>
@@ -71,7 +72,8 @@ export interface ElectronAPI {
     save: (
       mode: string,
       messages: import('./types').ChatMessage[],
-      workspacePath?: string | null
+      workspacePath?: string | null,
+      allowEmpty?: boolean
     ) => Promise<void>
   }
   analytics: {
@@ -87,7 +89,6 @@ export interface ElectronAPI {
     search: (request: CodebaseSearchRequest) => Promise<CodebaseSearchHit[]>
     onProgress: (callback: (progress: IndexProgress) => void) => () => void
     onStatus: (callback: (status: IndexStatus) => void) => () => void
-    onFilesChanged: (callback: (paths: string[]) => void) => () => void
   }
   mcp: {
     getStatus: () => Promise<McpStatusSnapshot>
@@ -137,6 +138,8 @@ const api: ElectronAPI = {
     readFile: (path) => ipcRenderer.invoke('fs:read-file', path),
     readFileDataUrl: (path) => ipcRenderer.invoke('fs:read-file-data-url', path),
     writeFile: (path, content) => ipcRenderer.invoke('fs:write-file', path, content),
+    savePlannerPlan: (markdown, workspacePath) =>
+      ipcRenderer.invoke('fs:save-planner-plan', markdown, workspacePath),
     listDir: (path) => ipcRenderer.invoke('fs:list-dir', path),
     searchFiles: (query, root) => ipcRenderer.invoke('fs:search-files', query, root),
     createFile: (parentDir, name) => ipcRenderer.invoke('fs:create-file', parentDir, name),
@@ -183,8 +186,8 @@ const api: ElectronAPI = {
   },
   chat: {
     load: (mode, workspacePath) => ipcRenderer.invoke('chat:load', mode, workspacePath),
-    save: (mode, messages, workspacePath) =>
-      ipcRenderer.invoke('chat:save', mode, messages, workspacePath)
+    save: (mode, messages, workspacePath, allowEmpty) =>
+      ipcRenderer.invoke('chat:save', mode, messages, workspacePath, allowEmpty)
   },
   analytics: {
     getRuns: (limit) => ipcRenderer.invoke('analytics:get-runs', limit),
@@ -206,11 +209,6 @@ const api: ElectronAPI = {
       const handler = (_event: Electron.IpcRendererEvent, status: IndexStatus) => callback(status)
       ipcRenderer.on('index:status', handler)
       return () => ipcRenderer.removeListener('index:status', handler)
-    },
-    onFilesChanged: (callback) => {
-      const handler = (_event: Electron.IpcRendererEvent, paths: string[]) => callback(paths)
-      ipcRenderer.on('index:files-changed', handler)
-      return () => ipcRenderer.removeListener('index:files-changed', handler)
     }
   },
   mcp: {

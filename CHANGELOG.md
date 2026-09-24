@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.2] — 2026-09-24
+
+### Indexing
+
+- Workspace file list goes through ripgrep, with the previous directory exclusions restored.
+- New files are picked up without waiting out the file-list cache. A full build no longer drops edits that arrive mid-index, and cancelling a build clears the "building" status.
+- Watcher debounce is back to 300ms.
+
+### Ask and planner
+
+- Ask mode can read the workspace (read-only tools, up to 12 steps) and no longer toasts "0 steps remaining" on every message.
+- Planner can edit saved markdown plans under `.openrouter/plans/` only. Plans save through IPC with unique filenames.
+
+### Settings
+
+- Saving settings no longer reconnects every MCP server or rebuilds the agent. Per-server Test and Reconnect all do the connecting.
+
+---
+
 ## [1.0.0-alpha.1] — 2026-09-18
 
 First alpha after full stability audit. AI SDK migration is **not** included.

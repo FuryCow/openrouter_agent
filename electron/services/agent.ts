@@ -40,6 +40,7 @@ import { parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
 import type { ProjectMemoryService } from './project-memory/project-memory-service'
 import type { ProjectMemoryCategory } from './project-memory/project-memory-types'
 import { suggestMemoryFromRun } from './project-memory/run-memory-suggest'
+import { isPlannerPlanPath } from './planner-plans'
 import { RunTaskChecklist } from './run-task-checklist'
 import { RunCheckpoint } from './run-checkpoint'
 import {
@@ -616,8 +617,7 @@ export class AgentService {
           if (shouldEmitIterationWarning(iterationsRemaining)) {
             emit({
               type: 'iteration_warning',
-              iterationsRemaining,
-              error: `Only ${iterationsRemaining} tool step(s) remaining before the run limit.`
+              iterationsRemaining
             })
           }
         }
@@ -949,6 +949,13 @@ export class AgentService {
 
     const args = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>
     const cwd = context.workingDirectory
+
+    if (mode === 'planner' && call.function.name === 'search_replace') {
+      const path = this.resolvePath(String(args.path ?? ''), cwd)
+      if (!isPlannerPlanPath(cwd, path)) {
+        return 'Error: In planner mode search_replace can only edit markdown files under .openrouter/plans/.'
+      }
+    }
 
     switch (call.function.name) {
       case 'read_file': {

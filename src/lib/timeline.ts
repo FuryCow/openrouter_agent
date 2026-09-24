@@ -7,12 +7,36 @@ export function appendTimelineChunk(
 ): TimelineItem[] {
   if (!chunk) return timeline
 
+  const resolvedType = resolveStreamChunkType(timeline, type, chunk)
   const last = timeline[timeline.length - 1]
-  if (last?.type === type) {
+  if (last?.type === resolvedType) {
     return [...timeline.slice(0, -1), { ...last, content: last.content + chunk }]
   }
 
-  return [...timeline, { id: `${type}-${Date.now()}-${Math.random()}`, type, content: chunk }]
+  return [...timeline, { id: `${resolvedType}-${Date.now()}-${Math.random()}`, type: resolvedType, content: chunk }]
+}
+
+export function shouldFoldTextIntoReasoning(
+  last: TimelineItem | undefined,
+  chunk: string
+): boolean {
+  if (last?.type !== 'reasoning') return false
+  if (chunk.includes('\n')) return false
+  const trimmed = chunk.trimStart()
+  if (!trimmed || trimmed.startsWith('#')) return false
+  if (trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+\./.test(trimmed)) return false
+  return true
+}
+
+function resolveStreamChunkType(
+  timeline: TimelineItem[],
+  type: 'reasoning' | 'text',
+  chunk: string
+): 'reasoning' | 'text' {
+  if (type === 'text' && shouldFoldTextIntoReasoning(timeline[timeline.length - 1], chunk)) {
+    return 'reasoning'
+  }
+  return type
 }
 
 export function upsertTimelineTool(

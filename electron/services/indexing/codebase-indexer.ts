@@ -11,7 +11,14 @@ import type {
 } from './index-types'
 import { DEFAULT_INDEX_SETTINGS } from './index-types'
 import { IndexStore } from './index-store'
-import { scanWorkspaceManifest } from './file-manifest'
+import { createDebouncedPathCollector, requeueIfBusy } from '../../lib/debounce-path-collector'
+import { manifestEntryForFile, scanWorkspaceManifest } from './file-manifest'
+import {
+  filterWatcherPaths,
+  getWorkspaceFileSet,
+  invalidateWorkspaceFileCache,
+  resolveWatcherFileSet
+} from './workspace-files'
 import { getWorkspaceIndexDir, getIndexDbPath, getVectorIndexPath, resolveSearchRoot } from './index-paths'
 import { chunkFileContent } from './chunker'
 import { parseSymbols } from './symbol-indexer'
@@ -26,6 +33,7 @@ async function loadEmbeddingService(): Promise<typeof import('./embedding-servic
 }
 
 type ProgressListener = (progress: IndexProgress) => void
+type StatusListener = (status: IndexStatus) => void
 
 export class CodebaseIndexer {
   private workspacePath: string | null = null
@@ -47,8 +55,12 @@ export class CodebaseIndexer {
   }
   private building = false
   private cancelRequested = false
+  private buildPromise: Promise<void> | null = null
   private progressListeners = new Set<ProgressListener>()
-  private pendingPaths = new Set<string>()
+  private statusListeners = new Set<StatusListener>()
+  private pendingPaths = createDebouncedPathCollector(1500, (paths) => {
+    void this.flushIncremental(paths)
+  })
 
   setSettings(settings: Partial<IndexSettings>): void {
     this.settings = { ...this.settings, ...settings }
@@ -63,17 +75,31 @@ export class CodebaseIndexer {
     return () => this.progressListeners.delete(listener)
   }
 
+  onStatus(listener: StatusListener): () => void {
+    this.statusListeners.add(listener)
+    return () => this.statusListeners.delete(listener)
+  }
+
   private emitProgress(progress: IndexProgress): void {
     this.status.progress = progress
     for (const listener of this.progressListeners) listener(progress)
   }
 
+  private emitStatus(): void {
+    const status = this.getStatus()
+    for (const listener of this.statusListeners) listener(status)
+  }
+
   private updateStatus(patch: Partial<IndexStatus>): void {
     this.status = { ...this.status, ...patch }
+    this.emitStatus()
   }
 
   async setWorkspace(workspacePath: string | null, options?: { rebuild?: boolean }): Promise<void> {
+    await this.stopActiveBuild()
     this.workspacePath = workspacePath
+    this.pendingPaths.cancel()
+    invalidateWorkspaceFileCache()
     this.store?.close()
     this.store = null
     this.vectorIndex.reset()
@@ -95,7 +121,6 @@ export class CodebaseIndexer {
     }
 
     const indexDir = getWorkspaceIndexDir(app.getPath('userData'), workspacePath)
-
     try {
       this.store = new IndexStore(getIndexDbPath(indexDir))
     } catch (err) {
@@ -137,30 +162,63 @@ export class CodebaseIndexer {
   }
 
   async rebuild(): Promise<void> {
-    if (!this.workspacePath || !this.store) return
+    if (!this.workspacePath || !this.store) {
+      throw new Error('No workspace open for indexing')
+    }
+
+    await this.stopActiveBuild()
+
+    this.pendingPaths.cancel()
+    invalidateWorkspaceFileCache()
+    this.chunkById.clear()
+    this.vectorIndex.reset()
     this.store.resetAll()
+    this.updateStatus({
+      state: 'building',
+      error: null,
+      progress: null,
+      semanticReady: false,
+      symbolReady: false,
+      filesIndexed: 0,
+      chunks: 0,
+      symbols: 0
+    })
     await this.runFullIndex()
+  }
+
+  private async stopActiveBuild(): Promise<void> {
+    if (!this.buildPromise) return
+    this.cancelRequested = true
+    await this.buildPromise
+    this.cancelRequested = false
+  }
+
+  async filterChangedPaths(paths: string[]): Promise<string[]> {
+    if (!this.workspacePath || !this.store) return []
+    const indexed = new Set(this.store.listManifest().map((entry) => entry.path))
+    const listed = await resolveWatcherFileSet(this.workspacePath, paths, indexed)
+    return filterWatcherPaths(paths, listed, indexed)
   }
 
   queueChangedPaths(paths: string[]): void {
     for (const path of paths) this.pendingPaths.add(path)
-    void this.flushIncremental()
   }
 
-  private async flushIncremental(): Promise<void> {
-    if (!this.workspacePath || !this.store || this.building) return
-    const paths = [...this.pendingPaths]
-    this.pendingPaths.clear()
+  private async flushIncremental(paths: string[]): Promise<void> {
+    if (!this.workspacePath || !this.store) return
+    if (requeueIfBusy(this.building, paths, (path) => this.pendingPaths.add(path))) return
     if (paths.length === 0) return
 
+    const listed = await getWorkspaceFileSet(this.workspacePath)
+    const maxBytes = this.settings.maxFileSizeKb * 1024
     for (const relPath of paths) {
-      const absolutePath = join(this.workspacePath, relPath)
+      const entry = await manifestEntryForFile(this.workspacePath, relPath, maxBytes, listed)
+      if (!entry) {
+        this.store.purgeFile(relPath)
+        continue
+      }
       try {
-        const content = await readFile(absolutePath, 'utf-8')
-        const entry = (await scanWorkspaceManifest(this.workspacePath, this.settings.maxFileSizeKb * 1024)).find(
-          (item) => item.path === relPath
-        )
-        if (!entry) continue
+        const content = await readFile(entry.absolutePath, 'utf-8')
         await this.indexFile(entry, content)
         this.store.upsertManifest([entry])
       } catch {
@@ -182,6 +240,21 @@ export class CodebaseIndexer {
 
   private async runFullIndex(): Promise<void> {
     if (!this.workspacePath || !this.store) return
+    await this.stopActiveBuild()
+
+    const build = this.executeFullIndex()
+    this.buildPromise = build
+    try {
+      await build
+    } finally {
+      if (this.buildPromise === build) {
+        this.buildPromise = null
+      }
+    }
+  }
+
+  private async executeFullIndex(): Promise<void> {
+    if (!this.workspacePath || !this.store) return
     this.building = true
     this.cancelRequested = false
 
@@ -192,10 +265,14 @@ export class CodebaseIndexer {
         filesDone: 0,
         filesTotal: 0
       })
+      invalidateWorkspaceFileCache()
       const manifest = await scanWorkspaceManifest(
         this.workspacePath,
         this.settings.maxFileSizeKb * 1024
       )
+      invalidateWorkspaceFileCache()
+      if (this.cancelRequested) return
+
       this.store.upsertManifest(manifest)
 
       this.emitProgress({
@@ -209,7 +286,7 @@ export class CodebaseIndexer {
       let done = 0
 
       for (const entry of manifest) {
-        if (this.cancelRequested) break
+        if (this.cancelRequested) return
         const content = await readFile(entry.absolutePath, 'utf-8')
         const chunks = await this.indexFile(entry, content)
         done++
@@ -241,12 +318,16 @@ export class CodebaseIndexer {
         }
       }
 
+      if (this.cancelRequested) return
+
       if (this.settings.semanticSearchEnabled && allChunks.length > 0) {
         this.emitProgress({ phase: 'vectors', filesDone: manifest.length, filesTotal: manifest.length })
         this.vectorIndex.rebuild(allChunks)
         const indexDir = getWorkspaceIndexDir(app.getPath('userData'), this.workspacePath)
         this.vectorIndex.save(getVectorIndexPath(indexDir))
       }
+
+      if (this.cancelRequested) return
 
       const builtAt = new Date().toISOString()
       this.store.setMeta('lastBuiltAt', builtAt)
@@ -260,13 +341,22 @@ export class CodebaseIndexer {
         error: null
       })
     } catch (err) {
-      this.updateStatus({
-        state: 'error',
-        error: err instanceof Error ? err.message : String(err),
-        progress: null
-      })
+      if (!this.cancelRequested) {
+        this.updateStatus({
+          state: 'error',
+          error: err instanceof Error ? err.message : String(err),
+          progress: null
+        })
+      }
     } finally {
+      const cancelled = this.cancelRequested
       this.building = false
+      if (cancelled && this.status.state === 'building') {
+        this.updateStatus({
+          state: this.workspacePath && this.store ? 'ready' : 'idle',
+          progress: null
+        })
+      }
     }
   }
 

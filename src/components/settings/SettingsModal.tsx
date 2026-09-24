@@ -12,6 +12,7 @@ import {
   SelectValue
 } from '../ui/select'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useIndexStore } from '@/stores/indexStore'
 import type { AppSettings } from '@/types'
 import { McpSettingsPanel } from './McpSettingsPanel'
 import { ProjectMemorySettings } from './ProjectMemorySettings'
@@ -86,6 +87,7 @@ export function SettingsModal(): React.ReactElement {
   const { t: tCommon } = useTranslation('common')
   const { settings, settingsOpen, settingsFocusSection, setSettingsOpen, setSettings, loadModels } =
     useSettingsStore()
+  const rebuildIndex = useIndexStore((s) => s.rebuild)
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
   const [draftSettings, setDraftSettings] = useState<AppSettings>(settings)
   const [apiKey, setApiKey] = useState(settings.apiKey)
@@ -323,7 +325,7 @@ export function SettingsModal(): React.ReactElement {
                 className="input-field max-w-xs"
               />
             </div>
-            <Button type="button" variant="secondary" onClick={() => void window.api.index.rebuild()}>
+            <Button type="button" variant="secondary" onClick={() => void rebuildIndex()}>
               {t('index.rebuild')}
             </Button>
           </div>

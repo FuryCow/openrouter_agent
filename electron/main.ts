@@ -18,6 +18,7 @@ import {
 } from './services/workspace-safety'
 import { getRecentAnalyticsRuns, getAnalyticsLogDir } from './services/tool-analytics'
 import { loadChatMessages, saveChatMessages } from './services/chat-persistence'
+import { writePlannerPlan } from './services/planner-plans'
 import { modeRequiresWorkspace } from './services/agent-modes'
 import { withRecentWorkspace } from './lib/recent-workspaces'
 import { McpManager } from './services/mcp/mcp-manager'
@@ -232,27 +233,22 @@ function setWorkspaceWatch(dir: string): void {
   setTimeout(() => {
     try {
       workspaceWatcher.watch(dir, (changedPaths) => {
-        projectMemoryService.invalidateByChangedPaths(dir, changedPaths)
-        sendToRenderer('fs:changed')
-        sendToRenderer('index:files-changed', changedPaths)
-        codebaseIndexer.queueChangedPaths(changedPaths)
+        void codebaseIndexer
+          .filterChangedPaths(changedPaths)
+          .then((relevantPaths) => {
+            if (relevantPaths.length === 0) return
+            projectMemoryService.invalidateByChangedPaths(dir, relevantPaths)
+            sendToRenderer('fs:changed')
+            codebaseIndexer.queueChangedPaths(relevantPaths)
+          })
+          .catch((err) => {
+            console.error('[Index] Failed to filter changed paths:', err)
+          })
       })
     } catch (err) {
       console.error('[Workspace] Failed to watch directory:', err)
     }
   }, 500)
-}
-
-function recreateAgentService(): void {
-  agentService = new AgentService(
-    openRouterClient,
-    fsService,
-    terminalService,
-    webSearchService,
-    codebaseIndexer,
-    mcpManager,
-    projectMemoryService
-  )
 }
 
 function getCurrentWorkspace(): string {
@@ -281,7 +277,7 @@ function registerIpc(): void {
   ipcMain.handle('window:close', () => getWindow().close())
 
   ipcMain.handle('settings:get', () => sanitizeSettings(store.get('settings')))
-  ipcMain.handle('settings:save', async (_event, settings: AppSettings) => {
+  ipcMain.handle('settings:save', (_event, settings: AppSettings) => {
     if (agentService.isRunning) {
       throw new AppError(AppErrorCode.SETTINGS_SAVE_WHILE_RUNNING)
     }
@@ -289,12 +285,25 @@ function registerIpc(): void {
       ...settings,
       apiKey: settings.apiKey.trim()
     })
+    const previous = sanitizeSettings(store.get('settings'))
     store.set('settings', normalized)
-    openRouterClient = new OpenRouterClient(normalized)
-    webSearchService.configure(normalized)
-    applyIndexSettings(normalized)
-    recreateAgentService()
-    await mcpManager.reconnectAll()
+    if (previous.apiKey !== normalized.apiKey || previous.model !== normalized.model) {
+      openRouterClient.updateSettings(normalized)
+    }
+    if (
+      previous.searchApiKey !== normalized.searchApiKey ||
+      previous.searchProvider !== normalized.searchProvider
+    ) {
+      webSearchService.configure(normalized)
+    }
+    if (
+      previous.indexOnOpen !== normalized.indexOnOpen ||
+      previous.embeddingModel !== normalized.embeddingModel ||
+      previous.maxFileSizeKb !== normalized.maxFileSizeKb ||
+      previous.semanticSearchEnabled !== normalized.semanticSearchEnabled
+    ) {
+      applyIndexSettings(normalized)
+    }
     return normalized
   })
 
@@ -336,6 +345,12 @@ function registerIpc(): void {
   ipcMain.handle('fs:write-file', (_event, filePath: string, content: string) => {
     assertPathNotInAgentApp(filePath)
     return fsService.writeFile(filePath, content)
+  })
+  ipcMain.handle('fs:save-planner-plan', async (_event, markdown: string, workspacePath?: string) => {
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    if (!workspace) throw new Error('No workspace open')
+    assertAllowedWorkspace(workspace)
+    return writePlannerPlan(workspace, markdown)
   })
   ipcMain.handle('fs:list-dir', (_event, dirPath: string) => {
     assertPathNotInAgentApp(dirPath)
@@ -487,8 +502,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('chat:load', (_event, mode: string, workspacePath?: string | null) => {
-    const workspace = workspacePath?.trim() || getCurrentWorkspace()
-    return loadChatMessages(mode as import('./types').ChatMode, workspace)
+    return loadChatMessages(mode as import('./types').ChatMode, workspacePath ?? getCurrentWorkspace())
   })
 
   ipcMain.handle(
@@ -497,10 +511,15 @@ function registerIpc(): void {
       _event,
       mode: string,
       messages: import('./types').ChatMessage[],
-      workspacePath?: string | null
+      workspacePath?: string | null,
+      allowEmpty?: boolean
     ) => {
-      const workspace = workspacePath?.trim() || getCurrentWorkspace()
-      await saveChatMessages(mode as import('./types').ChatMode, messages, workspace)
+      await saveChatMessages(
+        mode as import('./types').ChatMode,
+        messages,
+        workspacePath ?? getCurrentWorkspace(),
+        { allowEmpty: Boolean(allowEmpty) }
+      )
     }
   )
 
@@ -574,20 +593,13 @@ function registerIpc(): void {
   ipcMain.handle('mcp:getStatus', () => mcpManager.getStatus())
   ipcMain.handle('mcp:getConfig', () => mcpManager.getConfig())
 
-  ipcMain.handle('mcp:saveConfig', async (_event, servers: McpServerConfig[]) => {
-    if (agentService.isRunning) {
-      mcpManager.queueReconnectAfterRun()
-    }
+  ipcMain.handle('mcp:saveConfig', (_event, servers: McpServerConfig[]) => {
     const error = validateMcpServerConfigs(servers)
     if (error) throw error
 
     const settings = sanitizeSettings(store.get('settings'))
     const next = { ...settings, mcpServers: servers }
     store.set('settings', next)
-
-    if (!agentService.isRunning) {
-      await mcpManager.reconnectAll()
-    }
     return servers
   })
 
@@ -680,7 +692,9 @@ app.whenReady().then(() => {
   })
   codebaseIndexer.onProgress((progress) => {
     sendToRenderer('index:progress', progress)
-    sendToRenderer('index:status', codebaseIndexer.getStatus())
+  })
+  codebaseIndexer.onStatus((status) => {
+    sendToRenderer('index:status', status)
   })
 
   const workspaceDir = settings.workingDirectory

@@ -2,8 +2,9 @@ import { appendFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
 import type { ChatMode, ToolCallAnalytics, AgentRunAnalytics, ToolValidationIssue, TokenUsage } from '../types'
-import { isMcpQualifiedToolName, parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
-import { isMcpToolReadOnly } from './mcp/mcp-policies'
+import { isMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
+import { looksLikePlannerPlanPath } from './planner-plans'
+import { isToolAllowedInMode } from './agent-modes'
 
 const TOOLS_KNOWN: Record<string, true> = {
   read_file: true,
@@ -73,21 +74,16 @@ export function validateToolArguments(
     issues.push('unknown_tool')
   }
 
+  if ((mode === 'ask' || mode === 'planner') && !isToolAllowedInMode(toolName, mode)) {
+    issues.push('tool_not_allowed_in_mode')
+  }
   if (
     mode === 'planner' &&
-    !isMcpQualifiedToolName(toolName) &&
-    ['write_file', 'search_replace', 'run_terminal', 'update_project_memory'].includes(toolName)
+    toolName === 'search_replace' &&
+    typeof parsed.path === 'string' &&
+    !looksLikePlannerPlanPath(parsed.path)
   ) {
     issues.push('tool_not_allowed_in_mode')
-  }
-  if (mode === 'ask' && !isMcpQualifiedToolName(toolName)) {
-    issues.push('tool_not_allowed_in_mode')
-  }
-  if (mode === 'planner' && isMcpQualifiedToolName(toolName)) {
-    const parsed = parseMcpQualifiedToolName(toolName)
-    if (parsed && !isMcpToolReadOnly(parsed.toolName)) {
-      issues.push('tool_not_allowed_in_mode')
-    }
   }
 
   const required = isMcpQualifiedToolName(toolName) ? [] : (REQUIRED_ARGS[toolName] ?? [])

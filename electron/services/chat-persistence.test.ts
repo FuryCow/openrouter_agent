@@ -72,4 +72,36 @@ describe('chat-persistence', () => {
     expect(loadedB).toHaveLength(0)
     expect(readFileSync(join(legacyBucketDir, '.migrated-to'), 'utf-8').length).toBeGreaterThan(0)
   })
+
+  it('does not overwrite a non-empty chat with an empty save', async () => {
+    const { saveChatMessages, loadChatMessages } = await import('./chat-persistence')
+    const workspace = join(tmpdir(), 'project-keep')
+
+    await saveChatMessages('planner', [{ id: 'keep', role: 'user', content: 'plan', mode: 'planner' }], workspace)
+    await saveChatMessages('planner', [], workspace)
+
+    const loaded = await loadChatMessages('planner', workspace)
+    expect(loaded).toHaveLength(1)
+    expect(loaded[0].id).toBe('keep')
+    await saveChatMessages('planner', [], workspace, { allowEmpty: true })
+    expect(await loadChatMessages('planner', workspace)).toEqual([])
+  })
+
+  it('does not overwrite invalid non-empty chat files with []', async () => {
+    const { saveChatMessages, loadChatMessages } = await import('./chat-persistence')
+    const workspace = join(tmpdir(), 'project-corrupt')
+    const { hashWorkspacePath } = await import('./indexing/index-paths')
+    const filePath = join(
+      globalThis.__chatUserData,
+      'chats',
+      hashWorkspacePath(workspace),
+      'agent.json'
+    )
+    mkdirSync(join(filePath, '..'), { recursive: true })
+    writeFileSync(filePath, '{"truncated":true')
+
+    await saveChatMessages('agent', [], workspace)
+    expect(readFileSync(filePath, 'utf-8')).toBe('{"truncated":true')
+    expect(await loadChatMessages('agent', workspace)).toEqual([])
+  })
 })

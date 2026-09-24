@@ -54,4 +54,23 @@ describe('chatStore streaming', () => {
       expect.objectContaining({ type: 'tool', toolCall: expect.objectContaining({ id: 'tool-1' }) })
     ])
   })
+
+  it('keeps interleaved reasoning and text in one thinking block', () => {
+    useChatStore.getState().appendReasoning('Принято — масштаб')
+    useChatStore.getState().appendStream('ируем от леса')
+    vi.advanceTimersByTime(100)
+    expect(useChatStore.getState().activeTimeline).toEqual([
+      expect.objectContaining({ type: 'reasoning', content: 'Принято — масштабируем от леса' })
+    ])
+  })
+
+  it('starts a text item after a heading following thinking', () => {
+    useChatStore.getState().appendReasoning('notes')
+    useChatStore.getState().appendStream('# Goal\nShip it')
+    vi.advanceTimersByTime(100)
+    expect(useChatStore.getState().activeTimeline.map((item) => item.type)).toEqual([
+      'reasoning',
+      'text'
+    ])
+  })
 })

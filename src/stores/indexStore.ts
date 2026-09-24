@@ -30,12 +30,41 @@ export const useIndexStore = create<IndexState>((set) => ({
     set({ status })
   },
   rebuild: async () => {
-    const status = await window.api.index.rebuild()
-    set({ status })
+    set((state) => ({
+      status: {
+        ...state.status,
+        state: 'building',
+        progress: null,
+        error: null,
+        semanticReady: false,
+        symbolReady: false
+      }
+    }))
+    try {
+      const status = await window.api.index.rebuild()
+      set({ status })
+    } catch (err) {
+      set((state) => ({
+        status: {
+          ...state.status,
+          state: 'error',
+          error: err instanceof Error ? err.message : String(err),
+          progress: null
+        }
+      }))
+    }
   },
   subscribe: () => {
-    const onProgress = (_progress: IndexProgress): void => {
-      void window.api.index.getStatus().then((status) => set({ status }))
+    const onProgress = (progress: IndexProgress): void => {
+      set((state) => {
+        if (state.status.state !== 'building') return state
+        return {
+          status: {
+            ...state.status,
+            progress
+          }
+        }
+      })
     }
     const onStatus = (status: IndexStatus): void => set({ status })
     const unsubProgress = window.api.index.onProgress(onProgress)

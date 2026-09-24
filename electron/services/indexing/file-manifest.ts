@@ -1,14 +1,9 @@
-import { readdir, readFile, stat } from 'fs/promises'
+import { readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import XXHash from 'xxhash-wasm'
 import type { ManifestEntry } from './index-types'
-import {
-  getLanguageFromExtension,
-  shouldIgnoreDirName,
-  shouldIgnoreRelativePath,
-  shouldSkipFile,
-  relativePathFromRoot
-} from './ignore-rules'
+import { getLanguageFromExtension, shouldSkipFile } from './ignore-rules'
+import { getWorkspaceFileSet, listWorkspaceFiles } from './workspace-files'
 
 let hasherPromise: ReturnType<typeof XXHash> | null = null
 
@@ -23,51 +18,69 @@ export async function hashFileContent(content: Buffer): Promise<string> {
   return h64Raw(bytes).toString(16).padStart(16, '0')
 }
 
+export async function manifestEntryForFile(
+  root: string,
+  relativePath: string,
+  maxFileSizeBytes: number,
+  listedFiles?: Set<string>
+): Promise<ManifestEntry | null> {
+  const rel = relativePath.replace(/\\/g, '/')
+  const listed = listedFiles ?? await getWorkspaceFileSet(root)
+  if (!listed.has(rel)) return null
+
+  const absolutePath = join(root, rel)
+  const name = rel.split('/').pop() ?? rel
+
+  try {
+    const info = await stat(absolutePath)
+    if (!info.isFile()) return null
+    if (shouldSkipFile(name, info.size, maxFileSizeBytes)) return null
+
+    const buffer = await readFile(absolutePath)
+    const hash = await hashFileContent(buffer)
+    return {
+      path: rel,
+      absolutePath,
+      hash,
+      mtimeMs: info.mtimeMs,
+      size: info.size,
+      language: getLanguageFromExtension(name)
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function scanWorkspaceManifest(
   root: string,
   maxFileSizeBytes: number
 ): Promise<ManifestEntry[]> {
+  const relativePaths = await listWorkspaceFiles(root)
   const entries: ManifestEntry[] = []
 
-  async function walk(dir: string): Promise<void> {
-    let names: string[]
+  for (const rel of relativePaths) {
+    const absolutePath = join(root, rel)
+    const name = rel.split('/').pop() ?? rel
+
     try {
-      names = await readdir(dir)
+      const info = await stat(absolutePath)
+      if (!info.isFile()) continue
+      if (shouldSkipFile(name, info.size, maxFileSizeBytes)) continue
+
+      const buffer = await readFile(absolutePath)
+      const hash = await hashFileContent(buffer)
+      entries.push({
+        path: rel,
+        absolutePath,
+        hash,
+        mtimeMs: info.mtimeMs,
+        size: info.size,
+        language: getLanguageFromExtension(name)
+      })
     } catch {
-      return
-    }
-
-    for (const name of names) {
-      if (shouldIgnoreDirName(name)) continue
-      const absolutePath = join(dir, name)
-      const rel = relativePathFromRoot(root, absolutePath)
-      if (shouldIgnoreRelativePath(rel)) continue
-
-      try {
-        const info = await stat(absolutePath)
-        if (info.isDirectory()) {
-          await walk(absolutePath)
-          continue
-        }
-        if (!info.isFile()) continue
-        if (shouldSkipFile(name, info.size, maxFileSizeBytes)) continue
-
-        const buffer = await readFile(absolutePath)
-        const hash = await hashFileContent(buffer)
-        entries.push({
-          path: rel,
-          absolutePath,
-          hash,
-          mtimeMs: info.mtimeMs,
-          size: info.size,
-          language: getLanguageFromExtension(name)
-        })
-      } catch {
-        // skip unreadable files
-      }
+      // skip unreadable files
     }
   }
 
-  await walk(root)
   return entries.sort((a, b) => a.path.localeCompare(b.path))
 }

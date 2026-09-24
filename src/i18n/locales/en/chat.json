@@ -31,7 +31,12 @@
     "memoryDisabled": "Project memory is disabled in settings",
     "openWorkspaceForMemory": "Open a workspace to save project memory",
     "nothingToRemember": "Nothing to remember in this message",
-    "memorySaveFailed": "Failed to save project memory"
+    "memorySaveFailed": "Failed to save project memory",
+    "planSaved": "Saved plan to {{path}}",
+    "planSaveFailed": "Failed to save plan",
+    "clearFailed": "Failed to clear chat",
+    "stepsRemaining": "Only {{count}} tool step(s) remaining before the run limit.",
+    "openWorkspaceForPlan": "Open a workspace to save a plan"
   },
   "onboarding": {
     "title": "Quick start",
@@ -69,13 +74,14 @@
     },
     "planner": {
       "label": "Planner",
-      "description": "Explores the project and builds a plan without editing files",
+      "description": "Explores the project and builds a plan; can edit files only under .openrouter/plans",
       "placeholder": "Describe a task — get a step-by-step plan..."
     }
   },
   "message": {
     "streaming": "Requesting model…",
     "implementPlan": "Implement according to plan",
+    "savePlan": "Save plan to project",
     "attachmentAlt": "attachment"
   },
   "imagePreview": {

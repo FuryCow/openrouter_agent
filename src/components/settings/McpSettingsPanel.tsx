@@ -169,7 +169,6 @@ export function McpSettingsPanel({
         return
       }
 
-      await persistServers(servers)
       setTestFeedback((prev) => ({
         ...prev,
         [server.id]: {
@@ -290,7 +289,7 @@ export function McpSettingsPanel({
               {t('mcp.reconnectAll')}
             </Button>
             <Button type="button" size="sm" disabled={saving} onClick={() => void persistServers(servers)}>
-              {isDirty ? t('mcp.saveAndConnect') : tCommon('actions.save')}
+              {tCommon('actions.save')}
             </Button>
           </div>
 
@@ -422,7 +421,7 @@ export function McpSettingsPanel({
                         disabled={testingId === server.id || saving}
                         onClick={() => void handleTestServer(server)}
                       >
-                        {testingId === server.id ? t('mcp.testing') : t('mcp.testSave')}
+                        {testingId === server.id ? t('mcp.testing') : t('mcp.test')}
                       </Button>
                       <Button
                         type="button"

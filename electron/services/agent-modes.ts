@@ -1,7 +1,8 @@
 import type { AgentContext, ChatMode, ChatMessage, ApiChatMessage } from '../types'
 import type { ToolDefinition } from './openrouter'
 import type { McpManager } from './mcp/mcp-manager'
-import { isMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
+import { isMcpQualifiedToolName, parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
+import { isMcpToolReadOnly } from './mcp/mcp-policies'
 import { estimateTokens, trimToTokenBudget, DEFAULT_CONTEXT_BUDGET } from '../lib/tokens'
 import {
   buildUserMessageWithAttachments,
@@ -21,12 +22,14 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'read_project_memory'
 ])
 
+const PLANNER_TOOL_NAMES = new Set([...READ_ONLY_TOOL_NAMES, 'search_replace'])
+
 export function getToolsForMode(mode: ChatMode, allTools: ToolDefinition[]): ToolDefinition[] {
   switch (mode) {
     case 'ask':
-      return []
-    case 'planner':
       return allTools.filter((t) => READ_ONLY_TOOL_NAMES.has(t.function.name))
+    case 'planner':
+      return allTools.filter((t) => PLANNER_TOOL_NAMES.has(t.function.name))
     case 'agent':
     default:
       return allTools
@@ -36,7 +39,7 @@ export function getToolsForMode(mode: ChatMode, allTools: ToolDefinition[]): Too
 export function getMaxIterations(mode: ChatMode): number {
   switch (mode) {
     case 'ask':
-      return 1
+      return 12
     case 'planner':
       return 25
     case 'agent':
@@ -64,11 +67,15 @@ export function isToolAllowedInMode(
   mcpManager?: McpManager
 ): boolean {
   if (isMcpQualifiedToolName(toolName)) {
-    return mcpManager?.isToolAllowedInMode(toolName, mode) ?? false
+    if (mcpManager) return mcpManager.isToolAllowedInMode(toolName, mode)
+    if (mode === 'agent') return true
+    if (mode === 'ask') return false
+    const parsed = parseMcpQualifiedToolName(toolName)
+    return parsed ? isMcpToolReadOnly(parsed.toolName) : false
   }
   if (mode === 'agent') return true
-  if (mode === 'ask') return false
-  return READ_ONLY_TOOL_NAMES.has(toolName)
+  if (mode === 'ask') return READ_ONLY_TOOL_NAMES.has(toolName)
+  return PLANNER_TOOL_NAMES.has(toolName)
 }
 
 export function formatMcpServersSection(
@@ -92,10 +99,6 @@ function formatOpenFiles(context: AgentContext): string {
 
 function formatOpenFilesWithContent(context: AgentContext, perFileLimit = 4000, totalLimit = 12000): string {
   if (context.openFiles.length === 0) return 'None'
-
-  if (context.mode === 'ask') {
-    return context.openFiles.map((f) => `- ${f.path} (${f.language})`).join('\n')
-  }
 
   const parts: string[] = []
   let used = 0
@@ -264,7 +267,7 @@ export function buildSystemPrompt(
   switch (context.mode) {
     case 'ask':
       return `You are a helpful programming assistant in ASK mode inside a desktop IDE.
-You answer questions clearly and concisely. You do NOT have tools and cannot read or modify files directly.
+You answer questions about the code. You may use read-only tools (read_files, grep_workspace, codebase_search, list_directory). You cannot modify files or run shell commands.
 
 ${workspaceLine}
 ${attachmentSection ? `${attachmentSection}\n\n` : ''}Open files in editor:
@@ -274,7 +277,7 @@ File contents (if any open in editor):
 ${context.attachedFiles?.length ? '(Omitted for this turn — use the attached file content in the user message.)' : formatOpenFilesWithContent(context)}
 
 Guidelines:
-- Answer questions, explain concepts, review ideas, and suggest approaches
+- When the question is about this workspace, look it up with grep_workspace or codebase_search, then read_files in one batch
 ${context.attachedFiles?.length ? '- When the user attached files, answer from those attachments — not open editor tabs unless they ask about them\n' : ''}- If open file contents are relevant, use the context provided above
 - Do not claim you ran commands or changed files
 - Prefer practical, accurate answers with code examples when useful
@@ -282,7 +285,7 @@ ${context.attachedFiles?.length ? '- When the user attached files, answer from t
 
     case 'planner':
       return `You are a technical planning assistant in PLANNER mode inside a desktop IDE.
-Your job is to explore the codebase (read-only) and produce clear, actionable plans. You must NOT modify files or run shell commands.
+Your job is to explore the codebase and produce clear, actionable plans. Do not edit project source or run shell commands. The only files you may edit are existing markdown plans under .openrouter/plans/ via search_replace.
 
 ${workspaceLine}
 ${attachmentSection ? `${attachmentSection}\n\n` : ''}Open files:
@@ -307,7 +310,9 @@ Anti-patterns:
 Guidelines:
 - Output structured plans in Markdown with sections like: Goal, Assumptions, Steps, Files to touch, Risks, Testing
 - Number steps in execution order; keep steps small and verifiable
-- Never call write_file, search_replace, or run_terminal — planning only
+- Never call write_file or run_terminal — planning only
+- The user saves new plans with the chat button into .openrouter/plans/*.md
+- You may search_replace only those existing plan files (not project source)
 - Respond in the same language the user writes in`
 
     case 'agent':

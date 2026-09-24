@@ -88,8 +88,11 @@ function handleAgentEvent(event: AgentEvent): void {
       }
       break
     case 'iteration_warning':
-      if (event.error) {
-        useToastStore.getState().addToast(event.error, 'info')
+      if (event.iterationsRemaining != null) {
+        useToastStore.getState().addToast(
+          getT('chat')('toast.stepsRemaining', { count: event.iterationsRemaining }),
+          'info'
+        )
       }
       break
     case 'error': {

@@ -10,7 +10,7 @@ describe('agent-run-guards', () => {
 
   it('warns only for the last three iterations', () => {
     expect(shouldEmitIterationWarning(3)).toBe(true)
-    expect(shouldEmitIterationWarning(0)).toBe(true)
+    expect(shouldEmitIterationWarning(0)).toBe(false)
     expect(shouldEmitIterationWarning(4)).toBe(false)
     expect(shouldEmitIterationWarning(-1)).toBe(false)
   })

@@ -7,6 +7,7 @@ import {
   Loader2,
   ChevronRight,
   Play,
+  Save,
   Copy,
   RotateCcw,
   Pencil,
@@ -634,6 +635,8 @@ export function MessageBubble({
   runOutcome,
   showImplementPlan,
   onImplementPlan,
+  showSavePlan,
+  onSavePlan,
   onCopy,
   onRetry,
   onEdit,
@@ -652,6 +655,8 @@ export function MessageBubble({
   runOutcome?: AgentRunOutcome
   showImplementPlan?: boolean
   onImplementPlan?: () => void
+  showSavePlan?: boolean
+  onSavePlan?: () => void
   onCopy?: () => void
   onRetry?: () => void
   onEdit?: () => void
@@ -765,19 +770,34 @@ export function MessageBubble({
 
         <MessageActions actions={assistantActions} align="start" />
 
-        {showImplementPlan && onImplementPlan && content?.trim() && (
-          <div className="mt-1">
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 gap-1.5 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 border border-amber-500/20"
-              onClick={onImplementPlan}
-            >
-              <Play className="h-3.5 w-3.5" />
-              {t('message.implementPlan')}
-            </Button>
+        {(showImplementPlan && onImplementPlan && content?.trim()) ||
+        (showSavePlan && onSavePlan && content?.trim()) ? (
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {showSavePlan && onSavePlan && content?.trim() && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-8 gap-1.5"
+                onClick={onSavePlan}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {t('message.savePlan')}
+              </Button>
+            )}
+            {showImplementPlan && onImplementPlan && content?.trim() && (
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 gap-1.5 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 border border-amber-500/20"
+                onClick={onImplementPlan}
+              >
+                <Play className="h-3.5 w-3.5" />
+                {t('message.implementPlan')}
+              </Button>
+            )}
           </div>
-        )}
+        ) : null}
       </div>
     </motion.div>
   )
@@ -799,7 +819,8 @@ function areMessageBubblePropsEqual(
     prev.isError === next.isError &&
     prev.interrupted === next.interrupted &&
     prev.runOutcome === next.runOutcome &&
-    prev.showImplementPlan === next.showImplementPlan
+    prev.showImplementPlan === next.showImplementPlan &&
+    prev.showSavePlan === next.showSavePlan
   )
 }
 

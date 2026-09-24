@@ -1,3 +1,13 @@
+export function requeueIfBusy(
+  busy: boolean,
+  paths: string[],
+  requeue: (path: string) => void
+): boolean {
+  if (!busy) return false
+  for (const path of paths) requeue(path)
+  return true
+}
+
 export function createDebouncedPathCollector(
   debounceMs: number,
   onFlush: (paths: string[]) => void

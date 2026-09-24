@@ -13,6 +13,7 @@ import type { ToolDefinition } from '../services/openrouter'
 const ALL_TOOLS: ToolDefinition[] = [
   { type: 'function', function: { name: 'read_files', description: '', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'grep_workspace', description: '', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'search_replace', description: '', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'write_file', description: '', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'run_terminal', description: '', parameters: { type: 'object', properties: {} } } }
 ]
@@ -87,13 +88,14 @@ describe('agent-modes limits and tools', () => {
   it('uses raised iteration limits', () => {
     expect(getMaxIterations('agent')).toBe(Number.POSITIVE_INFINITY)
     expect(getMaxIterations('planner')).toBe(25)
-    expect(getMaxIterations('ask')).toBe(1)
+    expect(getMaxIterations('ask')).toBe(12)
   })
 
-  it('exposes read-only tools to planner but not mutating ones', () => {
+  it('exposes search_replace to planner but not write_file', () => {
     const plannerTools = getToolsForMode('planner', ALL_TOOLS).map((t) => t.function.name)
     expect(plannerTools).toContain('read_files')
     expect(plannerTools).toContain('grep_workspace')
+    expect(plannerTools).toContain('search_replace')
     expect(plannerTools).not.toContain('write_file')
     expect(plannerTools).not.toContain('run_terminal')
   })
@@ -101,8 +103,15 @@ describe('agent-modes limits and tools', () => {
   it('allows all tools in agent mode', () => {
     expect(isToolAllowedInMode('write_file', 'agent')).toBe(true)
     expect(isToolAllowedInMode('grep_workspace', 'planner')).toBe(true)
+    expect(isToolAllowedInMode('search_replace', 'planner')).toBe(true)
     expect(isToolAllowedInMode('write_file', 'planner')).toBe(false)
-    expect(isToolAllowedInMode('read_files', 'ask')).toBe(false)
+    expect(isToolAllowedInMode('read_files', 'ask')).toBe(true)
+    expect(isToolAllowedInMode('grep_workspace', 'ask')).toBe(true)
+    expect(isToolAllowedInMode('write_file', 'ask')).toBe(false)
+    expect(getToolsForMode('ask', ALL_TOOLS).map((t) => t.function.name)).toEqual([
+      'read_files',
+      'grep_workspace'
+    ])
   })
 })
 
@@ -161,6 +170,17 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Project memory (workspace-specific; read-only in planner mode)')
     expect(prompt).toContain('Use SQLite for indexing')
     expect(prompt).not.toContain('update_project_memory')
+  })
+
+  it('tells ask mode to read the workspace and not to edit it', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      mode: 'ask',
+      openFiles: [{ path: 'src/app.ts', language: 'typescript', content: 'export const n = 1' }]
+    })
+    expect(prompt).toContain('read_files')
+    expect(prompt).toContain('export const n = 1')
+    expect(prompt).not.toContain('do NOT have tools')
   })
 
   it('includes batch read guidance for planner', () => {

@@ -12,6 +12,30 @@ describe('timeline', () => {
     }
   })
 
+  it('folds stray text into the current reasoning block', () => {
+    const thinking = appendTimelineChunk([], 'reasoning', 'Принято — масштаб')
+    const folded = appendTimelineChunk(thinking, 'text', 'ируем от леса')
+    expect(folded).toHaveLength(1)
+    expect(folded[0].type).toBe('reasoning')
+    if (folded[0].type === 'reasoning') {
+      expect(folded[0].content).toBe('Принято — масштабируем от леса')
+    }
+  })
+
+  it('does not fold a markdown list or a new line into reasoning', () => {
+    const thinking = appendTimelineChunk([], 'reasoning', 'notes')
+    const list = appendTimelineChunk(thinking, 'text', '- Step 1')
+    expect(list.map((item) => item.type)).toEqual(['reasoning', 'text'])
+    const paragraph = appendTimelineChunk(thinking, 'text', '\nPlan body')
+    expect(paragraph.map((item) => item.type)).toEqual(['reasoning', 'text'])
+  })
+
+  it('starts text after a markdown heading', () => {
+    const thinking = appendTimelineChunk([], 'reasoning', 'notes')
+    const next = appendTimelineChunk(thinking, 'text', '# Plan\nDo it')
+    expect(next.map((item) => item.type)).toEqual(['reasoning', 'text'])
+  })
+
   it('upserts tool calls by id', () => {
     const base = upsertTimelineTool([], {
       id: 't1',

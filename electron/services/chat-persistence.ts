@@ -124,9 +124,23 @@ export async function loadChatMessages(
 export async function saveChatMessages(
   mode: ChatMode,
   messages: ChatMessage[],
-  workspacePath?: string | null
+  workspacePath?: string | null,
+  options?: { allowEmpty?: boolean }
 ): Promise<void> {
   const path = chatFilePath(workspacePath, mode)
+  if (messages.length === 0 && !options?.allowEmpty && (await existingChatShouldKeep(path))) {
+    return
+  }
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, JSON.stringify(messages, null, 2), 'utf-8')
+}
+
+async function existingChatShouldKeep(path: string): Promise<boolean> {
+  try {
+    const raw = (await readFile(path, 'utf-8')).trim()
+    if (raw === '' || raw === '[]') return false
+    return true
+  } catch {
+    return false
+  }
 }

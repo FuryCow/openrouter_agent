@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createDebouncedPathCollector } from './debounce-path-collector'
+import { createDebouncedPathCollector, requeueIfBusy } from './debounce-path-collector'
 
 describe('createDebouncedPathCollector', () => {
   afterEach(() => {
@@ -17,6 +17,14 @@ describe('createDebouncedPathCollector', () => {
 
     vi.advanceTimersByTime(300)
     expect(flushed).toEqual([['src/a.ts', 'src/b.ts']])
+  })
+
+  it('requeues paths while a build is running', () => {
+    const queued: string[] = []
+    expect(requeueIfBusy(true, ['src/new.ts'], (path) => queued.push(path))).toBe(true)
+    expect(queued).toEqual(['src/new.ts'])
+    expect(requeueIfBusy(false, ['src/new.ts'], () => queued.push('nope'))).toBe(false)
+    expect(queued).toEqual(['src/new.ts'])
   })
 
   it('cancel clears pending paths', () => {

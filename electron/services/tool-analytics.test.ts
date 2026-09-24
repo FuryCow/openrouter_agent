@@ -36,7 +36,17 @@ describe('validateToolArguments', () => {
     expect(result.issues).toContain('empty_query')
   })
 
-  it('blocks mutating tools in planner mode', () => {
+  it('blocks write_file in planner mode', () => {
+    const result = validateToolArguments(
+      'write_file',
+      JSON.stringify({ path: 'a.ts', content: 'x' }),
+      'planner'
+    )
+    expect(result.ok).toBe(false)
+    expect(result.issues).toContain('tool_not_allowed_in_mode')
+  })
+
+  it('blocks search_replace outside plan files in planner mode', () => {
     const result = validateToolArguments(
       'search_replace',
       JSON.stringify({ path: 'a.ts', old_string: 'x', new_string: 'y' }),
@@ -44,6 +54,19 @@ describe('validateToolArguments', () => {
     )
     expect(result.ok).toBe(false)
     expect(result.issues).toContain('tool_not_allowed_in_mode')
+  })
+
+  it('allows search_replace on planner plan files', () => {
+    const result = validateToolArguments(
+      'search_replace',
+      JSON.stringify({
+        path: '.openrouter/plans/camera.md',
+        old_string: 'x',
+        new_string: 'y'
+      }),
+      'planner'
+    )
+    expect(result.ok).toBe(true)
   })
 
   it('allows grep_workspace in planner mode', () => {
@@ -55,9 +78,16 @@ describe('validateToolArguments', () => {
     expect(result.ok).toBe(true)
   })
 
-  it('blocks all tools in ask mode', () => {
-    const result = validateToolArguments('read_files', JSON.stringify({ paths: ['a.ts'] }), 'ask')
-    expect(result.ok).toBe(false)
+  it('allows read_files in ask mode and blocks writes', () => {
+    const read = validateToolArguments('read_files', JSON.stringify({ paths: ['a.ts'] }), 'ask')
+    expect(read.ok).toBe(true)
+    const write = validateToolArguments(
+      'write_file',
+      JSON.stringify({ path: 'a.ts', content: 'x' }),
+      'ask'
+    )
+    expect(write.ok).toBe(false)
+    expect(write.issues).toContain('tool_not_allowed_in_mode')
   })
 
   it('accepts read_project_memory without required args', () => {

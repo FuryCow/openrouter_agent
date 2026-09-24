@@ -1,15 +1,20 @@
-import { basename, relative } from 'path'
+import { relative } from 'path'
 
-export const IGNORED_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-  'out',
-  'release',
-  '.next',
-  'build',
-  '.cursor'
-])
+export const INDEX_EXCLUDE_GLOBS = [
+  '!**/node_modules/**',
+  '!**/dist/**',
+  '!**/out/**',
+  '!**/release/**',
+  '!**/.next/**',
+  '!**/build/**',
+  '!**/.cursor/**'
+]
+
+export function indexExcludeGlobArgs(): string[] {
+  const args: string[] = []
+  for (const glob of INDEX_EXCLUDE_GLOBS) args.push('--glob', glob)
+  return args
+}
 
 export const LOCKFILES = new Set([
   'package-lock.json',
@@ -38,8 +43,13 @@ const BINARY_EXTENSIONS = new Set([
   '.ttf',
   '.eot',
   '.mp4',
+  '.wasm',
   '.mp3',
-  '.wasm'
+  '.ogg',
+  '.wav',
+  '.tif',
+  '.tiff',
+  '.psd'
 ])
 
 export function getLanguageFromExtension(fileName: string): string {
@@ -48,6 +58,7 @@ export function getLanguageFromExtension(fileName: string): string {
   if (lower.endsWith('.ts')) return 'typescript'
   if (lower.endsWith('.jsx')) return 'javascript'
   if (lower.endsWith('.js')) return 'javascript'
+  if (lower.endsWith('.cs')) return 'csharp'
   if (lower.endsWith('.py')) return 'python'
   if (lower.endsWith('.go')) return 'go'
   if (lower.endsWith('.rs')) return 'rust'
@@ -55,11 +66,10 @@ export function getLanguageFromExtension(fileName: string): string {
   if (lower.endsWith('.json')) return 'json'
   if (lower.endsWith('.css')) return 'css'
   if (lower.endsWith('.html')) return 'html'
+  if (lower.endsWith('.shader')) return 'shader'
+  if (lower.endsWith('.cginc')) return 'shader'
+  if (lower.endsWith('.hlsl')) return 'shader'
   return 'text'
-}
-
-export function shouldIgnoreDirName(name: string): boolean {
-  return name.startsWith('.') || IGNORED_DIRS.has(name)
 }
 
 export function shouldSkipFile(fileName: string, size: number, maxFileSizeBytes: number): boolean {
@@ -67,11 +77,6 @@ export function shouldSkipFile(fileName: string, size: number, maxFileSizeBytes:
   if (size > maxFileSizeBytes) return true
   const ext = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.')).toLowerCase() : ''
   return BINARY_EXTENSIONS.has(ext)
-}
-
-export function shouldIgnoreRelativePath(relativePath: string): boolean {
-  const parts = relativePath.replace(/\\/g, '/').split('/')
-  return parts.some((part) => shouldIgnoreDirName(part))
 }
 
 export function relativePathFromRoot(root: string, absolutePath: string): string {

@@ -6,7 +6,6 @@ import { useFileStore } from '@/stores/fileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 
 const SYSTEM_PROMPT_OVERHEAD = 1200
-const STREAM_SAMPLE_MS = 2000
 
 export interface ContextEstimate {
   estimatedContext: number
@@ -124,7 +123,6 @@ export function readContextEstimateFromStores(): ContextEstimate {
 export function useContextEstimate(): ContextEstimate {
   const messages = useChatStore((s) => s.messages)
   const chatMode = useChatStore((s) => s.chatMode)
-  const isStreaming = useChatStore((s) => s.isStreaming)
   const customSystemPrompt = useSettingsStore((s) => s.settings.customSystemPrompt ?? '')
   const projectMemoryEnabled = useSettingsStore((s) => s.settings.projectMemoryEnabled !== false)
   const modelId = useSettingsStore((s) => s.settings.model)
@@ -173,11 +171,15 @@ export function useContextEstimate(): ContextEstimate {
 
     refresh()
 
-    if (!isStreaming) return
-
-    const id = window.setInterval(refresh, STREAM_SAMPLE_MS)
-    return () => window.clearInterval(id)
-  }, [stableKey, isStreaming])
+    return useChatStore.subscribe((state, prev) => {
+      if (
+        state.activeTimeline !== prev.activeTimeline ||
+        state.isStreaming !== prev.isStreaming
+      ) {
+        refresh()
+      }
+    })
+  }, [stableKey])
 
   return estimate
 }

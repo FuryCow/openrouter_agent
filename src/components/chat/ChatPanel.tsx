@@ -31,6 +31,7 @@ import {
   splitChatAttachments,
   type ChatInputAttachment
 } from '@/lib/chatAttachments'
+import { savePlannerPlanFile } from '@/lib/plannerPlanSave'
 
 function StreamingMessageBubble(): React.ReactElement {
   const activeTimeline = useChatStore((s) => s.activeTimeline)
@@ -260,7 +261,19 @@ export function ChatPanel(): React.ReactElement {
   }
 
   const confirmClear = (): void => {
+    const mode = useChatStore.getState().chatMode
+    const workspace = workingDirectory
     clearMessages()
+    void (async () => {
+      try {
+        await window.api.chat.save(mode, [], workspace, true)
+      } catch (err) {
+        useToastStore.getState().addToast(
+          err instanceof Error ? err.message : t('toast.clearFailed'),
+          'error'
+        )
+      }
+    })()
   }
 
   const handleRestoreRunCheckpoint = async (): Promise<void> => {
@@ -289,6 +302,22 @@ export function ChatPanel(): React.ReactElement {
     runCheckpoint &&
     runCheckpoint.count > 0 &&
     chatMode !== 'agent'
+
+  const handleSavePlan = async (planContent: string): Promise<void> => {
+    if (!workingDirectory) {
+      useToastStore.getState().addToast(t('toast.openWorkspaceForPlan'), 'error')
+      return
+    }
+    try {
+      const path = await savePlannerPlanFile(workingDirectory, planContent)
+      useToastStore.getState().addToast(t('toast.planSaved', { path }), 'success')
+    } catch (err) {
+      useToastStore.getState().addToast(
+        err instanceof Error ? err.message : t('toast.planSaveFailed'),
+        'error'
+      )
+    }
+  }
 
   const handleImplementPlan = async (planContent: string): Promise<void> => {
     if (isStreaming) return
@@ -436,6 +465,13 @@ export function ChatPanel(): React.ReactElement {
                 !isStreaming
               }
               onImplementPlan={() => handleImplementPlan(msg.content)}
+              showSavePlan={
+                chatMode === 'planner' &&
+                msg.role === 'assistant' &&
+                Boolean(msg.content.trim()) &&
+                !isStreaming
+              }
+              onSavePlan={() => void handleSavePlan(msg.content)}
               onCopy={
                 msg.role === 'assistant'
                   ? () => copyMessage(msg.content)

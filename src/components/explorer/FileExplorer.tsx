@@ -183,7 +183,15 @@ export function FileExplorer(): React.ReactElement {
 
   useEffect(() => {
     if (!workingDirectory) return
-    return window.api.fs.onWorkspaceChanged(() => refresh())
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const unsubscribe = window.api.fs.onWorkspaceChanged(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => refresh(), 1000)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      unsubscribe()
+    }
   }, [workingDirectory, refresh])
 
   const handleOpenFolder = (): void => {

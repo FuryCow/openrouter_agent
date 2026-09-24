@@ -15,13 +15,17 @@ import type {
 import {
   appendTimelineChunk,
   mergeTimelineFromMessage,
+  shouldFoldTextIntoReasoning,
   timelineToLegacyFields,
   upsertTimelineTool
 } from '../lib/timeline'
 import { useTokenUsageStore } from './tokenUsageStore'
 
-let streamBuffer = { text: '', reasoning: '' }
-const toolProgressBuffer = new Map<string, ToolCallInfo>()
+let streamEvents: Array<
+  | { kind: 'text'; chunk: string }
+  | { kind: 'reasoning'; chunk: string }
+  | { kind: 'tool'; toolCall: ToolCallInfo }
+> = []
 let flushTimer: ReturnType<typeof setTimeout> | null = null
 const STREAM_FLUSH_MS = 100
 const MAX_STREAMING_REASONING_CHARS = 250_000
@@ -66,30 +70,52 @@ interface ChatState {
   setPendingMemorySuggest: (suggest: MemorySuggestRequest | null) => void
 }
 
+function pushStreamEvent(event: (typeof streamEvents)[number]): void {
+  const last = streamEvents[streamEvents.length - 1]
+  if (event.kind !== 'tool' && last?.kind === event.kind) {
+    last.chunk += event.chunk
+    return
+  }
+  if (event.kind === 'tool' && last?.kind === 'tool' && last.toolCall.id === event.toolCall.id) {
+    last.toolCall = event.toolCall
+    return
+  }
+  streamEvents.push(event)
+}
+
+function applyStreamEvents(timeline: TimelineItem[]): TimelineItem[] {
+  let next = timeline
+  let reasoningChars = next
+    .filter((item) => item.type === 'reasoning')
+    .reduce((sum, item) => sum + item.content.length, 0)
+
+  for (const event of streamEvents) {
+    if (event.kind === 'tool') {
+      next = upsertTimelineTool(next, event.toolCall)
+      continue
+    }
+    let chunk = event.chunk
+    if (event.kind === 'reasoning' || shouldFoldTextIntoReasoning(next[next.length - 1], chunk)) {
+      const room = MAX_STREAMING_REASONING_CHARS - reasoningChars
+      if (room <= 0) continue
+      if (chunk.length > room) chunk = chunk.slice(0, room)
+      reasoningChars += chunk.length
+    }
+    next = appendTimelineChunk(next, event.kind === 'reasoning' ? 'reasoning' : 'text', chunk)
+  }
+
+  streamEvents = []
+  return next
+}
+
 function scheduleStreamFlush(
   set: (fn: (s: ChatState) => Partial<ChatState>) => void
 ): void {
   if (flushTimer !== null) return
   flushTimer = setTimeout(() => {
     flushTimer = null
-    let { text, reasoning } = streamBuffer
-    streamBuffer = { text: '', reasoning: '' }
-    const pendingTools = [...toolProgressBuffer.values()]
-    toolProgressBuffer.clear()
-    if (reasoning.length > MAX_STREAMING_REASONING_CHARS) {
-      reasoning = reasoning.slice(0, MAX_STREAMING_REASONING_CHARS)
-    }
-    if (!text && !reasoning && pendingTools.length === 0) return
-
-    set((s) => {
-      let timeline = s.activeTimeline
-      if (text) timeline = appendTimelineChunk(timeline, 'text', text)
-      if (reasoning) timeline = appendTimelineChunk(timeline, 'reasoning', reasoning)
-      for (const toolCall of pendingTools) {
-        timeline = upsertTimelineTool(timeline, toolCall)
-      }
-      return { activeTimeline: timeline }
-    })
+    if (streamEvents.length === 0) return
+    set((s) => ({ activeTimeline: applyStreamEvents(s.activeTimeline) }))
   }, STREAM_FLUSH_MS)
 }
 
@@ -134,12 +160,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })),
 
   appendStream: (chunk) => {
-    streamBuffer.text += chunk
+    if (!chunk) return
+    pushStreamEvent({ kind: 'text', chunk })
     scheduleStreamFlush(set)
   },
 
   appendReasoning: (chunk) => {
-    streamBuffer.reasoning += chunk
+    if (!chunk) return
+    pushStreamEvent({ kind: 'reasoning', chunk })
     scheduleStreamFlush(set)
   },
 
@@ -148,29 +176,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       clearTimeout(flushTimer)
       flushTimer = null
     }
-    let { text, reasoning } = streamBuffer
-    streamBuffer = { text: '', reasoning: '' }
-    const pendingTools = [...toolProgressBuffer.values()]
-    toolProgressBuffer.clear()
-    if (reasoning.length > MAX_STREAMING_REASONING_CHARS) {
-      reasoning = reasoning.slice(0, MAX_STREAMING_REASONING_CHARS)
-    }
-    if (!text && !reasoning && pendingTools.length === 0) return
-
-    set((s) => {
-      let timeline = s.activeTimeline
-      if (text) timeline = appendTimelineChunk(timeline, 'text', text)
-      if (reasoning) timeline = appendTimelineChunk(timeline, 'reasoning', reasoning)
-      for (const toolCall of pendingTools) {
-        timeline = upsertTimelineTool(timeline, toolCall)
-      }
-      return { activeTimeline: timeline }
-    })
+    if (streamEvents.length === 0) return
+    set((s) => ({ activeTimeline: applyStreamEvents(s.activeTimeline) }))
   },
 
   clearStream: () => {
-    streamBuffer = { text: '', reasoning: '' }
-    toolProgressBuffer.clear()
+    streamEvents = []
     if (flushTimer !== null) {
       clearTimeout(flushTimer)
       flushTimer = null
@@ -188,7 +199,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   updateToolCall: (toolCall) => {
-    toolProgressBuffer.set(toolCall.id, toolCall)
+    pushStreamEvent({ kind: 'tool', toolCall })
     scheduleStreamFlush(set)
   },
 

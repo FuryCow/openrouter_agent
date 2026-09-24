@@ -74,9 +74,17 @@ export default function App(): React.ReactElement {
   }, [])
 
   useEffect(() => {
-    return window.api.fs.onWorkspaceChanged(() => {
-      void reloadCleanTabsFromDisk()
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const unsubscribe = window.api.fs.onWorkspaceChanged(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        void reloadCleanTabsFromDisk()
+      }, 1000)
     })
+    return () => {
+      if (timer) clearTimeout(timer)
+      unsubscribe()
+    }
   }, [reloadCleanTabsFromDisk])
 
   useEffect(() => {

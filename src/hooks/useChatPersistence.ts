@@ -7,6 +7,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useToastStore } from '@/stores/toastStore'
 import {
   CHAT_PERSISTENCE_MODES,
+  latestChatMode,
   messagesForMode,
   resolvePersistenceWorkspace
 } from '@/lib/chatPersistenceCore'
@@ -41,26 +42,34 @@ export function useChatPersistence(): void {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loadSeqRef = useRef(0)
   const initializedRef = useRef(false)
+  const loadedWorkspaceRef = useRef<string | null | undefined>(undefined)
 
   const flushSave = useCallback(async (workspace: string | null) => {
     const state = useChatStore.getState()
     for (const mode of CHAT_PERSISTENCE_MODES) {
-      await window.api.chat.save(mode, messagesForMode(state.messages, mode), workspace)
+      const messages = messagesForMode(state.messages, mode)
+      await window.api.chat.save(mode, messages, workspace, false)
     }
   }, [])
 
   const loadWorkspace = useCallback(
-    async (workspace: string | null, showToast: boolean): Promise<void> => {
+    async (workspace: string | null, showToast: boolean): Promise<boolean> => {
       const seq = ++loadSeqRef.current
       const messages = await loadWorkspaceChats(workspace)
-      if (seq !== loadSeqRef.current) return
+      if (seq !== loadSeqRef.current) return false
 
-      useChatStore.getState().setAllMessages(messages)
+      const store = useChatStore.getState()
+      store.setAllMessages(messages)
+      loadedWorkspaceRef.current = workspace
+      if (messages.length > 0) {
+        store.setChatMode(latestChatMode(messages, store.chatMode))
+      }
 
       if (showToast && workspace) {
         const name = workspace.split(/[/\\]/).pop() || workspace
         useToastStore.getState().addToast(t('persistence.switched', { name }), 'info')
       }
+      return true
     },
     [t]
   )
@@ -78,8 +87,8 @@ export function useChatPersistence(): void {
     const prev = prevWorkspaceRef.current
     if (prev === undefined) {
       prevWorkspaceRef.current = workspace
-      void loadWorkspace(workspace, false).then(() => {
-        initializedRef.current = true
+      void loadWorkspace(workspace, false).then((ok) => {
+        if (ok) initializedRef.current = true
       })
       return
     }
@@ -94,18 +103,23 @@ export function useChatPersistence(): void {
       if (initializedRef.current) {
         await flushSave(prev)
       }
+      loadedWorkspaceRef.current = undefined
       prevWorkspaceRef.current = workspace
-      await loadWorkspace(workspace, true)
+      initializedRef.current = false
+      const ok = await loadWorkspace(workspace, true)
+      if (ok) initializedRef.current = true
     })()
   }, [hydrated, workingDirectory, settingsWorkingDirectory, flushSave, loadWorkspace])
 
   useEffect(() => {
     if (!hydrated) return
 
-    const unsubscribe = useChatStore.subscribe(() => {
+    const unsubscribe = useChatStore.subscribe((state, prev) => {
+      if (state.messages === prev.messages) return
       if (!initializedRef.current) return
       const workspace = currentPersistenceWorkspace()
       if (workspace === undefined) return
+      if (workspace !== loadedWorkspaceRef.current) return
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
         void flushSave(workspace)
@@ -129,6 +143,7 @@ export function useChatPersistence(): void {
       }
       const workspace = currentPersistenceWorkspace()
       if (workspace === undefined) return
+      if (workspace !== loadedWorkspaceRef.current) return
       await flushSave(workspace)
     }
 
