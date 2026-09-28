@@ -28,7 +28,7 @@
 
 The app runs on your machine. The workspace stays on disk. A request goes to OpenRouter only when you send a message, and it includes the context you attached: the conversation, open files, and tool results.
 
-Current release: [v1.0.0-alpha.4](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.4) · Windows (NSIS), macOS (DMG), Linux (AppImage) · MIT
+Current release: [v1.0.0-alpha.5](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.5) · Windows (NSIS), macOS (DMG), Linux (AppImage) · MIT
 
 ## What you get
 

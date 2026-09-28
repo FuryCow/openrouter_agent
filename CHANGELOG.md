@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.5] — 2026-09-28
+
+### Index
+
+- The installed app can start ripgrep. The binary is unpacked next to `app.asar` instead of being launched from inside the archive.
+
+### Terminal
+
+- Switching folders restarts open terminal tabs in the new workspace. Closing the tab is no longer required.
+
+---
+
 ## [1.0.0-alpha.4] — 2026-09-28
 
 ### Tests

@@ -28,10 +28,20 @@ describe('terminalStore ensureInitialTab', () => {
     expect(activeTabId).toBe(tabId)
   })
 
-  it('does not overwrite an existing tab cwd', () => {
-    useTerminalStore.getState().ensureInitialTab('F:\\other\\project')
+  it('moves open tabs into the folder that was just opened', () => {
     useTerminalStore.getState().ensureInitialTab('F:\\pets\\step_to_award')
+    useTerminalStore.getState().addTab('F:\\pets\\step_to_award')
+    useTerminalStore.getState().renameFromFirstCommand(
+      useTerminalStore.getState().tabs[0]?.id ?? '',
+      'flutter test'
+    )
+    const ids = useTerminalStore.getState().tabs.map((tab) => tab.id)
 
-    expect(useTerminalStore.getState().tabs[0]?.cwd).toBe('F:\\other\\project')
+    useTerminalStore.getState().ensureInitialTab('F:\\UnityHub\\UnityProjects\\My project')
+
+    const { tabs } = useTerminalStore.getState()
+    expect(tabs.map((tab) => tab.id)).toEqual(ids)
+    expect(tabs.every((tab) => tab.cwd === 'F:\\UnityHub\\UnityProjects\\My project')).toBe(true)
+    expect(tabs.every((tab) => tab.title === 'Terminal' && !tab.customTitle)).toBe(true)
   })
 })

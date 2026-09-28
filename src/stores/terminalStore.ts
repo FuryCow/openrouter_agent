@@ -41,11 +41,16 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       return
     }
 
-    // Initial tab may have been created before workspace settings loaded (cwd was null).
-    if (state.tabs.length === 1 && state.tabs[0].cwd === null && cwd !== null) {
-      const tab = state.tabs[0]
-      set({ tabs: [{ ...tab, cwd }], activeTabId: tab.id })
-    }
+    // A tab created before the folder loaded has no cwd yet.
+    // Switching folders moves every open shell into the folder that is open now.
+    if (cwd === null) return
+    if (state.tabs.every((tab) => tab.cwd === cwd)) return
+
+    set({
+      tabs: state.tabs.map((tab) =>
+        tab.cwd === cwd ? tab : { ...tab, cwd, title: 'Terminal', customTitle: false }
+      )
+    })
   },
 
   addTab: (cwd) => {

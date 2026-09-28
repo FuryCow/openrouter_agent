@@ -28,9 +28,9 @@ export function TerminalPanel(): React.ReactElement {
   const renameFromFirstCommand = useTerminalStore((s) => s.renameFromFirstCommand)
 
   useEffect(() => {
-    if (!terminalOpen) return
     const cwd = resolveWorkspacePath(hydrated, workingDirectory, settingsWorkingDirectory)
     if (cwd === undefined) return
+    if (!terminalOpen && useTerminalStore.getState().tabs.length === 0) return
     ensureInitialTab(cwd)
   }, [terminalOpen, hydrated, workingDirectory, settingsWorkingDirectory, ensureInitialTab])
 

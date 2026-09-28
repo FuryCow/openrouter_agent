@@ -1,6 +1,6 @@
 {
   "name": "openrouter-agent",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "description": "LLM agent desktop app with chat, file browser, editor, and tools via OpenRouter",
   "author": "FuryCow",
   "license": "MIT",
@@ -93,7 +93,7 @@
       "**/*.node",
       "node_modules/better-sqlite3/**",
       "node_modules/hnswlib-node/**",
-      "node_modules/@vscode/ripgrep/**"
+      "node_modules/@vscode/ripgrep*/**"
     ],
     "win": {
       "target": "nsis"

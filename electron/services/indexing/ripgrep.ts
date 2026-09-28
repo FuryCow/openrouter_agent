@@ -2,9 +2,15 @@ import { spawn } from 'child_process'
 
 let rgPathPromise: Promise<string> | null = null
 
+/** Spawn cannot run a binary packed inside app.asar. electron-builder copies it beside the archive. */
+export function ripgrepExecutablePath(rgPath: string): string {
+  if (rgPath.includes(`${'app.asar'}.unpacked`)) return rgPath
+  return rgPath.replace('app.asar', 'app.asar.unpacked')
+}
+
 export async function getRgPath(): Promise<string> {
   if (!rgPathPromise) {
-    rgPathPromise = import('@vscode/ripgrep').then((module) => module.rgPath)
+    rgPathPromise = import('@vscode/ripgrep').then((module) => ripgrepExecutablePath(module.rgPath))
   }
   return rgPathPromise
 }
