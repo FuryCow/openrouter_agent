@@ -1,281 +1,152 @@
-# OpenRouter Agent
+<p align="center">
+  <img src="build/icon.png" width="128" alt="OpenRouter Agent">
+</p>
 
-[![Latest release](https://img.shields.io/github/v/release/FuryCow/openrouter_agent?label=latest&sort=semver&style=flat-square)](https://github.com/FuryCow/openrouter_agent/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/FuryCow/openrouter_agent/ci.yml?branch=main&style=flat-square&label=build)](https://github.com/FuryCow/openrouter_agent/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/github/license/FuryCow/openrouter_agent?style=flat-square)](https://github.com/FuryCow/openrouter_agent/blob/main/LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
+<h1 align="center">OpenRouter Agent</h1>
 
-**Desktop AI coding environment** — chat, file explorer, Monaco editor, integrated terminal, and autonomous agent tools over the [OpenRouter](https://openrouter.ai/) API.
+<p align="center">
+  A local desktop workspace for coding with any model on OpenRouter.<br>
+  Chat, files, editor, terminal, and an agent that edits the project in front of you.
+</p>
 
-Built with Electron, React, and TypeScript. Runs locally on your machine; source code and workspace stay on disk unless you send them to a model.
+<p align="center">
+  <a href="https://github.com/FuryCow/openrouter_agent/releases/latest"><img src="https://img.shields.io/github/v/release/FuryCow/openrouter_agent?include_prereleases&sort=semver&style=flat-square" alt="Current release"></a>
+  <a href="https://github.com/FuryCow/openrouter_agent/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/FuryCow/openrouter_agent/ci.yml?branch=main&style=flat-square&label=build" alt="Build"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/FuryCow/openrouter_agent?style=flat-square" alt="MIT license"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D24-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js 24+"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/FuryCow/openrouter_agent/releases/latest"><strong>Download</strong></a>
+  ·
+  <a href="#install-from-source">Install from source</a>
+  ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+---
+
+The app runs on your machine. The workspace stays on disk. A request goes to OpenRouter only when you send a message, and it includes the context you attached: the conversation, open files, and tool results.
+
+Current release: [v1.0.0-alpha.4](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.4) · Windows (NSIS), macOS (DMG), Linux (AppImage) · MIT
+
+## What you get
 
 | | |
 |---|---|
-| **Latest release** | [v1.0.0-alpha.4](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.4) |
-| **License** | MIT |
-| **Runtime** | Node.js 24+ |
-| **Platforms** | Windows (NSIS), macOS (DMG), Linux (AppImage) |
+| **Workspace** | File tree, Monaco editor, image preview, multi-tab terminal |
+| **Agent** | Streams an answer, calls tools, shows a diff, and can roll a run back |
+| **Ask** | Reads the project and answers. Does not write files or run the shell |
+| **Planner** | Drafts a plan and may edit only the markdown under `.openrouter/plans/` |
+| **Search** | Ripgrep, SQLite full-text, symbols, and an offline embedding index |
+| **MCP** | Extra tools from stdio, HTTP, or SSE servers, tested per server |
 
----
+Writes and shell commands stop for approval unless you turn auto-approve on for that category. Each run keeps a checkpoint, so one file or the whole run can be restored.
 
-## Table of contents
+## Modes
 
-- [Overview](#overview)
-- [Capabilities](#capabilities)
-- [Architecture](#architecture)
-- [Operating modes](#operating-modes)
-- [Security & governance](#security--governance)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
-- [Keyboard shortcuts](#keyboard-shortcuts)
-- [Agent tools](#agent-tools)
-- [MCP integration](#mcp-integration)
-- [Development](#development)
-- [Project structure](#project-structure)
-- [Changelog](#changelog)
-- [License](#license)
+| Mode | Can change the project | Used for |
+|------|------------------------|----------|
+| **Agent** | Yes, after approval | Implementing the task |
+| **Ask** | No | Questions about the code that is already there |
+| **Planner** | Only saved plan files | A plan you can hand to Agent |
 
----
+A finished plan can be sent to Agent from the chat. Ask and Planner keep going until the answer is done or you stop the run.
 
-## Overview
+## Download
 
-OpenRouter Agent is a self-contained IDE-style application for AI-assisted software development. It combines:
+Installers are attached to each [GitHub release](https://github.com/FuryCow/openrouter_agent/releases/latest).
 
-- **Multi-mode chat** — autonomous agent, read-only Q&A, and structured planning.
-- **Workspace tooling** — file I/O, hybrid codebase search, terminal execution, and web search.
-- **Review workflow** — inline diffs, run checkpoints, selective revert, and task checklists.
-- **Local indexing** — ripgrep, SQLite FTS, symbol extraction, and offline semantic embeddings.
+On first launch, open **Settings** (`Ctrl+L`) and paste an [OpenRouter API key](https://openrouter.ai/keys). Pick a model from the title bar. The app version is shown in the status bar and at the bottom of Settings.
 
-The UI is optimized for long agent sessions: streaming responses, tool-call timelines, context chips, run status, and attachment support for images and text files.
+## Install from source
 
----
-
-## Capabilities
-
-### Workspace & editor
-
-| Area | Description |
-|------|-------------|
-| **File explorer** | Lazy-loaded tree; open, rename, delete; image preview tabs |
-| **Monaco editor** | Syntax highlighting, multi-tab editing, inline run diffs |
-| **Terminal** | Multi-tab PTY via xterm.js; auto-named tabs; ANSI-safe titles |
-| **Command palette** | Quick open files, recent files, and editor commands |
-
-### Agent & chat
-
-| Area | Description |
-|------|-------------|
-| **Streaming chat** | Reasoning blocks, tool timelines, retry/remember actions |
-| **Context control** | Pin or exclude open files; compact context chips |
-| **Attachments** | Images and text/code files sent as structured `<attached_file>` blocks |
-| **Run review** | Changes strip, checkpoint summary, per-file revert |
-| **Persistence** | Conversations saved locally; debounced flush on close |
-
-### Code intelligence
-
-| Area | Description |
-|------|-------------|
-| **`grep_workspace`** | Regex search via bundled ripgrep |
-| **`codebase_search`** | Hybrid FTS + symbols + local semantic embeddings (offline) |
-| **Project memory** | Workspace-scoped notes the agent can read and update |
-| **MCP servers** | Extend tools via Model Context Protocol (stdio / HTTP / SSE) |
-
-### Models
-
-- Dynamic model list from OpenRouter (tool-capable models for agent mode).
-- Filter by vision support; sort by price, capability, or name.
-- Per-model pricing shown as input/output per 1M tokens.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Renderer (React + Zustand)                                 │
-│  Chat · Explorer · Editor · Terminal · Settings             │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ IPC (contextBridge)
-┌──────────────────────────▼──────────────────────────────────┐
-│  Main process (Electron)                                      │
-│  Agent loop · Tool execution · Indexing · MCP · Persistence   │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-         ┌─────────────────┼─────────────────┐
-         ▼                 ▼                 ▼
-   OpenRouter API    Local workspace    SQLite + HNSW
-   (LLM + tools)     (fs, pty, rg)      (codebase index)
-```
-
-**Stack:** Electron 33 · electron-vite · React 19 · TypeScript · Tailwind CSS 4 · Radix UI · Monaco · xterm.js · Zustand · i18next
-
----
-
-## Operating modes
-
-| Mode | Tools | Purpose |
-|------|-------|---------|
-| **Agent** | Full read/write, terminal, search, MCP | Implement changes autonomously with approval gates |
-| **ASK** | None | Answer questions using open-file context only |
-| **Planner** | Read-only exploration | Produce structured plans; hand off to Agent |
-
-Planner output can be approved and passed to Agent mode as an execution plan with an optional task checklist.
-
----
-
-## Security & governance
-
-OpenRouter Agent is designed for **local, user-controlled** workflows:
-
-- **API keys** stored locally via `electron-store`; never committed to the repository.
-- **Approval gates** for file writes and terminal commands (configurable auto-approve per category).
-- **Workspace safety** blocks destructive shell patterns and redirects code search away from raw terminal grep.
-- **Project memory hygiene** — conventions and decisions only; no secrets or credentials in memory.
-- **Context isolation** — renderer has no direct Node/fs access; tools run in the main process.
-
-> **Note:** LLM requests send selected context (messages, attachments, open files, tool results) to your chosen OpenRouter model. Review provider terms and data policies before use in regulated environments.
-
----
-
-## Quick start
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) **24+**
-- [OpenRouter API key](https://openrouter.ai/keys)
-
-### Install
+[Node.js 24+](https://nodejs.org/) or newer.
 
 ```bash
 git clone https://github.com/FuryCow/openrouter_agent.git
 cd openrouter_agent
 npm install
+npm run dev
 ```
 
-Native modules (`better-sqlite3`, `hnswlib-node`) are rebuilt for Electron on `postinstall` via `node scripts/rebuild-native.mjs`. If indexing fails after install:
+`npm install` rebuilds `better-sqlite3` and `hnswlib-node` for Electron. If the index fails to open after an Electron upgrade, run `npm run postinstall` again.
 
-```bash
-npm run postinstall
-```
+The first semantic index downloads an embedding model (about 25 MB) into the app data directory.
 
-The first semantic index run downloads an embedding model (~25 MB) to the app user-data directory.
+| Command | What it does |
+|---------|----------------|
+| `npm run dev` | Development window with reload |
+| `npm run build` | Compile main and renderer |
+| `npm run package` | Installers in `release/` |
+| `npm test` | Unit tests |
+| `npm run i18n:check` | Locale keys |
 
-### Run
+If the terminal fails after an Electron upgrade on Windows, install the [Spectre-mitigated MSVC libraries](https://aka.ms/Ofhn4c) and run `npx electron-rebuild -f -o node-pty`.
 
-```bash
-npm run dev          # development
-npm run build        # production build
-npm run package      # installers → release/
-npm test             # unit tests (Vitest)
-```
+## Settings
 
-On first launch, open **Settings** (`Ctrl+L`) and enter your OpenRouter API key. Select a model from the title bar.
+| Setting | What it controls |
+|---------|------------------|
+| API key | OpenRouter token, stored locally with `electron-store` |
+| Model | Tool-capable models for Agent; vision filter and price sort in the picker |
+| Temperature | Sampling temperature |
+| Custom system prompt | Extra instructions in Agent mode |
+| Auto-approve writes | Skip the card for file edits |
+| Auto-approve terminal | Skip the card for shell commands |
+| MCP servers | External tools. **Test** checks one server. **Save** does not reconnect them |
+| Locale | English |
 
----
+## Shortcuts
 
-## Configuration
-
-| Setting | Description |
-|---------|-------------|
-| **API key** | OpenRouter bearer token |
-| **Model** | Any tool-capable model from OpenRouter |
-| **Temperature** | Sampling temperature for completions |
-| **Custom system prompt** | Prepended in Agent mode |
-| **Auto-approve writes** | Skip confirmation for file edits |
-| **Auto-approve terminal** | Skip confirmation for shell commands |
-| **MCP servers** | JSON config for external tool servers |
-| **Locale** | UI language (English bundled; i18n-ready) |
-
-Terminal note: `node-pty` uses prebuilt binaries. If the terminal fails after an Electron upgrade on Windows, install [Spectre-mitigated MSVC libs](https://aka.ms/Ofhn4c) and run:
-
-```bash
-npx electron-rebuild -f -o node-pty
-```
-
----
-
-## Keyboard shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+S` | Save current file |
-| `Ctrl+P` | Command palette / quick open |
+| Keys | Action |
+|------|--------|
+| `Enter` | Send |
+| `Shift+Enter` | New line |
+| `Ctrl+S` | Save the file |
+| `Ctrl+P` | Quick open |
 | `Ctrl+L` | Settings |
-| `Ctrl+\`` | Toggle terminal panel |
-| `Ctrl+Shift+\`` | New terminal tab |
-| `Ctrl+/` | Keyboard shortcuts reference |
-| `Enter` | Send message |
-| `Shift+Enter` | New line in composer |
+| `` Ctrl+` `` | Terminal |
+| `` Ctrl+Shift+` `` | New terminal tab |
+| `Ctrl+/` | Shortcut list |
 
----
+## Tools the agent can call
 
-## Agent tools
+| Tool | What it does |
+|------|----------------|
+| `read_file` / `read_files` | Read one file, or up to 10 in one call |
+| `write_file` | Create or overwrite a file |
+| `search_replace` | Replace one match, or every match |
+| `list_directory` | List a folder |
+| `grep_workspace` | Regex search with ripgrep |
+| `search_files` | Text search under a root |
+| `codebase_search` | Full-text, symbols, and semantic hits |
+| `run_terminal` | Run a command in the workspace |
+| `web_search` | Search the web |
+| `get_open_files` | Tabs currently open in the editor |
+| `read_project_memory` / `update_project_memory` | Notes kept for this project |
+| `create_task_checklist` / `update_task_checklist` | Steps for the current run |
 
-| Tool | Description |
-|------|-------------|
-| `read_files` | Read 1–10 files in one call (primary read tool) |
-| `write_file` | Create or overwrite files |
-| `search_replace` | Targeted in-file edits |
-| `list_directory` | List directory entries |
-| `grep_workspace` | Regex search across workspace (ripgrep) |
-| `codebase_search` | Hybrid FTS + symbols + semantic search |
-| `run_terminal` | Execute shell commands (build, test, servers) |
-| `web_search` | Web search via DuckDuckGo |
-| `get_open_files` | List open editor tabs and selection context |
-| `read_project_memory` | Read workspace memory entries |
-| `update_project_memory` | Append or update project memory |
-| `create_task_checklist` | Create a run checklist (Agent mode) |
-| `update_task_checklist` | Update checklist step status |
+Search the tree before reading whole files. Shell search through `run_terminal` is blocked; use `grep_workspace` or `codebase_search`.
 
-Deprecated aliases (`read_file`, `search_files`) are mapped automatically.
+MCP tools show up as `mcp__<server>__<tool>`.
 
-**Exploration convention:** search first (`codebase_search` / `grep_workspace`), scope paths, then batch-read with `read_files`. Do not grep source via `run_terminal`.
+## Security
 
----
+The API key stays on disk and is not part of the repository. The window cannot touch the filesystem itself; tools run in the main process. The app refuses to use its own install folder as the workspace. Project memory is for conventions and decisions, not secrets.
 
-## MCP integration
+The model still receives whatever you put in the conversation. Read the provider terms before using this on a private codebase.
 
-Configure MCP servers in **Settings → MCP**. Supported transports:
-
-- **stdio** — local process (`command` + `args`)
-- **HTTP / SSE** — remote servers
-
-MCP tools appear as `mcp__<serverId>__<toolName>` in the agent tool list. Servers can be tested and saved from the settings panel.
-
----
-
-## Development
-
-```bash
-npm run dev            # hot-reload dev server
-npm run build          # compile main + renderer
-npm run test           # Vitest (189+ tests)
-npm run i18n:check     # validate locale key usage
-```
-
-### Project structure
+## Project layout
 
 ```
-openrouter_agent/
-├── electron/           # Main process: agent, tools, indexing, MCP
-│   ├── services/       # Agent loop, filesystem, terminal, OpenRouter
-│   └── lib/            # Shared utilities (diff, tokens, errors)
-├── src/                # Renderer: React UI, stores, hooks
-│   ├── components/     # Chat, editor, explorer, terminal, layout
-│   ├── stores/         # Zustand state
-│   └── i18n/           # Locale bundles
-├── scripts/            # Build and i18n scripts
-└── release/            # Packaged installers (generated)
+electron/     main process: agent loop, tools, index, MCP
+src/          React UI, stores, i18n
+scripts/      native rebuild and locale check
+build/        app icon
+release/      installers produced by npm run package
 ```
-
----
-
-## Changelog
-
-See [CHANGELOG.md](./CHANGELOG.md) for release notes.
-
----
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT. See [LICENSE](LICENSE).
