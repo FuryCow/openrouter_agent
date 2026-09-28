@@ -11,7 +11,7 @@ Built with Electron, React, and TypeScript. Runs locally on your machine; source
 
 | | |
 |---|---|
-| **Latest release** | [v1.0.0-alpha.3](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.3) |
+| **Latest release** | [v1.0.0-alpha.4](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.4) |
 | **License** | MIT |
 | **Runtime** | Node.js 24+ |
 | **Platforms** | Windows (NSIS), macOS (DMG), Linux (AppImage) |

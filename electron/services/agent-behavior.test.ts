@@ -56,7 +56,9 @@ describe('a full agent run', () => {
   let hangStream = false
   let hangAfter = -1
   let throwAfter = -1
-  let seenMessages: Array<{ role: string; content: unknown }> = []
+  let seenMessages: Array<{ role: string; content: unknown; tool_calls?: unknown; tool_call_id?: string; name?: string }> = []
+  let seenTools: Array<{ function?: { name?: string } }> = []
+  let seenCallOptions: { model?: string; temperature?: number; maxTokens?: number } = {}
 
   afterEach(() => {
     hasApiKey = true
@@ -82,15 +84,24 @@ describe('a full agent run', () => {
     const model = {
       hasApiKey: () => hasApiKey,
       streamCompletion: async (
-        messages: Array<{ role: string; content: unknown }>,
-        _tools: unknown,
+        messages: Array<{ role: string; content: unknown; tool_calls?: unknown; tool_call_id?: string; name?: string }>,
+        tools: Array<{ function?: { name?: string } }>,
         options: {
           onChunk?: (text: string) => void
           onReasoningChunk?: (text: string) => void
           onToolCallProgress?: (call: ToolCall) => void
+          model?: string
+          temperature?: number
+          maxTokens?: number
         } = {}
       ) => {
         seenMessages = messages
+        seenTools = tools
+        seenCallOptions = {
+          model: options.model,
+          temperature: options.temperature,
+          maxTokens: options.maxTokens
+        }
         const callIndex = index
         if (throwAfter >= 0 && callIndex >= throwAfter) {
           throw new Error('network down')
@@ -111,7 +122,7 @@ describe('a full agent run', () => {
       }
     }
     const mcp = {
-      getToolsForMode: () => [],
+      getToolsForMode: () => [{ type: 'function', function: { name: 'mcp__docs__search' } }],
       getConnectedServerSummaries: () => [{ id: 'docs', name: 'Docs', toolCount: 1 }],
       isMcpTool: (name: string) => name.startsWith('mcp__'),
       requiresApproval: (name: string) => mcpNeedsApproval && name.includes('danger'),
@@ -178,6 +189,8 @@ describe('a full agent run', () => {
     memoryUpdate = null
     mcpCalls = []
     seenMessages = []
+    seenTools = []
+    seenCallOptions = {}
     const agent = create(steps)
     const events: AgentEvent[] = []
     await agent.run(
@@ -277,11 +290,13 @@ describe('a full agent run', () => {
     const events = await run(
       dir,
       [
-        tools(call('read_file', { path: 'Camera.ts' })),
+        tools(call('read_file', { path: 'Camera.ts' }, 'camera')),
+        tools(call('read_file', { path: join(process.cwd(), 'package.json') }, 'app-file')),
         tools(call('read_files', { paths: ['Camera.ts', 'missing.ts'] })),
         tools(call('read_files', { paths: [] })),
         tools(call('read_files', { paths: Array.from({ length: 11 }, (_, i) => `f${i}.ts`) })),
         tools(call('list_directory', { path: '.' })),
+        tools(call('list_directory', {}, 'list-root')),
         tools(call('search_files', { query: 'uniqueZoomToken', root: 'src' })),
         tools(call('search_files', { query: 'no-such-token' })),
         tools(call('grep_workspace', { query: 'cameraFocus', limit: 1, path_glob: 'Camera.ts' })),
@@ -316,8 +331,10 @@ describe('a full agent run', () => {
       }
     )
 
-    expect(toolOutput(events, 'read_file')).toContain('cameraFocus')
+    expect(events.find((event) => event.toolCall?.id === 'app-file')?.toolCall?.result).toContain('workspace.agentAppFolder')
+    expect(events.find((event) => event.toolCall?.id === 'camera')?.toolCall?.result).toContain('cameraFocus')
     expect(toolOutput(events, 'read_files')).toContain('missing.ts')
+    expect(toolOutput(events, 'read_files')).toContain('Error:')
     expect(events.filter((event) => event.type === 'tool_done' && event.toolCall?.name === 'read_files')[1]?.toolCall?.result).toContain(
       'missing_required_argument'
     )
@@ -325,15 +342,17 @@ describe('a full agent run', () => {
       'missing_required_argument'
     )
     expect(toolOutput(events, 'list_directory')).toContain('[file] Camera.ts')
+    expect(events.find((event) => event.toolCall?.id === 'list-root')?.toolCall?.result).toContain('[file] Camera.ts')
+    expect(toolOutput(events, 'grep_workspace')).toContain('cameraFocus')
     expect(toolOutput(events, 'search_files')).toContain('uniqueZoomToken')
     expect(events.filter((event) => event.type === 'tool_done' && event.toolCall?.name === 'search_files')[1]?.toolCall?.result).toBe(
       'No matches found'
     )
-    expect(toolOutput(events, 'grep_workspace')).toContain('cameraFocus')
-    expect(toolOutput(events, 'codebase_search')).toContain('cameraFocus')
+    expect(toolOutput(events, 'grep_workspace').split('\n')).toHaveLength(1)
+    expect(toolOutput(events, 'codebase_search')).toBe('src/Camera.ts:1-2 [text] cameraFocus focus')
     expect(toolOutput(events, 'get_open_files')).toContain('A')
     expect(toolOutput(events, 'get_open_files')).not.toContain('TAIL')
-    expect(toolOutput(events, 'web_search')).toContain('https://example.test')
+    expect(toolOutput(events, 'web_search')).toBe('**Docs**\nhttps://example.test\ncameras')
     expect(toolOutput(events, 'read_project_memory')).toContain('remembered focus')
     const userMessage = seenMessages.find((message) => message.role === 'user')
     expect(JSON.stringify(userMessage?.content)).toContain('attached-body')
@@ -344,9 +363,13 @@ describe('a full agent run', () => {
   it('writes, patches, checks a command, and can roll the files back', async () => {
     const dir = workspace()
     writeFileSync(join(dir, 'Camera.ts'), 'alpha alpha')
+    writeFileSync(join(dir, 'Pair.ts'), 'gamma gamma')
+    writeFileSync(join(dir, 'Once.ts'), 'epsilon epsilon')
     const agent = create([
       tools(call('write_file', { path: 'Fresh.ts', content: 'fresh' })),
       tools(call('search_replace', { path: 'Camera.ts', old_string: 'alpha', new_string: 'beta', replace_all: true })),
+      tools(call('search_replace', { path: 'Pair.ts', old_string: 'gamma', new_string: 'delta', replace_all: 'true' }, 'all-string')),
+      tools(call('search_replace', { path: 'Once.ts', old_string: 'epsilon', new_string: 'zeta', replace_all: false }, 'one')),
       tools(call('run_terminal', { command: 'echo hi' })),
       reply('edited')
     ])
@@ -360,6 +383,16 @@ describe('a full agent run', () => {
 
     expect(readFileSync(join(dir, 'Fresh.ts'), 'utf8')).toBe('fresh')
     expect(readFileSync(join(dir, 'Camera.ts'), 'utf8')).toBe('beta beta')
+    expect(readFileSync(join(dir, 'Pair.ts'), 'utf8')).toBe('delta delta')
+    expect(readFileSync(join(dir, 'Once.ts'), 'utf8')).toBe('epsilon epsilon')
+    expect(events.find((event) => event.toolCall?.id === 'one')?.toolCall?.result).toContain('matched 2 times')
+    expect(toolOutput(events, 'write_file')).toContain('Successfully wrote 5 characters')
+    expect(
+      events
+        .find((event) => event.type === 'tool_done' && event.toolCall?.name === 'write_file')
+        ?.toolCall?.fileDiff?.lines.some((line) => line.type === 'add' && line.content.includes('fresh'))
+    ).toBe(true)
+    expect(events.filter((event) => event.type === 'checkpoint_updated')).toHaveLength(4)
     expect(terminalCommand).toBe('echo hi')
     expect(events.some((event) => event.type === 'checkpoint_updated')).toBe(true)
     expect(events.some((event) => event.type === 'memory_suggest')).toBe(true)
@@ -431,11 +464,13 @@ describe('a full agent run', () => {
     mcpNeedsApproval = true
     const events = await run(dir, [
       tools(call('update_project_memory', { action: 'append', content: 'use the wide lens', category: 'note' })),
+      tools(call('update_project_memory', { action: 'update', id: 'mem-1', content: 'wider', category: 'decision' }, 'update-mem')),
       tools(call('update_project_memory', { action: 'delete', id: 'mem-1' }, 'delete-mem')),
       tools(call('create_task_checklist', { steps: ['Open camera', 'Fix focus'] })),
       tools(call('update_task_checklist', { step: 1, status: 'done' })),
       tools(call('update_task_checklist', { step: 1, status: 'nope' }, 'bad-status')),
       tools(call('create_task_checklist', { steps: [] }, 'empty-list')),
+      tools(call('create_task_checklist', { steps: Array.from({ length: 20 }, (_, i) => `s${i}`) }, 'twenty')),
       tools(call('create_task_checklist', { steps: Array.from({ length: 21 }, (_, i) => `step ${i}`) }, 'long-list')),
       tools(call('mcp__docs__search', { q: 'focus' })),
       tools(call('mcp__docs__danger_write', { q: 'x' }, 'mcp-danger')),
@@ -445,9 +480,13 @@ describe('a full agent run', () => {
 
     expect(memoryUpdate).toMatchObject({ action: 'delete' })
     expect(toolOutput(events, 'update_project_memory')).toContain('Saved memory entry mem-1')
-    expect(events.find((event) => event.type === 'tool_done' && event.toolCall?.id === 'delete-mem')?.toolCall?.result).toContain(
-      'Deleted memory entry'
+    expect(events.find((event) => event.type === 'tool_done' && event.toolCall?.id === 'delete-mem')?.toolCall?.result).toBe(
+      'Deleted memory entry mem-1'
     )
+    expect(events.find((event) => event.type === 'tool_done' && event.toolCall?.id === 'update-mem')?.toolCall?.result).toContain(
+      '(decision)'
+    )
+    expect(events.find((event) => event.toolCall?.id === 'twenty')?.toolCall?.result).toContain('s19')
     expect(events.some((event) => event.type === 'checklist_updated' && (event.checklist?.steps.length ?? 0) > 0)).toBe(
       true
     )
@@ -512,6 +551,10 @@ describe('a full agent run', () => {
       { mode: 'ask', workingDirectory: '' }
     )
     expect(toolOutput(events, 'run_terminal')).toContain('tool_not_allowed_in_mode')
+
+    const askInside = await run(dir, [reply('ok')], { mode: 'ask', workingDirectory: process.cwd() })
+    expect(askInside.some((event) => event.errorCode === 'workspace.agentAppFolder')).toBe(false)
+    expect(askInside.some((event) => event.type === 'done' && event.message?.content === 'ok')).toBe(true)
   })
 
   it('reports misses, empty output, and a stopped run that already wrote a file', async () => {
@@ -611,7 +654,7 @@ describe('a full agent run', () => {
 
   it('stops reading once the file budget is spent and keeps an error on the answer', async () => {
     const dir = workspace()
-    const big = 'A'.repeat(50_000)
+    const big = 'A'.repeat(60_000)
     for (let i = 0; i < 4; i++) writeFileSync(join(dir, `big${i}.txt`), big)
     const events = await run(dir, [
       tools(call('read_files', { paths: ['big0.txt', 'big1.txt', 'big2.txt', 'big3.txt'] })),
@@ -619,7 +662,11 @@ describe('a full agent run', () => {
       tools(call('update_task_checklist', { step: 9, status: 'done' }, 'bad-step')),
       reply('done')
     ])
-    expect(toolOutput(events, 'read_files')).toContain('budget exceeded')
+    const batch = toolOutput(events, 'read_files')
+    expect(batch.startsWith('===')).toBe(true)
+    expect(batch).toContain('A'.repeat(50_000))
+    expect(batch).not.toContain('A'.repeat(60_000))
+    expect(batch.indexOf('budget exceeded')).toBeGreaterThan(batch.indexOf('A'.repeat(100)))
     expect(events.find((event) => event.toolCall?.id === 'bad-step')?.toolCall?.result).toContain('Invalid step number')
 
     throwAfter = 1
@@ -647,6 +694,92 @@ describe('a full agent run', () => {
     expect(agent.getRunCheckpointSummary()?.count).toBeGreaterThan(0)
     expect(events.some((event) => event.type === 'stream' && event.content)).toBe(false)
     expect(events.some((event) => event.message?.content === 'should not be asked')).toBe(false)
+  })
+
+  it('passes tools, history, and a fresh checklist into the next turn', async () => {
+    const dir = workspace()
+    writeFileSync(join(dir, 'Camera.ts'), `${'A'.repeat(50_001)}Z`)
+    terminalThrows = true
+    const agent = create([
+      tools(call('read_file', { path: 'Camera.ts' })),
+      tools(call('create_task_checklist', { steps: ['Open camera'] })),
+      tools(call('run_terminal', { command: 'echo hi' })),
+      tools(call('run_terminal', { command: 'echo hi' }, 'again')),
+      reply('first', { usage: { promptTokens: 2, completionTokens: 2, totalTokens: 4 } }),
+      tools(call('run_terminal', { command: 'echo hi' }, 'later')),
+      reply('second')
+    ])
+    const first: AgentEvent[] = []
+    await agent.run(
+      'do the task',
+      {
+        ...base(dir),
+        model: 'test-model',
+        temperature: 0.2,
+        maxTokens: 64,
+        images: [],
+        history: [
+          {
+            id: 'h1',
+            role: 'assistant',
+            content: 'earlier',
+            mode: 'agent',
+            apiMessages: [
+              {
+                role: 'assistant',
+                content: 'earlier question',
+                tool_calls: [{ id: 'old', type: 'function', function: { name: 'read_file', arguments: '{}' } }]
+              },
+              { role: 'tool', content: 'old result', tool_call_id: 'old', name: 'read_file' }
+            ]
+          } as ChatMessage
+        ]
+      },
+      (event) => first.push(event)
+    )
+
+    const read = toolOutput(first, 'read_file')
+    expect(read).toHaveLength(50_000)
+    expect(read.endsWith('A')).toBe(true)
+    expect(seenTools.map((tool) => tool.function?.name)).toEqual(
+      expect.arrayContaining(['read_file', 'write_file', 'mcp__docs__search'])
+    )
+    expect(seenCallOptions).toEqual({ model: 'test-model', temperature: 0.2, maxTokens: 64 })
+    expect(first.some((event) => event.type === 'iteration_warning')).toBe(false)
+    expect(seenMessages.find((message) => message.role === 'tool')).toMatchObject({
+      content: 'old result',
+      tool_call_id: 'old',
+      name: 'read_file'
+    })
+    expect(
+      seenMessages.some(
+        (message) =>
+          Array.isArray(message.tool_calls) &&
+          (message.tool_calls as Array<{ id?: string }>)[0]?.id === 'old'
+      )
+    ).toBe(true)
+    expect(typeof seenMessages.find((message) => message.role === 'user')?.content).toBe('string')
+
+    const analytics = first.find((event) => event.type === 'run_analytics')?.analytics
+    expect(analytics).toMatchObject({
+      model: 'test-model',
+      iterations: 5,
+      userMessagePreview: 'do the task',
+      tokenUsage: { promptTokens: 2, completionTokens: 2, totalTokens: 4 }
+    })
+    const done = first.find((event) => event.type === 'done')
+    expect(done?.message?.apiMessages?.[0]?.role).toBe('assistant')
+    expect(done?.message?.apiMessages?.some((message) => message.role === 'system')).toBe(false)
+    expect(done?.message?.apiMessages?.find((message) => message.name === 'read_file')?.content).toHaveLength(50_000)
+    expect(done?.message?.timeline?.some((item) => item.type === 'text' && item.content === 'first')).toBe(true)
+    expect(first.find((event) => event.type === 'checklist_updated')?.checklist?.steps).toEqual([])
+
+    const second: AgentEvent[] = []
+    await agent.run('again', { ...base(dir), model: 'test-model' }, (event) => second.push(event))
+    expect(second.find((event) => event.type === 'checklist_updated')?.checklist?.steps).toEqual([])
+    const later = second.find((event) => event.toolCall?.id === 'later')?.toolCall?.result ?? ''
+    expect(later).toContain('shell missing')
+    expect(later).not.toContain('retry_exhausted')
   })
 })
 

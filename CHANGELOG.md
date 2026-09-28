@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.4] — 2026-09-28
+
+### Tests
+
+- Agent runs now lock the tools sent to the model, history fields, token totals, file-read limits, replace-one versus replace-all, and the refusal to read the app's own folder.
+
+---
+
 ## [1.0.0-alpha.3] — 2026-09-28
 
 ### Agent
