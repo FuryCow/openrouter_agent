@@ -226,6 +226,134 @@ describe('processToolCallsBatch', () => {
 
     expect(requestApproval).not.toHaveBeenCalled()
     expect(executeTool).not.toHaveBeenCalled()
+
+    const writeApproval = vi.fn()
+    await processToolCallsBatch({
+      toolCalls: [tool('write_file', {}, 'missing')],
+      mode: 'agent',
+      cwd,
+      iteration: 1,
+      timeline: [],
+      messages: [],
+      onToolStart: vi.fn(),
+      onToolDone: vi.fn(),
+      onRecordAnalytics: vi.fn(),
+      requestApproval: writeApproval,
+      executeTool: vi.fn()
+    })
+    expect(writeApproval).not.toHaveBeenCalled()
     expect(onRecordAnalytics.mock.calls[0]?.[0].outcome).toBe('invalid_args')
+    expect(onRecordAnalytics.mock.calls[0]?.[0].result).toContain('Error:')
+  })
+
+  it('asks before a write or a terminal command', async () => {
+    const requestApproval = vi.fn(async () => false)
+
+    await processToolCallsBatch({
+      toolCalls: [
+        tool('write_file', { path: 'a.txt', content: 'x' }, '1'),
+        tool('run_terminal', { command: 'echo hi' }, '2')
+      ],
+      mode: 'agent',
+      cwd,
+      iteration: 1,
+      timeline: [],
+      messages: [],
+      onToolStart: vi.fn(),
+      onToolDone: vi.fn(),
+      onRecordAnalytics: vi.fn(),
+      requestApproval,
+      executeTool: vi.fn()
+    })
+
+    expect(requestApproval.mock.calls.map((call) => call[0].function.name)).toEqual([
+      'write_file',
+      'run_terminal'
+    ])
+  })
+
+  it('marks a rejected edit as an error and a finished edit as done', async () => {
+    const rejectedDone = vi.fn()
+    const rejectedTimeline: Parameters<typeof processToolCallsBatch>[0]['timeline'] = []
+    const rejectedMessages: Parameters<typeof processToolCallsBatch>[0]['messages'] = []
+    const rejectedAnalytics = vi.fn()
+
+    await processToolCallsBatch({
+      toolCalls: [tool('write_file', { path: 'a.txt', content: 'x' }, 'rej')],
+      mode: 'agent',
+      cwd,
+      iteration: 4,
+      timeline: rejectedTimeline,
+      messages: rejectedMessages,
+      onToolStart: vi.fn(),
+      onToolDone: rejectedDone,
+      onRecordAnalytics: rejectedAnalytics,
+      requestApproval: vi.fn(async () => false),
+      executeTool: vi.fn(async () => 'should not run'),
+      onExecuteSuccess: vi.fn()
+    })
+
+    expect(rejectedDone.mock.calls[0]?.[0]).toMatchObject({
+      status: 'error',
+      result: 'Error: User rejected this action.'
+    })
+    expect(rejectedTimeline[0]).toMatchObject({
+      type: 'tool',
+      toolCall: { status: 'error', result: 'Error: User rejected this action.' }
+    })
+    expect(rejectedMessages[0]).toMatchObject({
+      role: 'tool',
+      content: 'Error: User rejected this action.'
+    })
+    expect(rejectedAnalytics.mock.calls[0]?.[0]).toMatchObject({
+      outcome: 'error',
+      issues: ['execution_error'],
+      iteration: 4
+    })
+    expect(rejectedAnalytics.mock.calls[0]?.[0].durationMs).toBeLessThan(10_000)
+
+    const successDone = vi.fn()
+    const onExecuteSuccess = vi.fn()
+    const startedStatuses: string[] = []
+    await processToolCallsBatch({
+      toolCalls: [tool('write_file', { path: 'a.txt', content: 'x' }, 'ok')],
+      mode: 'agent',
+      cwd,
+      iteration: 1,
+      timeline: [],
+      messages: [],
+      onToolStart: (tool) => {
+        startedStatuses.push(tool.status)
+      },
+      onToolDone: successDone,
+      onRecordAnalytics: vi.fn(),
+      requestApproval: vi.fn(async () => true),
+      executeTool: vi.fn(async () => 'Successfully wrote 1 characters'),
+      onExecuteSuccess
+    })
+
+    expect(startedStatuses).toEqual(['running'])
+    expect(successDone.mock.calls[0]?.[0].status).toBe('done')
+    expect(onExecuteSuccess).toHaveBeenCalledTimes(1)
+
+    const failedSuccess = vi.fn()
+    const failedDone = vi.fn()
+    await processToolCallsBatch({
+      toolCalls: [tool('write_file', { path: 'a.txt', content: 'x' }, 'bad')],
+      mode: 'agent',
+      cwd,
+      iteration: 1,
+      timeline: [],
+      messages: [],
+      onToolStart: vi.fn(),
+      onToolDone: failedDone,
+      onRecordAnalytics: vi.fn(),
+      requestApproval: vi.fn(async () => true),
+      executeTool: vi.fn(async () => 'Error: disk full'),
+      onExecuteSuccess: failedSuccess
+    })
+
+    expect(failedDone.mock.calls[0]?.[0].status).toBe('error')
+    expect(failedSuccess).not.toHaveBeenCalled()
   })
 })

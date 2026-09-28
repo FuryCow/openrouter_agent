@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { useChatStore } from '@/stores/chatStore'
+import { respondToPendingApproval } from '@/lib/approvalResponse'
 import { DiffView } from './DiffView'
 import { FilePathLink } from './FilePathLink'
 
@@ -12,12 +13,14 @@ export function ApprovalDialog(): React.ReactElement {
   const setPendingApproval = useChatStore((s) => s.setPendingApproval)
 
   const handleResponse = async (approved: boolean, alwaysAllow = false): Promise<void> => {
-    if (!pendingApproval) return
-    if (alwaysAllow && approved) {
-      await window.api.agent.setSessionAutoApprove(pendingApproval.name)
-    }
-    await window.api.agent.approve(pendingApproval.id, approved)
-    setPendingApproval(null)
+    const handled = await respondToPendingApproval({
+      pending: pendingApproval,
+      approved,
+      alwaysAllow,
+      approve: (id, nextApproved) => window.api.agent.approve(id, nextApproved),
+      setSessionAutoApprove: (toolName) => window.api.agent.setSessionAutoApprove(toolName)
+    })
+    if (handled) setPendingApproval(null)
   }
 
   const showDiff = Boolean(pendingApproval?.fileDiff || pendingApproval?.diff)

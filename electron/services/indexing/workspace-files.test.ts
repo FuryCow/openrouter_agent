@@ -51,6 +51,14 @@ describe('workspace-files', () => {
     expect(files).toContain('src/app.ts')
     expect(files).toContain('.openrouter/plans/note.md')
     expect(files).not.toContain('node_modules/pkg/index.js')
+    mkdirSync(join(dir, 'dist', 'nested'), { recursive: true })
+    mkdirSync(join(dir, '.cursor'), { recursive: true })
+    writeFileSync(join(dir, 'dist', 'nested', 'out.js'), 'x', 'utf-8')
+    writeFileSync(join(dir, '.cursor', 'rules.md'), 'x', 'utf-8')
+    const excluded = await listWorkspaceFiles(dir)
+    expect(excluded).not.toContain('dist/nested/out.js')
+    expect(excluded).not.toContain('.cursor/rules.md')
+    expect(excluded).toContain('.openrouter/plans/note.md')
 
     rmSync(dir, { recursive: true, force: true })
   })
@@ -68,6 +76,10 @@ describe('workspace-files', () => {
     const listed = await resolveWatcherFileSet(dir, ['src/new.ts'], new Set())
     expect(listed.has('src/new.ts')).toBe(true)
 
+    writeFileSync(join(dir, 'src', 'later.ts'), 'export const later = 1', 'utf-8')
+    const cached = await resolveWatcherFileSet(dir, ['src/old.ts'], new Set(['src/old.ts']))
+    expect(cached.has('src/later.ts')).toBe(false)
+
     rmSync(dir, { recursive: true, force: true })
   })
 
@@ -81,5 +93,8 @@ describe('workspace-files', () => {
         indexed
       )
     ).toEqual(['Assets/Scripts/Player.cs', 'Assets/Scripts/Old.cs'])
+    expect(filterWatcherPaths(['src\\a.ts', '.', ''], new Set(['src/a.ts']), new Set())).toEqual([
+      'src/a.ts'
+    ])
   })
 })

@@ -30,6 +30,27 @@ describe('timeline', () => {
     expect(paragraph.map((item) => item.type)).toEqual(['reasoning', 'text'])
   })
 
+  it('does not fold numbered lists, star lists, headings, or blank chunks', () => {
+    const thinking = appendTimelineChunk([], 'reasoning', 'notes')
+    expect(appendTimelineChunk(thinking, 'text', '* item').map((item) => item.type)).toEqual([
+      'reasoning',
+      'text'
+    ])
+    expect(appendTimelineChunk(thinking, 'text', '1. step').map((item) => item.type)).toEqual([
+      'reasoning',
+      'text'
+    ])
+    expect(appendTimelineChunk(thinking, 'text', '  # Title').map((item) => item.type)).toEqual([
+      'reasoning',
+      'text'
+    ])
+    expect(appendTimelineChunk(thinking, 'text', '   ').map((item) => item.type)).toEqual([
+      'reasoning',
+      'text'
+    ])
+    expect(appendTimelineChunk(thinking, 'text', '')).toBe(thinking)
+  })
+
   it('starts text after a markdown heading', () => {
     const thinking = appendTimelineChunk([], 'reasoning', 'notes')
     const next = appendTimelineChunk(thinking, 'text', '# Plan\nDo it')

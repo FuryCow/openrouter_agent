@@ -104,4 +104,25 @@ describe('chat-persistence', () => {
     expect(readFileSync(filePath, 'utf-8')).toBe('{"truncated":true')
     expect(await loadChatMessages('agent', workspace)).toEqual([])
   })
+
+  it('overwrites a whitespace or empty-array file, and clears a corrupt file when allowed', async () => {
+    const { saveChatMessages, loadChatMessages } = await import('./chat-persistence')
+    const { hashWorkspacePath } = await import('./indexing/index-paths')
+    const workspace = join(tmpdir(), 'project-blank')
+    const filePath = join(
+      globalThis.__chatUserData,
+      'chats',
+      hashWorkspacePath(workspace),
+      'ask.json'
+    )
+    mkdirSync(join(filePath, '..'), { recursive: true })
+    writeFileSync(filePath, '  [] \n')
+
+    await saveChatMessages('ask', [{ id: 'n', role: 'user', content: 'next', mode: 'ask' }], workspace)
+    expect(await loadChatMessages('ask', workspace)).toHaveLength(1)
+
+    writeFileSync(filePath, '{')
+    await saveChatMessages('ask', [], workspace, { allowEmpty: true })
+    expect(readFileSync(filePath, 'utf-8').trim()).toBe('[]')
+  })
 })

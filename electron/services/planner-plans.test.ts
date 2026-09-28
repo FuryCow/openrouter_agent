@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir, platform } from 'os'
 import {
@@ -18,6 +18,11 @@ describe('planner-plans', () => {
     expect(isPlannerPlanPath(root, join(root, 'src', 'foo.ts'))).toBe(false)
     expect(looksLikePlannerPlanPath('.openrouter/notes.md')).toBe(false)
     expect(looksLikePlannerPlanPath('.openrouter/plans/../secret.md')).toBe(false)
+    expect(looksLikePlannerPlanPath('.openrouter\\plans\\camera.md')).toBe(true)
+    expect(looksLikePlannerPlanPath('.OPENROUTER/plans/Camera.MD')).toBe(true)
+    expect(looksLikePlannerPlanPath('.openrouter/plans/.md')).toBe(false)
+    expect(looksLikePlannerPlanPath('.openrouter/plans/sub/../../secret.md')).toBe(false)
+    expect(isPlannerPlanPath(root, join(root, '..', 'other', '.openrouter', 'plans', 'x.md'))).toBe(false)
   })
 
   it('rejects a plan path on another drive', () => {
@@ -28,8 +33,11 @@ describe('planner-plans', () => {
   it('builds a slug and unique filenames', () => {
     expect(planFileSlug('# Camera occlusion\n\nDo the thing')).toBe('camera-occlusion')
     expect(planFileSlug('# Камера\n\nСделать')).toBe('камера')
+    expect(planFileSlug('###\n!!!')).toBe('plan')
+    expect(planFileSlug(`# ${'a'.repeat(80)}`)).toHaveLength(48)
     expect(uniquePlanFilename('plan.md', ['plan.md'])).toBe('plan-2.md')
-    expect(uniquePlanFilename('plan.md', ['plan.md', 'plan-2.md'])).toBe('plan-3.md')
+    expect(uniquePlanFilename('plan.md', ['Plan.md', 'plan-2.md'])).toBe('plan-3.md')
+    expect(uniquePlanFilename('notes', ['notes'])).toBe('notes-2')
   })
 
   it('writes a unique plan file', async () => {
@@ -39,6 +47,19 @@ describe('planner-plans', () => {
     const relative = await writePlannerPlan(dir, '# Camera occlusion\n\nSphereCast.')
     expect(relative.startsWith('.openrouter/plans/')).toBe(true)
     expect(relative.endsWith('.md')).toBe(true)
+    expect(readFileSync(join(dir, relative), 'utf-8')).toContain('SphereCast.')
+    expect(readFileSync(join(dir, '.openrouter', 'plans', 'keep.md'), 'utf-8')).toBe('old')
+
+    const again = await writePlannerPlan(dir, '# Camera occlusion\n\nSphereCast.')
+    expect(again).not.toBe(relative)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('creates the plans directory when it is missing', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ora-plans-new-'))
+    const relative = await writePlannerPlan(dir, '# Камера\n\nТекст')
+    expect(relative).toContain('камера.md')
+    expect(readFileSync(join(dir, relative), 'utf-8')).toMatch(/^<!-- saved /)
     rmSync(dir, { recursive: true, force: true })
   })
 })

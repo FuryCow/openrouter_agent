@@ -1,5 +1,5 @@
 import type { ApprovedPlan, ChatMode, ChatFileAttachment } from '../types'
-import { parsePlannerPlan } from '../lib/parsePlannerPlan'
+import { prepareImplementPlan } from '../lib/implementPlan'
 import { useChatStore } from '../stores/chatStore'
 import { useFileStore } from '../stores/fileStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -14,15 +14,6 @@ import {
   isEligibleAgentHistoryMessage,
   stripStaleInterruptedApiContext
 } from '../../electron/lib/chat-history'
-
-function buildImplementPlanPrompt(planContent: string, originalTask?: string): string {
-  const t = getT('chat')
-  const taskLine = originalTask
-    ? t('agent.implementPlanPrompt.taskLine', { task: originalTask })
-    : ''
-
-  return `${taskLine}${t('agent.implementPlanPrompt.body', { plan: planContent })}`
-}
 
 export function useAgent(): {
   sendMessage: (
@@ -118,21 +109,16 @@ export function useAgent(): {
   }
 
   const implementPlan = async (planContent: string): Promise<void> => {
-    if (useChatStore.getState().isStreaming) return
+    const prepared = prepareImplementPlan({
+      isStreaming: useChatStore.getState().isStreaming,
+      messages: useChatStore.getState().messages,
+      planContent
+    })
+    if (!prepared.ready) return
 
-    const tChat = getT('chat')
-    const { messages, setChatMode } = useChatStore.getState()
-    const plannerMessages = messages.filter((m) => m.mode === 'planner')
-    const originalTask = [...plannerMessages]
-      .reverse()
-      .find((m) => m.role === 'user')?.content
-
-    setChatMode('agent')
-    useToastStore.getState().addToast(tChat('agent.implementingPlan'), 'info')
-
-    const approvedPlan = parsePlannerPlan(planContent)
-    const prompt = buildImplementPlanPrompt(planContent, originalTask)
-    await sendMessage(prompt, { mode: 'agent', approvedPlan })
+    useChatStore.getState().setChatMode('agent')
+    useToastStore.getState().addToast(getT('chat')('agent.implementingPlan'), 'info')
+    await sendMessage(prepared.prompt, { mode: 'agent', approvedPlan: prepared.approvedPlan })
   }
 
   const abort = (): void => {

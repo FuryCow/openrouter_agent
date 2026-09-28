@@ -67,6 +67,27 @@ describe('validateToolArguments', () => {
       'planner'
     )
     expect(result.ok).toBe(true)
+    const windows = validateToolArguments(
+      'search_replace',
+      JSON.stringify({
+        path: '.openrouter\\plans\\camera.md',
+        old_string: 'x',
+        new_string: 'y'
+      }),
+      'planner'
+    )
+    expect(windows.ok).toBe(true)
+    const escaped = validateToolArguments(
+      'search_replace',
+      JSON.stringify({
+        path: '.openrouter/plans/../secret.md',
+        old_string: 'x',
+        new_string: 'y'
+      }),
+      'planner'
+    )
+    expect(escaped.ok).toBe(false)
+    expect(escaped.issues).toContain('tool_not_allowed_in_mode')
   })
 
   it('allows grep_workspace in planner mode', () => {
@@ -88,6 +109,22 @@ describe('validateToolArguments', () => {
     )
     expect(write.ok).toBe(false)
     expect(write.issues).toContain('tool_not_allowed_in_mode')
+    const terminal = validateToolArguments('run_terminal', JSON.stringify({ command: 'ls' }), 'ask')
+    expect(terminal.ok).toBe(false)
+    const mcpRead = validateToolArguments('mcp__srv__read_file', JSON.stringify({ path: 'a.ts' }), 'ask')
+    expect(mcpRead.issues).toContain('tool_not_allowed_in_mode')
+    const plannerMcpWrite = validateToolArguments(
+      'mcp__srv__write_file',
+      JSON.stringify({ path: 'a.ts' }),
+      'planner'
+    )
+    expect(plannerMcpWrite.issues).toContain('tool_not_allowed_in_mode')
+    const plannerMcpRead = validateToolArguments(
+      'mcp__srv__read_file',
+      JSON.stringify({ path: 'a.ts' }),
+      'planner'
+    )
+    expect(plannerMcpRead.issues).not.toContain('tool_not_allowed_in_mode')
   })
 
   it('accepts read_project_memory without required args', () => {

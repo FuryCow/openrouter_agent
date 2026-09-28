@@ -5,6 +5,7 @@ import { Button } from '../ui/button'
 import { useChatStore } from '@/stores/chatStore'
 import { useFileStore } from '@/stores/fileStore'
 import { useToastStore } from '@/stores/toastStore'
+import { saveSuggestedMemories } from '@/lib/memorySuggestSave'
 import type { MemorySuggestEntry } from '@/types'
 
 export function MemorySuggestDialog(): React.ReactElement {
@@ -49,15 +50,13 @@ export function MemorySuggestDialog(): React.ReactElement {
     }
 
     try {
-      for (const index of [...selected].sort()) {
-        const entry = pendingSuggest.entries[index]
-        if (!entry) continue
-        await window.api.memory.remember(
-          { content: entry.content, category: entry.category, source: 'agent' },
-          workingDirectory
-        )
-      }
-      addToast(tc('toast.savedToMemory', { count: selected.size }), 'success')
+      const { saved } = await saveSuggestedMemories({
+        entries: pendingSuggest.entries,
+        selectedIndexes: [...selected],
+        workspace: workingDirectory,
+        remember: (entry, workspace) => window.api.memory.remember(entry, workspace)
+      })
+      if (saved > 0) addToast(tc('toast.savedToMemory', { count: saved }), 'success')
     } catch (err) {
       addToast(err instanceof Error ? err.message : t('memorySuggest.saveFailed'), 'error')
     }

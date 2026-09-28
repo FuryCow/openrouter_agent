@@ -7,6 +7,8 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useAnalyticsStore } from '@/stores/analyticsStore'
 import { useIndexStore } from '@/stores/indexStore'
 import { useMcp } from '@/hooks/useMcp'
+import { useAppVersion } from '@/hooks/useAppVersion'
+import { AppVersionMark } from './AppVersionMark'
 import { getModelPriceLabel } from '@/lib/models'
 import { cn } from '@/lib/utils'
 import type { IndexStatus } from '@/types'
@@ -81,6 +83,7 @@ export function StatusBar(): React.ReactElement {
   const rebuildIndex = useIndexStore((s) => s.rebuild)
   const setSettingsOpen = useSettingsStore((s) => s.setSettingsOpen)
   const { status: mcpStatus } = useMcp()
+  const appVersion = useAppVersion()
 
   const indexLabel = formatIndexLabel(indexStatus, t, tTools)
   const mcpLabel = formatMcpLabel(mcpStatus, t)
@@ -94,6 +97,7 @@ export function StatusBar(): React.ReactElement {
   return (
     <div className="flex h-9 items-center justify-between border-t border-white/5 bg-background px-3 text-xs text-zinc-500">
       <div className="flex items-center gap-3">
+        <AppVersionMark version={appVersion} className="font-mono text-[10px] text-zinc-600" />
         <WorkspaceSwitcher />
         <button
           type="button"

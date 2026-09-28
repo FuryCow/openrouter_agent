@@ -9,7 +9,7 @@ import type { AgentEvent } from '@/types'
 
 let unsubscribe: (() => void) | null = null
 
-function handleAgentEvent(event: AgentEvent): void {
+export function handleAgentEvent(event: AgentEvent): void {
   const {
     appendStream,
     appendReasoning,

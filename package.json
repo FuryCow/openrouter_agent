@@ -1,6 +1,6 @@
 {
   "name": "openrouter-agent",
-  "version": "1.0.0-alpha.2",
+  "version": "1.0.0-alpha.3",
   "description": "LLM agent desktop app with chat, file browser, editor, and tools via OpenRouter",
   "author": "FuryCow",
   "license": "MIT",
@@ -18,6 +18,7 @@
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder",
     "test": "vitest run",
+    "test:mutation": "stryker run",
     "i18n:check": "node scripts/i18n-check.mjs",
     "postinstall": "node scripts/rebuild-native.mjs"
   },
@@ -57,6 +58,8 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.10.1",

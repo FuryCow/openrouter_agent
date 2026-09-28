@@ -3,7 +3,9 @@ import { isAbsolute, join, normalize, resolve, win32 } from 'path'
 import { mkdirSync } from 'fs'
 
 export function hashWorkspacePath(workspacePath: string): string {
-  const normalized = workspacePath.replace(/\\/g, '/').toLowerCase()
+  let normalized = workspacePath.trim().replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '')
+  if (normalized.endsWith(':')) normalized += '/'
+  if (!normalized) normalized = '/'
   return createHash('sha256').update(normalized).digest('hex').slice(0, 16)
 }
 

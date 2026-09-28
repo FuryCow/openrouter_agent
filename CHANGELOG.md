@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.3] — 2026-09-28
+
+### Agent
+
+- Ask and Planner no longer stop after a fixed number of tool steps. Every mode runs until the answer is done or you stop it.
+- Russian plan headings (Цель, Шаги, Файлы, Проверка) are recognized when you implement a plan.
+- The app version is shown in the status bar and at the bottom of Settings.
+
+### Settings
+
+- Save still writes every tab, and still does not reconnect MCP servers. Test stays on each server.
+
+### Tests
+
+- Product flows for approval, plan implementation, memory, version, folder switch, and a full agent run are covered.
+- Mutation testing is available with `npm run test:mutation`.
+
+---
+
 ## [1.0.0-alpha.2] — 2026-09-24
 
 ### Indexing

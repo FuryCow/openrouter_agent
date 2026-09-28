@@ -22,6 +22,9 @@ import {
   type SettingsSection
 } from '@/lib/settingsSections'
 import { cn } from '@/lib/utils'
+import { useAppVersion } from '@/hooks/useAppVersion'
+import { AppVersionMark } from '../layout/AppVersionMark'
+import { saveAppSettings } from '@/lib/saveAppSettings'
 
 const SEARCH_PROVIDER_VALUES: AppSettings['searchProvider'][] = ['duckduckgo', 'tavily', 'brave']
 
@@ -88,6 +91,7 @@ export function SettingsModal(): React.ReactElement {
   const { settings, settingsOpen, settingsFocusSection, setSettingsOpen, setSettings, loadModels } =
     useSettingsStore()
   const rebuildIndex = useIndexStore((s) => s.rebuild)
+  const appVersion = useAppVersion()
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
   const [draftSettings, setDraftSettings] = useState<AppSettings>(settings)
   const [apiKey, setApiKey] = useState(settings.apiKey)
@@ -164,10 +168,13 @@ export function SettingsModal(): React.ReactElement {
         projectMemoryAutoLoadDocs,
         agentAutoVerify
       }
-      await window.api.settings.save(newSettings)
-      setSettings(newSettings)
-      await loadModels()
-      setSettingsOpen(false)
+      await saveAppSettings({
+        draft: newSettings,
+        save: (next) => window.api.settings.save(next),
+        applyLocal: setSettings,
+        reloadModels: loadModels,
+        close: () => setSettingsOpen(false)
+      })
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : t('saveFailed'))
     } finally {
@@ -388,7 +395,13 @@ export function SettingsModal(): React.ReactElement {
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/5 px-6 py-4">
-          <div>{saveError && <p className="text-xs text-red-400">{saveError}</p>}</div>
+          <div className="flex min-w-0 items-center gap-3">
+            <AppVersionMark
+              version={appVersion}
+              className="shrink-0 font-mono text-[11px] text-zinc-600"
+            />
+            {saveError && <p className="text-xs text-red-400">{saveError}</p>}
+          </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
               {tCommon('actions.cancel')}

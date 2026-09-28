@@ -85,10 +85,10 @@ describe('agent-modes history', () => {
 })
 
 describe('agent-modes limits and tools', () => {
-  it('uses raised iteration limits', () => {
+  it('does not cap tool steps in any mode', () => {
     expect(getMaxIterations('agent')).toBe(Number.POSITIVE_INFINITY)
-    expect(getMaxIterations('planner')).toBe(25)
-    expect(getMaxIterations('ask')).toBe(12)
+    expect(getMaxIterations('planner')).toBe(Number.POSITIVE_INFINITY)
+    expect(getMaxIterations('ask')).toBe(Number.POSITIVE_INFINITY)
   })
 
   it('exposes search_replace to planner but not write_file', () => {
@@ -112,6 +112,14 @@ describe('agent-modes limits and tools', () => {
       'read_files',
       'grep_workspace'
     ])
+    expect(isToolAllowedInMode('search_replace', 'ask')).toBe(false)
+    expect(isToolAllowedInMode('run_terminal', 'ask')).toBe(false)
+    expect(isToolAllowedInMode('run_terminal', 'planner')).toBe(false)
+    expect(isToolAllowedInMode('mcp__srv__read_file', 'ask')).toBe(false)
+    expect(isToolAllowedInMode('mcp__srv__read_file', 'planner')).toBe(true)
+    expect(isToolAllowedInMode('mcp__srv__write_file', 'planner')).toBe(false)
+    expect(isToolAllowedInMode('mcp__srv__write_file', 'agent')).toBe(true)
+    expect(isToolAllowedInMode('mcp__broken', 'planner')).toBe(false)
   })
 })
 

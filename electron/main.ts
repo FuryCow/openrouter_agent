@@ -18,6 +18,7 @@ import {
 } from './services/workspace-safety'
 import { getRecentAnalyticsRuns, getAnalyticsLogDir } from './services/tool-analytics'
 import { loadChatMessages, saveChatMessages } from './services/chat-persistence'
+import { settingsSaveEffects } from './lib/settings-save'
 import { writePlannerPlan } from './services/planner-plans'
 import { modeRequiresWorkspace } from './services/agent-modes'
 import { withRecentWorkspace } from './lib/recent-workspaces'
@@ -267,6 +268,7 @@ function registerIpc(): void {
   ipcMain.on('app:flush-complete', () => {
     finishAppClose()
   })
+  ipcMain.handle('app:get-version', () => app.getVersion())
 
   ipcMain.handle('window:minimize', () => getWindow().minimize())
   ipcMain.handle('window:maximize', () => {
@@ -287,23 +289,10 @@ function registerIpc(): void {
     })
     const previous = sanitizeSettings(store.get('settings'))
     store.set('settings', normalized)
-    if (previous.apiKey !== normalized.apiKey || previous.model !== normalized.model) {
-      openRouterClient.updateSettings(normalized)
-    }
-    if (
-      previous.searchApiKey !== normalized.searchApiKey ||
-      previous.searchProvider !== normalized.searchProvider
-    ) {
-      webSearchService.configure(normalized)
-    }
-    if (
-      previous.indexOnOpen !== normalized.indexOnOpen ||
-      previous.embeddingModel !== normalized.embeddingModel ||
-      previous.maxFileSizeKb !== normalized.maxFileSizeKb ||
-      previous.semanticSearchEnabled !== normalized.semanticSearchEnabled
-    ) {
-      applyIndexSettings(normalized)
-    }
+    const effects = settingsSaveEffects(previous, normalized)
+    if (effects.refreshModelClient) openRouterClient.updateSettings(normalized)
+    if (effects.refreshSearch) webSearchService.configure(normalized)
+    if (effects.refreshIndex) applyIndexSettings(normalized)
     return normalized
   })
 

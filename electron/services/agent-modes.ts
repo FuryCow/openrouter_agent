@@ -36,16 +36,8 @@ export function getToolsForMode(mode: ChatMode, allTools: ToolDefinition[]): Too
   }
 }
 
-export function getMaxIterations(mode: ChatMode): number {
-  switch (mode) {
-    case 'ask':
-      return 12
-    case 'planner':
-      return 25
-    case 'agent':
-    default:
-      return Number.POSITIVE_INFINITY
-  }
+export function getMaxIterations(_mode: ChatMode): number {
+  return Number.POSITIVE_INFINITY
 }
 
 export function modeRequiresWorkspace(mode: ChatMode): boolean {

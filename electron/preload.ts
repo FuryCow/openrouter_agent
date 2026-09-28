@@ -113,6 +113,7 @@ export interface ElectronAPI {
     ) => Promise<ProjectMemoryEntry>
   }
   app: {
+    getVersion: () => Promise<string>
     onFlushRequest: (callback: () => void) => () => void
     flushComplete: () => void
   }
@@ -234,6 +235,7 @@ const api: ElectronAPI = {
     remember: (input, workspacePath) => ipcRenderer.invoke('memory:remember', input, workspacePath)
   },
   app: {
+    getVersion: () => ipcRenderer.invoke('app:get-version'),
     onFlushRequest: (callback) => {
       const handler = (): void => callback()
       ipcRenderer.on('app:flush-request', handler)

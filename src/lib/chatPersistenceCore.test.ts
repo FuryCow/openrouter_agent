@@ -25,6 +25,18 @@ describe('latestChatMode', () => {
     ]
     expect(latestChatMode(messages)).toBe('planner')
   })
+
+  it('ignores ids without a timestamp and keeps the later equal timestamp', () => {
+    const messages: ChatMessage[] = [
+      { id: 'no-stamp', role: 'user', content: 'x', mode: 'planner' },
+      { id: 'user-10', role: 'user', content: 'a', mode: 'ask' },
+      { id: 'user-10', role: 'assistant', content: 'b', mode: 'agent' }
+    ]
+    expect(latestChatMode(messages, 'planner')).toBe('agent')
+    expect(latestChatMode([{ id: 'plain', role: 'user', content: 'x', mode: 'ask' }], 'planner')).toBe(
+      'planner'
+    )
+  })
 })
 
 describe('resolvePersistenceWorkspace', () => {
@@ -32,5 +44,7 @@ describe('resolvePersistenceWorkspace', () => {
     expect(resolvePersistenceWorkspace(false, null, '/tmp')).toBeUndefined()
     expect(resolvePersistenceWorkspace(true, null, '/tmp')).toBeUndefined()
     expect(resolvePersistenceWorkspace(true, '/tmp/a', '/tmp/b')).toBe('/tmp/a')
+    expect(resolvePersistenceWorkspace(true, null, '   ')).toBeNull()
+    expect(resolvePersistenceWorkspace(true, '', '/tmp')).toBe('')
   })
 })

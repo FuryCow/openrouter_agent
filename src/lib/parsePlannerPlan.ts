@@ -12,10 +12,10 @@ export interface ApprovedPlan {
 }
 
 const SECTION_ALIASES: Record<'goal' | 'steps' | 'files' | 'verification', RegExp[]> = {
-  goal: [/^goal\b/i, /^цель\b/i, /^assumptions\b/i],
-  steps: [/^steps\b/i, /^plan\b/i, /^шаги\b/i, /^execution\b/i],
-  files: [/^files to touch\b/i, /^files\b/i, /^файлы\b/i],
-  verification: [/^testing\b/i, /^verification\b/i, /^verify\b/i, /^risks\b/i, /^проверка\b/i]
+  goal: [/^goal\b/i, /^цель(?:\s|$)/i, /^assumptions\b/i],
+  steps: [/^steps\b/i, /^plan\b/i, /^шаги(?:\s|$)/i, /^execution\b/i],
+  files: [/^files to touch\b/i, /^files\b/i, /^файлы(?:\s|$)/i],
+  verification: [/^testing\b/i, /^verification\b/i, /^verify\b/i, /^risks\b/i, /^проверка(?:\s|$)/i]
 }
 
 function normalizeHeading(line: string): string {

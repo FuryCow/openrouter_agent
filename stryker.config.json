@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.config.ts",
+    "related": true
+  },
+  "mutate": [
+    "src/lib/approvalResponse.ts",
+    "src/lib/saveAppSettings.ts",
+    "src/lib/memorySuggestSave.ts",
+    "src/lib/mcpServerTest.ts",
+    "src/lib/implementPlan.ts",
+    "src/lib/appVersionLabel.ts",
+    "electron/lib/settings-save.ts",
+    "electron/lib/tool-call-runner.ts",
+    "electron/lib/agent-run-guards.ts",
+    "electron/services/run-checkpoint.ts",
+    "electron/services/agent.ts"
+  ],
+  "mutator": {
+    "excludedMutations": ["StringLiteral"]
+  },
+  "reporters": ["clear-text", "progress", "html"],
+  "concurrency": 4,
+  "timeoutMS": 20000,
+  "timeoutFactor": 2,
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": null
+  },
+  "ignorePatterns": ["dist", "out", "release", "node_modules", ".stryker-tmp", "reports"]
+}

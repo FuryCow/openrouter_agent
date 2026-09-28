@@ -15,6 +15,7 @@ import { useMcp } from '@/hooks/useMcp'
 import type { AppSettings, McpServerConfig, McpTransportType } from '@/types'
 import { cn } from '@/lib/utils'
 import { parseCursorMcpJson, toCursorMcpJson, validateMcpServerConfigs } from '@/lib/mcp-config'
+import { runMcpServerTest } from '@/lib/mcpServerTest'
 
 type McpTab = 'servers' | 'json' | 'policies'
 
@@ -156,25 +157,10 @@ export function McpSettingsPanel({
     })
 
     try {
-      const validationError = validateMcpServerConfigs([server])
-      if (validationError) throw new Error(validationError)
-
-      const result = await testServer(server)
-      if (!result.ok) {
-        const message = result.error ?? t('mcp.testFailed')
-        setTestFeedback((prev) => ({
-          ...prev,
-          [server.id]: { type: 'error', message }
-        }))
-        return
-      }
-
+      const feedback = await runMcpServerTest(server, testServer, t)
       setTestFeedback((prev) => ({
         ...prev,
-        [server.id]: {
-          type: 'success',
-          message: t('mcp.testSuccess', { count: result.toolCount })
-        }
+        [server.id]: feedback
       }))
     } catch (err) {
       const message = err instanceof Error ? err.message : t('mcp.testFailed')
