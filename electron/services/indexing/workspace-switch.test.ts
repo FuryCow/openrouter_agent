@@ -112,13 +112,30 @@ vi.mock('./file-manifest', async () => {
   return {
     ...actual,
     scanWorkspaceManifest: async (...args: Parameters<typeof actual.scanWorkspaceManifest>) => {
-      await new Promise((resolve) => setTimeout(resolve, 40))
+      const hold = (globalThis as { __holdWorkspaceScan?: Promise<void> }).__holdWorkspaceScan
+      if (hold) await hold
       return actual.scanWorkspaceManifest(...args)
     }
   }
 })
 
 import { CodebaseIndexer } from './codebase-indexer'
+
+let releaseHeldScan = () => {}
+
+function holdScan(): { release: () => void } {
+  let releaseHold = () => {}
+  const hold = new Promise<void>((resolve) => {
+    releaseHold = () => {
+      releaseHeldScan = () => {}
+      ;(globalThis as { __holdWorkspaceScan?: Promise<void> }).__holdWorkspaceScan = undefined
+      resolve()
+    }
+  })
+  releaseHeldScan = releaseHold
+  ;(globalThis as { __holdWorkspaceScan?: Promise<void> }).__holdWorkspaceScan = hold
+  return { release: releaseHold }
+}
 
 function project(name: string, file: string, body: string): string {
   const dir = mkdtempSync(join(tmpdir(), `index-${name}-`))
@@ -132,6 +149,7 @@ describe('switching folders while indexing', () => {
   let indexer: CodebaseIndexer | null = null
 
   afterEach(async () => {
+    releaseHeldScan()
     await indexer?.setWorkspace(null)
     indexer = null
     for (const dir of dirs.splice(0)) {
@@ -154,12 +172,14 @@ describe('switching folders while indexing', () => {
     const audio = project('audio', 'Mixer.ts', 'export const mixerGain = 2')
     dirs.push(camera, audio)
     const index = openIndexer()
+    const scan = holdScan()
 
     const opening = index.setWorkspace(camera)
     await vi.waitFor(() => {
       expect(index.getStatus().state).toBe('building')
     })
     const switched = index.setWorkspace(audio)
+    scan.release()
     await opening
     await switched
 
@@ -176,12 +196,14 @@ describe('switching folders while indexing', () => {
     const camera = project('cancel', 'Camera.ts', 'export const cameraFocus = 1')
     dirs.push(camera)
     const index = openIndexer()
+    const scan = holdScan()
 
     const opening = index.setWorkspace(camera)
     await vi.waitFor(() => {
       expect(index.getStatus().state).toBe('building')
     })
     index.cancel()
+    scan.release()
     await opening
 
     expect(index.getStatus().state).not.toBe('building')
