@@ -26,7 +26,11 @@ export class McpManager {
   private listeners = new Set<McpStatusListener>()
 
   constructor(
-    private getSettings: () => { mcpServers?: McpServerConfig[]; mcpRequireApproval?: boolean },
+    private getSettings: () => {
+      mcpServers?: McpServerConfig[]
+      mcpRequireApproval?: boolean
+      mcpConfigError?: string
+    },
     private onStatusChanged?: McpStatusListener
   ) {}
 
@@ -70,7 +74,7 @@ export class McpManager {
       enabled: runtime.config.enabled,
       transport: runtime.session.connectedTransport ?? runtime.config.transport,
       status: runtime.config.enabled ? runtime.status : ('disabled' as const),
-      toolCount: runtime.tools.length,
+      toolCount: runtime.config.enabled ? runtime.tools.length : 0,
       lastError:
         runtime.config.enabled && runtime.status === 'error'
           ? runtime.lastError
@@ -80,8 +84,15 @@ export class McpManager {
     const enabledCount = servers.filter((s) => s.enabled).length
     const connectedCount = servers.filter((s) => s.status === 'connected').length
     const totalTools = servers.reduce((sum, s) => sum + s.toolCount, 0)
+    const configError = this.getSettings().mcpConfigError
 
-    return { servers, totalTools, connectedCount, enabledCount }
+    return {
+      servers,
+      totalTools,
+      connectedCount,
+      enabledCount,
+      ...(configError ? { configError } : {})
+    }
   }
 
   getConfig(): McpServerConfig[] {
@@ -180,7 +191,7 @@ export class McpManager {
 
     const tools: ToolDefinition[] = []
     for (const runtime of this.servers.values()) {
-      if (runtime.status !== 'connected') continue
+      if (!runtime.config.enabled || runtime.status !== 'connected') continue
       if (mode === 'planner') {
         tools.push(
           ...runtime.tools.filter((tool) => {
@@ -240,7 +251,7 @@ export class McpManager {
       return `Error: Invalid MCP tool name: ${qualifiedName}`
     }
 
-    this.syncRuntimeConfigsFromSettings()
+    await this.applyConfigFromSettings()
 
     let runtime = this.servers.get(parsed.serverId)
     if (!runtime) {
@@ -269,8 +280,9 @@ export class McpManager {
     }
   }
 
-  /** Keep in-memory server entries aligned with persisted settings (e.g. after save while agent runs). */
-  private syncRuntimeConfigsFromSettings(): void {
+  /** Align runtime with persisted settings; disconnect servers turned off in Settings. */
+  async applyConfigFromSettings(): Promise<void> {
+    this.globalRequireApproval = this.getSettings().mcpRequireApproval !== false
     const configs = this.getSettings().mcpServers ?? []
     const seen = new Set<string>()
 
@@ -279,6 +291,17 @@ export class McpManager {
       const existing = this.servers.get(config.id)
       if (existing) {
         existing.config = config
+        if (!config.enabled) {
+          await existing.session.disconnect()
+          existing.status = 'disabled'
+          existing.tools = []
+          existing.lastError = undefined
+          continue
+        }
+        if (existing.status === 'disabled' && existing.tools.length === 0) {
+          existing.status = 'error'
+          existing.lastError = 'Not connected yet — use Reconnect all in Settings'
+        }
         continue
       }
       this.servers.set(config.id, {
@@ -291,8 +314,14 @@ export class McpManager {
     }
 
     for (const id of [...this.servers.keys()]) {
-      if (!seen.has(id)) this.servers.delete(id)
+      if (!seen.has(id)) {
+        const runtime = this.servers.get(id)
+        if (runtime) await runtime.session.disconnect()
+        this.servers.delete(id)
+      }
     }
+
+    this.emitStatus()
   }
 
   private emitStatus(): void {

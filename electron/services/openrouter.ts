@@ -1,4 +1,9 @@
 import type { AppSettings, ModelInfo, TokenUsage } from '../types'
+import {
+  toOpenRouterReasoningBody,
+  type ReasoningEffortLevel,
+  type ReasoningRequestContext
+} from '../../shared/reasoning-effort'
 import { AppError, AppErrorCode } from '../lib/app-errors'
 import { fetchAgentVisionModels } from './models'
 import { apiFetch } from './http'
@@ -12,6 +17,14 @@ import {
 } from '../lib/openrouter-sse'
 
 const API_BASE = 'https://openrouter.ai/api/v1'
+
+export function toOpenRouterProviderBody(tag?: string | null): {
+  provider: { allow_fallbacks: boolean; only?: string[] }
+} {
+  const slug = tag?.trim()
+  if (!slug) return { provider: { allow_fallbacks: true } }
+  return { provider: { only: [slug], allow_fallbacks: false } }
+}
 
 export interface ChatCompletionMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
@@ -135,6 +148,9 @@ export class OpenRouterClient {
       model?: string
       temperature?: number
       maxTokens?: number
+      reasoningEffort?: ReasoningEffortLevel
+      reasoningContext?: ReasoningRequestContext
+      modelProvider?: string
     } = {}
   ): Promise<StreamResult> {
     let lastError: Error | null = null
@@ -168,10 +184,23 @@ export class OpenRouterClient {
       model?: string
       temperature?: number
       maxTokens?: number
+      reasoningEffort?: ReasoningEffortLevel
+      reasoningContext?: ReasoningRequestContext
+      modelProvider?: string
     }
   ): Promise<StreamResult> {
-    const { onChunk, onReasoningChunk, onToolCallProgress, signal, model, temperature, maxTokens } =
-      options
+    const {
+      onChunk,
+      onReasoningChunk,
+      onToolCallProgress,
+      signal,
+      model,
+      temperature,
+      maxTokens,
+      reasoningEffort,
+      reasoningContext,
+      modelProvider
+    } = options
     const apiKey = this.settings.apiKey?.trim()
     if (!apiKey) {
       throw new AppError(AppErrorCode.OPENROUTER_API_KEY_MISSING)
@@ -192,7 +221,8 @@ export class OpenRouterClient {
           ...(tools.length > 0 ? { tools } : {}),
           ...(temperature !== undefined ? { temperature } : {}),
           ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
-          provider: { allow_fallbacks: true },
+          ...toOpenRouterReasoningBody(reasoningEffort, reasoningContext),
+          ...toOpenRouterProviderBody(modelProvider),
           stream: true
         }),
         signal

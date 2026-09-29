@@ -5,6 +5,7 @@ import type {
   AppSettings,
   ChatMessage,
   DirEntry,
+  ModelEndpoint,
   ModelInfo,
   SearchResult
 } from '../../electron/types'
@@ -22,6 +23,7 @@ export type {
   ChatMessage,
   ChatMode,
   DirEntry,
+  ModelEndpoint,
   ModelInfo,
   SearchResult,
   TimelineItem,

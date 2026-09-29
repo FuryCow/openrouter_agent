@@ -109,11 +109,19 @@ export function ChatModeSelector({
   )
 }
 
-export function ChatModeDescription({ mode }: { mode: ChatMode }): React.ReactElement {
+export function ChatModeDescription({
+  mode,
+  className
+}: {
+  mode: ChatMode
+  className?: string
+}): React.ReactElement {
   const { getModeConfig } = useChatModes()
   const current = getModeConfig(mode)
 
   return (
-    <p className="min-w-0 flex-1 truncate text-[11px] leading-snug text-zinc-500">{current.description}</p>
+    <p className={cn('min-w-0 flex-1 truncate text-[11px] leading-snug text-zinc-500', className)}>
+      {current.description}
+    </p>
   )
 }

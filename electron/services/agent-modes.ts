@@ -3,12 +3,16 @@ import type { ToolDefinition } from './openrouter'
 import type { McpManager } from './mcp/mcp-manager'
 import { isMcpQualifiedToolName, parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
 import { isMcpToolReadOnly } from './mcp/mcp-policies'
-import { estimateTokens, trimToTokenBudget, DEFAULT_CONTEXT_BUDGET } from '../lib/tokens'
+import { trimToTokenBudget, DEFAULT_CONTEXT_BUDGET } from '../lib/tokens'
 import {
   buildUserMessageWithAttachments,
   formatAttachedFilesForSystemPrompt
 } from '../lib/attached-files'
-import { isEligibleAgentHistoryMessage } from '../lib/chat-history'
+import {
+  appendAssistantConclusion,
+  fitHistoryToBudget,
+  isEligibleAgentHistoryMessage
+} from '../lib/chat-history'
 
 const READ_ONLY_TOOL_NAMES = new Set([
   'read_file',
@@ -113,38 +117,29 @@ export function expandHistoryForApi(
 ): ApiChatMessage[] {
   const filtered = filterHistoryForApi(history, mode)
   const expanded: ApiChatMessage[] = []
-  let tokenCount = 0
 
   for (const message of filtered) {
     if (message.apiMessages && message.apiMessages.length > 0) {
-      for (const apiMsg of message.apiMessages) {
-        const msgTokens = estimateTokens(apiMsg.content ?? '') +
-          (apiMsg.tool_calls ? estimateTokens(JSON.stringify(apiMsg.tool_calls)) : 0)
-        if (tokenCount + msgTokens > budget) break
-        expanded.push({
-          ...apiMsg,
-          content: apiMsg.content
-            ? trimToTokenBudget(apiMsg.content, Math.min(8000, budget - tokenCount))
-            : apiMsg.content
-        })
-        tokenCount += msgTokens
-      }
+      const traced = message.apiMessages.map((apiMsg, index, all) => {
+        const isStoredConclusion =
+          index === all.length - 1 && apiMsg.role === 'assistant' && !apiMsg.tool_calls?.length
+        if (!apiMsg.content || isStoredConclusion) return apiMsg
+        return { ...apiMsg, content: trimToTokenBudget(apiMsg.content, 8000) }
+      })
+      expanded.push(...appendAssistantConclusion(traced, message.content))
       continue
     }
 
     const content = message.attachedFiles?.length
       ? buildUserMessageWithAttachments(message.content, message.attachedFiles)
       : message.content
-    const msgTokens = estimateTokens(content)
-    if (tokenCount + msgTokens > budget) break
     expanded.push({
       role: message.role as 'user' | 'assistant',
       content
     })
-    tokenCount += msgTokens
   }
 
-  return expanded
+  return fitHistoryToBudget(expanded, budget)
 }
 
 const EXPLORATION_WORKFLOW = `Code exploration workflow:

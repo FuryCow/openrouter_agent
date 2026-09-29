@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
@@ -13,7 +13,7 @@ import {
 } from '../ui/select'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useIndexStore } from '@/stores/indexStore'
-import type { AppSettings } from '@/types'
+import type { AppSettings, McpServerConfig } from '@/types'
 import { McpSettingsPanel } from './McpSettingsPanel'
 import { ProjectMemorySettings } from './ProjectMemorySettings'
 import {
@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { useAppVersion } from '@/hooks/useAppVersion'
 import { AppVersionMark } from '../layout/AppVersionMark'
 import { saveAppSettings } from '@/lib/saveAppSettings'
+import { mcpServerConfigsEqual } from '@/lib/mcp-config'
 
 const SEARCH_PROVIDER_VALUES: AppSettings['searchProvider'][] = ['duckduckgo', 'tavily', 'brave']
 
@@ -117,6 +118,20 @@ export function SettingsModal(): React.ReactElement {
   const [agentAutoVerify, setAgentAutoVerify] = useState(settings.agentAutoVerify !== false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const mcpModalSaveRef = useRef<(() => Promise<McpServerConfig[] | void>) | null>(null)
+  const draftRef = useRef(draftSettings)
+  draftRef.current = draftSettings
+
+  const syncMcpDraft = useCallback((servers: McpServerConfig[]) => {
+    setDraftSettings((draft) => {
+      if (mcpServerConfigsEqual(servers, draft.mcpServers ?? [])) return draft
+      return { ...draft, mcpServers: servers }
+    })
+  }, [])
+
+  const registerMcpModalSave = useCallback((handler: (() => Promise<McpServerConfig[] | void>) | null) => {
+    mcpModalSaveRef.current = handler
+  }, [])
 
   useEffect(() => {
     if (!settingsOpen) return
@@ -152,8 +167,10 @@ export function SettingsModal(): React.ReactElement {
     setSaving(true)
     setSaveError('')
     try {
+      const flushedMcp = mcpModalSaveRef.current ? await mcpModalSaveRef.current() : undefined
       const newSettings = {
-        ...draftSettings,
+        ...draftRef.current,
+        ...(flushedMcp ? { mcpServers: flushedMcp } : {}),
         apiKey,
         temperature: Number(temperature) || 0.7,
         customSystemPrompt,
@@ -343,6 +360,8 @@ export function SettingsModal(): React.ReactElement {
           <McpSettingsPanel
             settings={draftSettings}
             onSettingsChange={setDraftSettings}
+            syncMcpDraft={syncMcpDraft}
+            registerModalSave={registerMcpModalSave}
             embedded
             initialTab={settingsFocusSection === 'mcp' ? 'servers' : undefined}
           />

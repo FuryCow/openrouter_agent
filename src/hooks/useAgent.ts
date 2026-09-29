@@ -47,6 +47,7 @@ export function useAgent(): {
     const modeConfig = getChatModeConfig(mode, tChat)
     const workingDirectory = useFileStore.getState().workingDirectory || ''
     const settings = useSettingsStore.getState().settings
+    const selectedModel = useSettingsStore.getState().models.find((model) => model.id === settings.model)
 
     if (!settings.apiKey) {
       useSettingsStore.getState().setSettingsOpen(true)
@@ -94,6 +95,11 @@ export function useAgent(): {
         history,
         model: settings.model,
         temperature: settings.temperature,
+        reasoningEffort: settings.reasoningEffort,
+        modelProvider: settings.modelProvider,
+        reasoningMandatory: selectedModel?.reasoningMandatory,
+        reasoningDefaultEffort: selectedModel?.reasoningDefaultEffort,
+        reasoningSupportedEfforts: selectedModel?.reasoningSupportedEfforts,
         images: options?.images,
         attachedFiles: options?.attachedFiles,
         customSystemPrompt: settings.customSystemPrompt,

@@ -10,6 +10,8 @@ import { useMcp } from '@/hooks/useMcp'
 import { useAppVersion } from '@/hooks/useAppVersion'
 import { AppVersionMark } from './AppVersionMark'
 import { getModelPriceLabel } from '@/lib/models'
+import { useModelEndpoints } from '@/hooks/useModelEndpoints'
+import { VendorPrivacy } from '../models/VendorPrivacy'
 import { cn } from '@/lib/utils'
 import type { IndexStatus } from '@/types'
 
@@ -75,6 +77,11 @@ export function StatusBar(): React.ReactElement {
   const settings = useSettingsStore((s) => s.settings)
   const modelCount = useSettingsStore((s) => s.models.length)
   const currentModel = useSettingsStore((s) => s.models.find((m) => m.id === s.settings.model))
+  const { endpoints } = useModelEndpoints(settings.model)
+  const selectedVendor = settings.modelProvider
+    ? endpoints.find((endpoint) => endpoint.tag === settings.modelProvider)
+    : undefined
+  const priceLabel = selectedVendor?.priceLabel ?? (currentModel ? getModelPriceLabel(currentModel) : null)
   const terminalOpen = useSettingsStore((s) => s.terminalOpen)
   const setTerminalOpen = useSettingsStore((s) => s.setTerminalOpen)
   const setAnalyticsOpen = useAnalyticsStore((s) => s.setPanelOpen)
@@ -167,9 +174,13 @@ export function StatusBar(): React.ReactElement {
         <span>{settings.apiKey ? t('status.apiConnected') : t('status.noApiKey')}</span>
         <span className="text-zinc-600">{t('status.modelCount', { count: modelCount })}</span>
         <span className="font-medium text-indigo-400">{settings.model.split('/').pop()}</span>
-        {currentModel && (
-          <span className="font-mono text-emerald-500/80">{getModelPriceLabel(currentModel)}</span>
-        )}
+        {selectedVendor ? (
+          <span className="flex items-center gap-1 text-zinc-300">
+            {selectedVendor.name}
+            <VendorPrivacy endpoint={selectedVendor} />
+          </span>
+        ) : null}
+        {priceLabel ? <span className="font-mono text-emerald-500/80">{priceLabel}</span> : null}
       </div>
     </div>
   )

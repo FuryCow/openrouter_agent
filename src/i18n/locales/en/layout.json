@@ -131,6 +131,19 @@
       "agentic": "Agentic {{score}}",
       "context": "{{label}} ctx"
     },
-    "providerGroup": "{{provider}} · {{count}}"
+    "providerGroup": "{{provider}} · {{count}}",
+    "vendor": {
+      "auto": "Auto",
+      "ariaLabel": "Model provider",
+      "loading": "Loading providers...",
+      "empty": "No providers",
+      "loadFailed": "Couldn't load providers",
+      "privacy": {
+        "noRetention": "Doesn't store prompts",
+        "retains": "May log prompts",
+        "retainsDays": "May log prompts for {{days}} days",
+        "trains": "May train on prompts"
+      }
+    }
   }
 }

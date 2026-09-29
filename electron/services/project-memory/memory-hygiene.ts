@@ -12,6 +12,13 @@ function normalizeContent(content: string): string {
   return content.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
+/** Bare file lists from a finished run; git already shows them. */
+const LOW_VALUE_NOTE = /^changed files in last run:/i
+
+export function dropLowValueEntries(entries: ProjectMemoryEntry[]): ProjectMemoryEntry[] {
+  return entries.filter((entry) => !LOW_VALUE_NOTE.test(entry.content.trim()))
+}
+
 export function areSimilarMemoryEntries(a: string, b: string): boolean {
   const left = normalizeContent(a)
   const right = normalizeContent(b)
@@ -57,5 +64,5 @@ export function applyCategoryCaps(entries: ProjectMemoryEntry[]): ProjectMemoryE
 }
 
 export function applyMemoryHygiene(entries: ProjectMemoryEntry[]): ProjectMemoryEntry[] {
-  return applyCategoryCaps(dedupeMemoryEntries(entries))
+  return applyCategoryCaps(dedupeMemoryEntries(dropLowValueEntries(entries)))
 }

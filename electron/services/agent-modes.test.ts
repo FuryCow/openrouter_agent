@@ -66,7 +66,7 @@ describe('agent-modes history', () => {
     expect(expanded.filter((message) => message.role === 'user')).toHaveLength(1)
   })
 
-  it('expands apiMessages when present', () => {
+  it('keeps the visible reply after a tool round', () => {
     const history: ChatMessage[] = [
       {
         id: '1',
@@ -79,8 +79,67 @@ describe('agent-modes history', () => {
       }
     ]
     const expanded = expandHistoryForApi(history, 'agent')
-    expect(expanded).toHaveLength(2)
-    expect(expanded[1].role).toBe('tool')
+    expect(expanded.map((message) => message.role)).toEqual(['assistant', 'tool', 'assistant'])
+    expect(expanded[2].content).toBe('done')
+  })
+
+  it('does not repeat a conclusion already stored at the end of the tool log', () => {
+    const history: ChatMessage[] = [
+      {
+        id: '1',
+        role: 'assistant',
+        content: 'done',
+        apiMessages: [
+          { role: 'tool', content: 'file contents', tool_call_id: 'c1', name: 'read_file' },
+          { role: 'assistant', content: 'done' }
+        ]
+      }
+    ]
+    const expanded = expandHistoryForApi(history, 'agent')
+    expect(expanded.filter((message) => message.content === 'done')).toHaveLength(1)
+  })
+
+  it('does not invent a reply for an empty or interrupted turn', () => {
+    const toolLog: ChatMessage['apiMessages'] = [
+      { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'read_file', arguments: '{}' } }] },
+      { role: 'tool', content: 'file', tool_call_id: 'c1', name: 'read_file' }
+    ]
+    const empty = expandHistoryForApi(
+      [{ id: '1', role: 'assistant', content: '', apiMessages: toolLog }],
+      'agent'
+    )
+    expect(empty).toEqual([])
+
+    const interrupted = expandHistoryForApi(
+      [{ id: '1', role: 'assistant', content: '', interrupted: true, apiMessages: toolLog }],
+      'agent'
+    )
+    expect(interrupted).toHaveLength(2)
+  })
+
+  it('drops an older tool round whole and keeps the latest reply', () => {
+    const oldCall = [{ id: 'old', type: 'function' as const, function: { name: 'read_file', arguments: '{}' } }]
+    const newCall = [{ id: 'new', type: 'function' as const, function: { name: 'read_file', arguments: '{}' } }]
+    const history: ChatMessage[] = [
+      { id: 'u', role: 'user', content: 'go' },
+      {
+        id: '1',
+        role: 'assistant',
+        content: 'the answer',
+        apiMessages: [
+          { role: 'assistant', content: null, tool_calls: oldCall },
+          { role: 'tool', content: 'x'.repeat(400), tool_call_id: 'old', name: 'read_file' },
+          { role: 'assistant', content: null, tool_calls: newCall },
+          { role: 'tool', content: 'short', tool_call_id: 'new', name: 'read_file' }
+        ]
+      }
+    ]
+    const expanded = expandHistoryForApi(history, 'agent', 80)
+    expect(expanded.some((message) => message.tool_calls?.[0]?.id === 'old')).toBe(false)
+    expect(expanded.some((message) => message.tool_call_id === 'old')).toBe(false)
+    expect(expanded.some((message) => message.tool_calls?.[0]?.id === 'new')).toBe(true)
+    expect(expanded.some((message) => message.tool_call_id === 'new')).toBe(true)
+    expect(expanded.at(-1)).toMatchObject({ role: 'assistant', content: 'the answer' })
   })
 })
 

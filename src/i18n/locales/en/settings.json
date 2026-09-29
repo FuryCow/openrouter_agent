@@ -92,6 +92,13 @@
   },
   "mcp": {
     "title": "MCP Servers",
+    "scope": {
+      "global": "Global",
+      "folder": "This folder",
+      "noFolder": "Open a folder to edit its MCP override.",
+      "folderHint": "Saved to .openrouter/mcp.json. An empty list means this folder uses the global servers.",
+      "projectBadge": "project"
+    },
     "tabs": {
       "servers": "servers",
       "json": "json",

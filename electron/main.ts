@@ -9,6 +9,7 @@ import { WebSearchService } from './services/websearch'
 import { CodebaseIndexer } from './services/indexing/codebase-indexer'
 import { DEFAULT_INDEX_SETTINGS } from './services/indexing/index-types'
 import { OpenRouterClient } from './services/openrouter'
+import { fetchModelEndpoints } from './services/models'
 import { AgentService } from './services/agent'
 import type { AgentContext, AppSettings, ModelInfo, McpServerConfig } from './types'
 import {
@@ -28,6 +29,10 @@ import {
   getWorkspaceCursorMcpPath,
   mergeMcpServerConfigs,
   parseCursorMcpJson,
+  readWorkspaceMcpOverride,
+  resolveWorkspaceMcpServers,
+  scheduleWorkspaceMcpReconnect,
+  writeWorkspaceMcpOverride,
   validateMcpServerConfigs
 } from './services/mcp/mcp-config'
 import { ProjectMemoryService } from './services/project-memory/project-memory-service'
@@ -74,7 +79,11 @@ const terminalService = new TerminalService()
 const webSearchService = new WebSearchService()
 let openRouterClient = new OpenRouterClient(store.get('settings'))
 const mcpManager = new McpManager(
-  () => sanitizeSettings(store.get('settings')),
+  () => {
+    const settings = sanitizeSettings(store.get('settings'))
+    const resolved = resolveWorkspaceMcpServers(settings.mcpServers ?? [], settings.workingDirectory)
+    return { ...settings, mcpServers: resolved.servers, mcpConfigError: resolved.error }
+  },
   (status) => sendToRenderer('mcp:status-changed', status)
 )
 const projectMemoryService = new ProjectMemoryService(app.getPath('userData'))
@@ -217,6 +226,9 @@ function applyWorkspaceSelection(workspacePath: string): AppSettings {
   const next = withRecentWorkspace(sanitizeSettings(store.get('settings')), workspacePath)
   store.set('settings', next)
   setWorkspaceWatch(workspacePath)
+  void Promise.resolve(scheduleWorkspaceMcpReconnect(agentService.isRunning, mcpManager)).catch((err) => {
+    console.error('[MCP] Failed to reconnect after workspace change:', err)
+  })
   return next
 }
 
@@ -279,7 +291,7 @@ function registerIpc(): void {
   ipcMain.handle('window:close', () => getWindow().close())
 
   ipcMain.handle('settings:get', () => sanitizeSettings(store.get('settings')))
-  ipcMain.handle('settings:save', (_event, settings: AppSettings) => {
+  ipcMain.handle('settings:save', async (_event, settings: AppSettings) => {
     if (agentService.isRunning) {
       throw new AppError(AppErrorCode.SETTINGS_SAVE_WHILE_RUNNING)
     }
@@ -288,11 +300,14 @@ function registerIpc(): void {
       apiKey: settings.apiKey.trim()
     })
     const previous = sanitizeSettings(store.get('settings'))
+    const mcpChanged =
+      JSON.stringify(previous.mcpServers ?? []) !== JSON.stringify(normalized.mcpServers ?? [])
     store.set('settings', normalized)
     const effects = settingsSaveEffects(previous, normalized)
     if (effects.refreshModelClient) openRouterClient.updateSettings(normalized)
     if (effects.refreshSearch) webSearchService.configure(normalized)
     if (effects.refreshIndex) applyIndexSettings(normalized)
+    if (mcpChanged) await mcpManager.applyConfigFromSettings()
     return normalized
   })
 
@@ -302,6 +317,13 @@ function registerIpc(): void {
       `[OpenRouter Agent] Loaded ${models.length} models. Example: ${models[0]?.id} → ${models[0]?.priceLabel}`
     )
     return JSON.parse(JSON.stringify(models)) as ModelInfo[]
+  })
+
+  ipcMain.handle('models:endpoints', async (_event, modelId: string) => {
+    if (!modelId || typeof modelId !== 'string') return []
+    const settings = sanitizeSettings(store.get('settings'))
+    const endpoints = await fetchModelEndpoints(modelId, settings.apiKey)
+    return endpoints
   })
 
   ipcMain.handle('fs:open-folder', async () => {
@@ -439,6 +461,11 @@ function registerIpc(): void {
         model,
         temperature: context.temperature ?? settings.temperature,
         maxTokens: context.maxTokens,
+        reasoningEffort: context.reasoningEffort ?? settings.reasoningEffort,
+        modelProvider: context.modelProvider ?? settings.modelProvider,
+        reasoningMandatory: context.reasoningMandatory,
+        reasoningDefaultEffort: context.reasoningDefaultEffort,
+        reasoningSupportedEfforts: context.reasoningSupportedEfforts,
         customSystemPrompt: context.customSystemPrompt ?? settings.customSystemPrompt,
         autoApproveWrites: context.autoApproveWrites ?? settings.autoApproveWrites,
         autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal,
@@ -582,13 +609,32 @@ function registerIpc(): void {
   ipcMain.handle('mcp:getStatus', () => mcpManager.getStatus())
   ipcMain.handle('mcp:getConfig', () => mcpManager.getConfig())
 
-  ipcMain.handle('mcp:saveConfig', (_event, servers: McpServerConfig[]) => {
+  ipcMain.handle('mcp:getWorkspaceConfig', () => {
+    const settings = sanitizeSettings(store.get('settings'))
+    if (!settings.workingDirectory?.trim()) return { servers: [] as McpServerConfig[] }
+    const override = readWorkspaceMcpOverride(settings.workingDirectory)
+    return { servers: override.servers, error: override.error, overrideIds: override.servers.map((server) => server.id) }
+  })
+
+  ipcMain.handle('mcp:saveWorkspaceConfig', async (_event, servers: McpServerConfig[]) => {
+    const settings = sanitizeSettings(store.get('settings'))
+    if (!settings.workingDirectory?.trim()) {
+      throw new AppError(AppErrorCode.WORKSPACE_PATH_REQUIRED)
+    }
+    writeWorkspaceMcpOverride(settings.workingDirectory, servers)
+    await mcpManager.applyConfigFromSettings()
+    const override = readWorkspaceMcpOverride(settings.workingDirectory)
+    return { servers: override.servers, error: override.error }
+  })
+
+  ipcMain.handle('mcp:saveConfig', async (_event, servers: McpServerConfig[]) => {
     const error = validateMcpServerConfigs(servers)
     if (error) throw error
 
     const settings = sanitizeSettings(store.get('settings'))
     const next = { ...settings, mcpServers: servers }
     store.set('settings', next)
+    await mcpManager.applyConfigFromSettings()
     return servers
   })
 

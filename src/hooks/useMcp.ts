@@ -9,6 +9,8 @@ export function useMcp(): {
   error: string | null
   refresh: () => Promise<void>
   saveConfig: (servers: McpServerConfig[]) => Promise<void>
+  loadWorkspaceConfig: () => Promise<{ servers: McpServerConfig[]; error?: string; overrideIds?: string[] }>
+  saveWorkspaceConfig: (servers: McpServerConfig[]) => Promise<McpServerConfig[]>
   importDefaultCursor: () => Promise<McpServerConfig[]>
   importFromFile: () => Promise<McpServerConfig[] | null>
   testServer: (config: McpServerConfig) => Promise<{ ok: boolean; toolCount: number; error?: string }>
@@ -57,6 +59,19 @@ export function useMcp(): {
     setStatus(await window.api.mcp.getStatus())
   }, [])
 
+  const loadWorkspaceConfig = useCallback(
+    () => window.api.mcp.getWorkspaceConfig(),
+    []
+  )
+
+  const saveWorkspaceConfig = useCallback(async (servers: McpServerConfig[]): Promise<McpServerConfig[]> => {
+    setError(null)
+    const saved = await window.api.mcp.saveWorkspaceConfig(servers)
+    if (saved.error) setError(saved.error)
+    setStatus(await window.api.mcp.getStatus())
+    return saved.servers
+  }, [])
+
   const importDefaultCursor = useCallback(async (): Promise<McpServerConfig[]> => {
     setError(null)
     const imported = await window.api.mcp.importDefaultCursor()
@@ -88,6 +103,8 @@ export function useMcp(): {
     error,
     refresh,
     saveConfig,
+    loadWorkspaceConfig,
+    saveWorkspaceConfig,
     importDefaultCursor,
     importFromFile,
     testServer,

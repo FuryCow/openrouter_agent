@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import Editor from '@monaco-editor/react'
@@ -14,16 +14,18 @@ import {
 import { useMcp } from '@/hooks/useMcp'
 import type { AppSettings, McpServerConfig, McpTransportType } from '@/types'
 import { cn } from '@/lib/utils'
-import { parseCursorMcpJson, toCursorMcpJson, validateMcpServerConfigs } from '@/lib/mcp-config'
+import {
+  mcpServerConfigsEqual,
+  parseCursorMcpJson,
+  toCursorMcpJson,
+  validateMcpServerConfigs
+} from '@/lib/mcp-config'
 import { runMcpServerTest } from '@/lib/mcpServerTest'
 
 type McpTab = 'servers' | 'json' | 'policies'
+type McpScope = 'global' | 'folder'
 
 type TestFeedback = { type: 'success' | 'error'; message: string }
-
-function serverConfigsEqual(a: McpServerConfig[], b: McpServerConfig[] | undefined): boolean {
-  return JSON.stringify(toCursorMcpJson(a)) === JSON.stringify(toCursorMcpJson(b ?? []))
-}
 
 const TRANSPORT_OPTIONS: Array<{ value: McpTransportType; label: string }> = [
   { value: 'stdio', label: 'stdio' },
@@ -84,6 +86,10 @@ function formatMcpStatus(
 interface McpSettingsPanelProps {
   settings: AppSettings
   onSettingsChange: (settings: AppSettings) => void
+  /** Keeps settings draft in sync when editing global MCP (no-op if unchanged). */
+  syncMcpDraft?: (servers: McpServerConfig[]) => void
+  /** Called when MCP has unsaved edits so the settings modal can flush before Save. */
+  registerModalSave?: (handler: (() => Promise<McpServerConfig[] | void>) | null) => void
   initialTab?: McpTab
   embedded?: boolean
 }
@@ -91,31 +97,83 @@ interface McpSettingsPanelProps {
 export function McpSettingsPanel({
   settings,
   onSettingsChange,
+  syncMcpDraft,
+  registerModalSave,
   initialTab,
   embedded = false
 }: McpSettingsPanelProps): React.ReactElement {
   const { t } = useTranslation('settings')
   const { t: tCommon } = useTranslation('common')
   const [tab, setTab] = useState<McpTab>(initialTab ?? 'servers')
+  const [scope, setScope] = useState<McpScope>('global')
   const [servers, setServers] = useState<McpServerConfig[]>(settings.mcpServers ?? [])
+  const [folderBaseline, setFolderBaseline] = useState<McpServerConfig[]>([])
+  const [overrideIds, setOverrideIds] = useState<string[]>([])
   const [jsonText, setJsonText] = useState('')
   const [jsonError, setJsonError] = useState('')
   const [actionError, setActionError] = useState('')
   const [saving, setSaving] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testFeedback, setTestFeedback] = useState<Record<string, TestFeedback>>({})
-  const { status, loading, error, saveConfig, importDefaultCursor, importFromFile, testServer, reconnect } =
-    useMcp()
+  const {
+    status,
+    loading,
+    error,
+    saveConfig,
+    loadWorkspaceConfig,
+    saveWorkspaceConfig,
+    importDefaultCursor,
+    importFromFile,
+    testServer,
+    reconnect
+  } = useMcp()
 
-  const isDirty = !serverConfigsEqual(servers, settings.mcpServers)
+  const folderOpen = Boolean(settings.workingDirectory?.trim())
+  const baseline = scope === 'folder' ? folderBaseline : (settings.mcpServers ?? [])
+  const isDirty = !mcpServerConfigsEqual(servers, baseline)
+  const scopeRef = useRef(scope)
+  const serversRef = useRef(servers)
+  const folderBaselineRef = useRef(folderBaseline)
+  scopeRef.current = scope
+  serversRef.current = servers
+  folderBaselineRef.current = folderBaseline
 
   useEffect(() => {
     if (initialTab) setTab(initialTab)
   }, [initialTab])
 
   useEffect(() => {
-    setServers(settings.mcpServers ?? [])
-  }, [settings.mcpServers])
+    if (scope !== 'global') return
+    const next = settings.mcpServers ?? []
+    setServers((prev) => (mcpServerConfigsEqual(prev, next) ? prev : next))
+  }, [settings.mcpServers, scope])
+
+  useEffect(() => {
+    if (!folderOpen) {
+      setOverrideIds([])
+      setFolderBaseline([])
+      if (scopeRef.current === 'folder') setScope('global')
+      return
+    }
+    let cancelled = false
+    void loadWorkspaceConfig()
+      .then((loaded) => {
+        if (cancelled) return
+        const previous = folderBaselineRef.current
+        setOverrideIds(loaded.overrideIds ?? loaded.servers.map((server) => server.id))
+        setFolderBaseline(loaded.servers)
+        if (scopeRef.current === 'folder' && mcpServerConfigsEqual(serversRef.current, previous)) {
+          setServers(loaded.servers)
+        }
+        if (loaded.error) setActionError(loaded.error)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setActionError(err instanceof Error ? err.message : t('mcp.loadFailed'))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [folderOpen, settings.workingDirectory, loadWorkspaceConfig, t])
 
   const cursorJson = useMemo(
     () => JSON.stringify(toCursorMcpJson(servers), null, 2),
@@ -129,23 +187,52 @@ export function McpSettingsPanel({
     }
   }, [tab, cursorJson])
 
-  const persistServers = async (next: McpServerConfig[]): Promise<void> => {
-    setSaving(true)
-    setActionError('')
-    try {
-      const validationError = validateMcpServerConfigs(next)
-      if (validationError) throw new Error(validationError)
-      await saveConfig(next)
-      onSettingsChange({ ...settings, mcpServers: next })
-      setServers(next)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('mcp.saveFailed')
-      setActionError(message)
-      throw err instanceof Error ? err : new Error(message)
-    } finally {
-      setSaving(false)
+  const persistServers = useCallback(
+    async (next: McpServerConfig[]): Promise<void> => {
+      setSaving(true)
+      setActionError('')
+      try {
+        const validationError = validateMcpServerConfigs(next)
+        if (validationError) throw new Error(validationError)
+        if (scope === 'folder') {
+          const saved = await saveWorkspaceConfig(next)
+          setFolderBaseline(saved)
+          setOverrideIds(saved.map((server) => server.id))
+          setServers(saved)
+          return
+        }
+        await saveConfig(next)
+        syncMcpDraft?.(next)
+        setServers(next)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : t('mcp.saveFailed')
+        setActionError(message)
+        throw err instanceof Error ? err : new Error(message)
+      } finally {
+        setSaving(false)
+      }
+    },
+    [saveConfig, saveWorkspaceConfig, scope, syncMcpDraft, t]
+  )
+
+  useEffect(() => {
+    if (scope !== 'global' || !syncMcpDraft) return
+    syncMcpDraft(servers)
+  }, [servers, scope, syncMcpDraft])
+
+  useEffect(() => {
+    if (!registerModalSave) return
+    if (!isDirty) {
+      registerModalSave(null)
+      return
     }
-  }
+    registerModalSave(async () => {
+      const next = serversRef.current
+      await persistServers(next)
+      if (scopeRef.current === 'global') return next
+    })
+    return () => registerModalSave(null)
+  }, [isDirty, persistServers, registerModalSave])
 
   const handleTestServer = async (server: McpServerConfig): Promise<void> => {
     setTestingId(server.id)
@@ -194,6 +281,14 @@ export function McpSettingsPanel({
   }
 
   const statusById = new Map(status.servers.map((s) => [s.id, s]))
+  const projectIds = new Set(overrideIds)
+
+  const selectScope = (next: McpScope): void => {
+    if (next === 'folder' && !folderOpen) return
+    setScope(next)
+    setServers(next === 'folder' ? folderBaseline : (settings.mcpServers ?? []))
+    setJsonError('')
+  }
 
   const Wrapper = embedded ? 'div' : 'section'
 
@@ -222,11 +317,34 @@ export function McpSettingsPanel({
         </div>
       </div>
 
-      {(error || actionError) && (
+      {(error || actionError || status.configError) && (
         <p className="rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-          {actionError || error}
+          {actionError || error || status.configError}
         </p>
       )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {(['global', 'folder'] as McpScope[]).map((value) => (
+          <button
+            key={value}
+            type="button"
+            disabled={value === 'folder' && !folderOpen}
+            onClick={() => selectScope(value)}
+            className={cn(
+              'rounded-lg px-2.5 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+              scope === value
+                ? 'bg-white/10 text-zinc-100'
+                : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300'
+            )}
+          >
+            {t(value === 'global' ? 'mcp.scope.global' : 'mcp.scope.folder')}
+          </button>
+        ))}
+        {!folderOpen && <span className="text-xs text-zinc-500">{t('mcp.scope.noFolder')}</span>}
+        {scope === 'folder' && folderOpen && (
+          <span className="text-xs text-zinc-500">{t('mcp.scope.folderHint')}</span>
+        )}
+      </div>
 
       {tab === 'servers' && (
         <div className="space-y-3">
@@ -302,6 +420,11 @@ export function McpSettingsPanel({
                         onChange={(e) => updateServer(server.id, { name: e.target.value })}
                         className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-zinc-200"
                       />
+                      {projectIds.has(server.id) && (
+                        <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-indigo-300">
+                          {t('mcp.scope.projectBadge')}
+                        </span>
+                      )}
                       <span className={cn('text-xs', STATUS_COLORS[live?.status ?? 'disabled'])}>
                         {formatMcpStatus(live?.status, isDirty, t)}
                       </span>

@@ -6,8 +6,6 @@ export interface MemorySuggestEntry {
   category: ProjectMemoryCategory
 }
 
-const FILE_TOOLS = new Set(['write_file', 'search_replace'])
-
 function extractSummary(finalContent: string): string | null {
   const trimmed = finalContent.trim()
   if (!trimmed) return null
@@ -33,23 +31,6 @@ export function suggestMemoryFromRun(
 ): MemorySuggestEntry[] {
   const suggestions: MemorySuggestEntry[] = []
   const seen = new Set<string>()
-
-  const changedPaths = timeline
-    .filter((item): item is Extract<TimelineItem, { type: 'tool' }> => item.type === 'tool')
-    .filter(
-      (item) =>
-        item.toolCall.status === 'done' &&
-        FILE_TOOLS.has(item.toolCall.name) &&
-        Boolean(item.toolCall.filePath?.trim())
-    )
-    .map((item) => item.toolCall.filePath!.trim())
-
-  const uniquePaths = [...new Set(changedPaths)]
-  if (uniquePaths.length > 0) {
-    const content = `Changed files in last run: ${uniquePaths.slice(0, 6).join(', ')}`
-    suggestions.push({ content, category: 'note' })
-    seen.add(content)
-  }
 
   const hadMemoryWrite = timeline.some(
     (item) =>

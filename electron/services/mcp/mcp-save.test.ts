@@ -36,4 +36,27 @@ describe('MCP save and test', () => {
     expect(manager.getConfig()).toEqual([docs])
     expect(manager.getStatus().connectedCount).toBe(0)
   })
+
+  it('drops connected MCP tools when a server is saved as disabled', async () => {
+    const stored: McpServerConfig[] = [{ ...docs, enabled: true }]
+    const manager = new McpManager(() => ({ mcpServers: stored, mcpRequireApproval: true }))
+    const servers = (manager as unknown as { servers: Map<string, unknown> }).servers
+    servers.set('docs', {
+      config: { ...docs, enabled: true },
+      session: { disconnect: async () => undefined },
+      status: 'connected',
+      tools: [
+        {
+          type: 'function',
+          function: { name: 'mcp__docs__search', description: 'search', parameters: {} }
+        }
+      ]
+    })
+
+    stored[0] = { ...docs, enabled: false }
+    await manager.applyConfigFromSettings()
+
+    expect(manager.getToolsForMode('agent')).toEqual([])
+    expect(manager.getStatus().servers[0]).toMatchObject({ id: 'docs', status: 'disabled', toolCount: 0 })
+  })
 })

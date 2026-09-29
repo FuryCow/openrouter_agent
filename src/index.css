@@ -38,6 +38,47 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.reasoning-effort-slider {
+  appearance: none;
+  margin: 0;
+  background: transparent;
+}
+
+.reasoning-effort-slider:focus-visible {
+  outline: none;
+}
+
+.reasoning-effort-slider::-webkit-slider-runnable-track {
+  height: 20px;
+  background: transparent;
+}
+
+.reasoning-effort-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.reasoning-effort-slider::-moz-range-track {
+  height: 20px;
+  border: none;
+  background: transparent;
+}
+
+.reasoning-effort-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  box-shadow: none;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

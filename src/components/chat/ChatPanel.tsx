@@ -19,6 +19,12 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyStateShell } from '@/components/ui/EmptyStateShell'
 import { ChatOnboarding } from './ChatOnboarding'
 import { TokenUsageRing } from './TokenUsageRing'
+import { ReasoningEffortSlider } from './ReasoningEffortSlider'
+import {
+  clampReasoningEffortForModel,
+  normalizeReasoningEffort,
+  type ReasoningEffortLevel
+} from '../../../shared/reasoning-effort'
 import { useUiStore } from '@/stores/uiStore'
 import { useAgentRunStore } from '@/stores/agentRunStore'
 import { AgentContextChips } from './AgentContextChips'
@@ -90,6 +96,7 @@ export function ChatPanel(): React.ReactElement {
   const { sendMessage, implementPlan, abort, retryLast } = useAgent()
   const clearMessages = useChatStore((s) => s.clearMessages)
   const settings = useSettingsStore((s) => s.settings)
+  const setSettings = useSettingsStore((s) => s.setSettings)
   const workingDirectory = useFileStore((s) => s.workingDirectory)
   const models = useSettingsStore((s) => s.models)
   const setSettingsOpen = useSettingsStore((s) => s.setSettingsOpen)
@@ -108,6 +115,63 @@ export function ChatPanel(): React.ReactElement {
 
   const selectedModel = models.find((m) => m.id === settings.model)
   const visionSupported = selectedModel?.supportsVision ?? false
+  const reasoningSupported = selectedModel?.supportsReasoning ?? false
+  const reasoningMandatory = selectedModel?.reasoningMandatory ?? false
+  const reasoningDefaultEffort = selectedModel?.reasoningDefaultEffort
+  const reasoningSupportedEfforts = selectedModel?.reasoningSupportedEfforts
+  const reasoningEffort = normalizeReasoningEffort(settings.reasoningEffort)
+  const reasoningContext = useMemo(
+    () => ({
+      mandatory: reasoningMandatory,
+      defaultEffort: reasoningDefaultEffort,
+      supportedEfforts: reasoningSupportedEfforts
+    }),
+    [reasoningMandatory, reasoningDefaultEffort, reasoningSupportedEfforts]
+  )
+  const reasoningSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const persistReasoningEffort = useCallback((nextSettings: typeof settings): void => {
+    void window.api.settings.save(nextSettings).catch(() => {
+      // The slider already updated local settings.
+    })
+  }, [])
+
+  const handleReasoningEffortChange = useCallback(
+    (nextEffort: ReasoningEffortLevel): void => {
+      const nextSettings = {
+        ...useSettingsStore.getState().settings,
+        reasoningEffort: nextEffort
+      }
+      setSettings(nextSettings)
+      if (reasoningSaveTimerRef.current) clearTimeout(reasoningSaveTimerRef.current)
+      reasoningSaveTimerRef.current = setTimeout(() => {
+        reasoningSaveTimerRef.current = null
+        persistReasoningEffort(nextSettings)
+      }, 350)
+    },
+    [setSettings, persistReasoningEffort]
+  )
+
+  const flushReasoningEffortSave = useCallback((): void => {
+    if (reasoningSaveTimerRef.current) {
+      clearTimeout(reasoningSaveTimerRef.current)
+      reasoningSaveTimerRef.current = null
+    }
+    persistReasoningEffort(useSettingsStore.getState().settings)
+  }, [persistReasoningEffort])
+
+  useEffect(() => {
+    return () => {
+      if (reasoningSaveTimerRef.current) clearTimeout(reasoningSaveTimerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!reasoningSupported) return
+    const clamped = clampReasoningEffortForModel(settings.reasoningEffort, reasoningContext)
+    if (normalizeReasoningEffort(settings.reasoningEffort) === clamped) return
+    handleReasoningEffortChange(clamped)
+  }, [settings.model, settings.reasoningEffort, reasoningSupported, reasoningContext, handleReasoningEffortChange])
 
   const resizeInput = useCallback(() => {
     const el = inputRef.current
@@ -520,9 +584,24 @@ export function ChatPanel(): React.ReactElement {
           <div className="flex h-9 items-center gap-2 border-b border-white/5 bg-white/[0.02] px-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <ChatModeSelector mode={chatMode} onModeChange={setChatMode} disabled={isStreaming} />
-              <ChatModeDescription mode={chatMode} />
+              <ChatModeDescription
+                mode={chatMode}
+                className={reasoningSupported ? 'hidden min-[920px]:block' : undefined}
+              />
             </div>
-            <TokenUsageRing compact />
+            <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              <ReasoningEffortSlider
+                value={reasoningEffort}
+                onChange={handleReasoningEffortChange}
+                onCommit={flushReasoningEffortSave}
+                disabled={isStreaming}
+                supportsReasoning={reasoningSupported}
+                reasoningMandatory={reasoningMandatory}
+                reasoningDefaultEffort={reasoningDefaultEffort}
+                reasoningSupportedEfforts={reasoningSupportedEfforts}
+              />
+              <TokenUsageRing compact />
+            </div>
           </div>
 
           {chatMode === 'agent' && <AgentContextChips />}

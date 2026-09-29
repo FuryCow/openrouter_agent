@@ -61,6 +61,28 @@
   "modeSelector": {
     "title": "Chat mode"
   },
+  "reasoningEffort": {
+    "label": "Thinking",
+    "ariaLabel": "Reasoning effort",
+    "levels": {
+      "auto": "Auto",
+      "none": "Off",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "xhigh": "Extra high",
+      "max": "Max"
+    },
+    "hints": {
+      "auto": "Use the model default reasoning depth",
+      "none": "Disable internal reasoning for faster, cheaper replies",
+      "low": "Low reasoning effort — faster, lighter thinking",
+      "medium": "Medium reasoning effort — balanced depth and speed",
+      "high": "High reasoning effort — slower, more thorough thinking",
+      "xhigh": "Extra high reasoning effort — near the top of the model's range",
+      "max": "Max reasoning effort — deepest thinking, highest cost"
+    }
+  },
   "modes": {
     "agent": {
       "label": "Agent",

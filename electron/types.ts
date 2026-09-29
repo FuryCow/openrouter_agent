@@ -1,3 +1,5 @@
+import type { ReasoningEffortLevel } from '../shared/reasoning-effort'
+
 export type ChatMode = 'agent' | 'ask' | 'planner'
 
 export type McpTransportType = 'stdio' | 'streamable-http' | 'sse'
@@ -33,6 +35,7 @@ export interface McpStatusSnapshot {
   totalTools: number
   connectedCount: number
   enabledCount: number
+  configError?: string
 }
 
 export interface AppSettings {
@@ -42,6 +45,9 @@ export interface AppSettings {
   recentWorkspaces?: string[]
   temperature?: number
   maxTokens?: number
+  reasoningEffort?: ReasoningEffortLevel
+  /** OpenRouter endpoint tag. Empty means Auto routing. */
+  modelProvider?: string
   customSystemPrompt?: string
   autoApproveWrites?: boolean
   autoApproveTerminal?: boolean
@@ -164,6 +170,12 @@ export interface AgentContext {
   workspaceState?: string
   agentAutoVerify?: boolean
   approvedPlan?: ApprovedPlan
+  reasoningEffort?: ReasoningEffortLevel
+  reasoningMandatory?: boolean
+  reasoningDefaultEffort?: string
+  reasoningSupportedEfforts?: string[] | null
+  /** OpenRouter endpoint tag. Empty means Auto routing. */
+  modelProvider?: string
 }
 
 export interface ChatFileAttachment {
@@ -433,6 +445,10 @@ export interface ModelInfo {
   outputModalities: string[]
   supportsTools: boolean
   supportsVision: boolean
+  supportsReasoning?: boolean
+  reasoningMandatory?: boolean
+  reasoningDefaultEffort?: string
+  reasoningSupportedEfforts?: string[] | null
   agenticIndex?: number | null
   /** USD per 1M input tokens */
   promptPricePerM: number | null
@@ -440,6 +456,29 @@ export interface ModelInfo {
   completionPricePerM: number | null
   /** Ready-to-display pricing label */
   priceLabel: string
+  iconUrl?: string | null
+}
+
+export interface ModelEndpoint {
+  /** Routing slug sent as provider.only */
+  tag: string
+  name: string
+  promptPricePerM: number | null
+  completionPricePerM: number | null
+  priceLabel: string
+  iconUrl?: string | null
+  /** False when the provider does not store prompts. */
+  retainsPrompts?: boolean | null
+  trainsOnData?: boolean | null
+  retentionDays?: number | null
+}
+
+export interface ProviderDataPolicy {
+  slug: string
+  iconUrl: string | null
+  retainsPrompts: boolean
+  trainsOnData: boolean
+  retentionDays: number | null
 }
 
 export interface WebSearchResult {

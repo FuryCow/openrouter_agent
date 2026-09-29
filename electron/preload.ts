@@ -5,6 +5,7 @@ import type {
   AgentRunAnalytics,
   AppSettings,
   DirEntry,
+  ModelEndpoint,
   ModelInfo,
   SearchResult,
   IndexStatus,
@@ -29,6 +30,7 @@ export interface ElectronAPI {
   }
   models: {
     list: () => Promise<ModelInfo[]>
+    endpoints: (modelId: string) => Promise<ModelEndpoint[]>
   }
   fs: {
     openFolder: () => Promise<string | null>
@@ -94,6 +96,10 @@ export interface ElectronAPI {
     getStatus: () => Promise<McpStatusSnapshot>
     getConfig: () => Promise<McpServerConfig[]>
     saveConfig: (servers: McpServerConfig[]) => Promise<McpServerConfig[]>
+    getWorkspaceConfig: () => Promise<{ servers: McpServerConfig[]; error?: string; overrideIds?: string[] }>
+    saveWorkspaceConfig: (
+      servers: McpServerConfig[]
+    ) => Promise<{ servers: McpServerConfig[]; error?: string }>
     importFromFile: (filePath?: string) => Promise<McpServerConfig[] | null>
     importDefaultCursor: () => Promise<McpServerConfig[]>
     testServer: (config: McpServerConfig) => Promise<{ ok: boolean; toolCount: number; error?: string }>
@@ -130,7 +136,8 @@ const api: ElectronAPI = {
     save: (settings) => ipcRenderer.invoke('settings:save', settings)
   },
   models: {
-    list: () => ipcRenderer.invoke('models:list')
+    list: () => ipcRenderer.invoke('models:list'),
+    endpoints: (modelId) => ipcRenderer.invoke('models:endpoints', modelId)
   },
   fs: {
     openFolder: () => ipcRenderer.invoke('fs:open-folder'),
@@ -216,6 +223,8 @@ const api: ElectronAPI = {
     getStatus: () => ipcRenderer.invoke('mcp:getStatus'),
     getConfig: () => ipcRenderer.invoke('mcp:getConfig'),
     saveConfig: (servers) => ipcRenderer.invoke('mcp:saveConfig', servers),
+    getWorkspaceConfig: () => ipcRenderer.invoke('mcp:getWorkspaceConfig'),
+    saveWorkspaceConfig: (servers) => ipcRenderer.invoke('mcp:saveWorkspaceConfig', servers),
     importFromFile: (filePath) => ipcRenderer.invoke('mcp:importFromFile', filePath),
     importDefaultCursor: () => ipcRenderer.invoke('mcp:importDefaultCursor'),
     testServer: (config) => ipcRenderer.invoke('mcp:testServer', config),

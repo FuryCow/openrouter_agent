@@ -395,7 +395,7 @@ describe('a full agent run', () => {
     expect(events.filter((event) => event.type === 'checkpoint_updated')).toHaveLength(4)
     expect(terminalCommand).toBe('echo hi')
     expect(events.some((event) => event.type === 'checkpoint_updated')).toBe(true)
-    expect(events.some((event) => event.type === 'memory_suggest')).toBe(true)
+    expect(events.some((event) => event.type === 'memory_suggest')).toBe(false)
     expect(agent.getRunCheckpointSummary()?.count).toBeGreaterThan(0)
 
     const details = await agent.getRunCheckpointDetails()
@@ -769,6 +769,7 @@ describe('a full agent run', () => {
     })
     const done = first.find((event) => event.type === 'done')
     expect(done?.message?.apiMessages?.[0]?.role).toBe('assistant')
+    expect(done?.message?.apiMessages?.at(-1)).toMatchObject({ role: 'assistant', content: 'first' })
     expect(done?.message?.apiMessages?.some((message) => message.role === 'system')).toBe(false)
     expect(done?.message?.apiMessages?.find((message) => message.name === 'read_file')?.content).toHaveLength(50_000)
     expect(done?.message?.timeline?.some((item) => item.type === 'text' && item.content === 'first')).toBe(true)

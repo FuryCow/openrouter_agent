@@ -60,6 +60,7 @@ function ModelRow({
       )}
     >
       <div className="flex items-start justify-between gap-2">
+        <ModelIcon url={model.iconUrl} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-zinc-200">{model.name}</div>
           <div className="truncate text-[10px] text-zinc-500">{model.id}</div>
@@ -124,7 +125,6 @@ export function ModelPicker({
   const [sort, setSort] = useState<ModelSort>('price-low')
 
   const selected = models.find((m) => m.id === value)
-  const selectedPricing = selected ? getModelPriceLabel(selected) : null
   const staleCatalog = isStaleModelCatalog(models)
 
   const filtered = useMemo(() => {
@@ -177,7 +177,7 @@ export function ModelPicker({
             'justify-between gap-2 font-normal shadow-none transition-all',
             compact
               ? [
-                  'h-8 min-h-8 max-w-[18rem] min-w-[11rem] rounded-md border border-indigo-500/20 px-2 py-0',
+                  'h-8 min-h-8 max-w-[13rem] min-w-0 rounded-md border border-indigo-500/20 px-2 py-0',
                   'bg-gradient-to-r from-indigo-500/10 via-violet-500/10 to-indigo-500/5',
                   'hover:border-indigo-400/30 hover:from-indigo-500/15 hover:brightness-110',
                   'data-[state=open]:border-indigo-400/35 data-[state=open]:shadow-[0_0_18px_-6px_rgba(99,102,241,0.5)]',
@@ -187,11 +187,7 @@ export function ModelPicker({
             className
           )}
         >
-          {compact && (
-            <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] bg-gradient-to-br from-indigo-500/30 to-violet-500/20 ring-1 ring-inset ring-indigo-400/30">
-              <Sparkles className="h-2.5 w-2.5 text-indigo-200" />
-            </span>
-          )}
+          {compact && <ModelIcon url={selected?.iconUrl} />}
           <div
             className={cn(
               'min-w-0 flex-1 text-left leading-tight',
@@ -206,16 +202,6 @@ export function ModelPicker({
             >
               {selected?.name || value || t('models.selectModel')}
             </div>
-            {selectedPricing && (
-              <div
-                className={cn(
-                  'whitespace-nowrap font-mono leading-none',
-                  compact ? 'mt-0.5 text-[11px] text-emerald-400/80' : 'truncate text-[9px] text-emerald-400/80'
-                )}
-              >
-                {selectedPricing}
-              </div>
-            )}
           </div>
           <ChevronDown
             className={cn(
@@ -386,5 +372,25 @@ export function ModelPicker({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  )
+}
+
+function ModelIcon({ url }: { url?: string | null }): React.ReactElement {
+  const [failed, setFailed] = useState(false)
+  const showImage = Boolean(url) && !failed
+
+  return (
+    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/5">
+      {showImage ? (
+        <img
+          src={url ?? undefined}
+          alt=""
+          className="h-6 w-6 object-contain"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <Sparkles className="h-3 w-3 text-zinc-500" />
+      )}
+    </span>
   )
 }

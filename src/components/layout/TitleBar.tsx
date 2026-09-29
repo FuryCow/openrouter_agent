@@ -2,6 +2,7 @@ import { Minus, Search, Settings, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { ModelPicker } from '../models/ModelPicker'
+import { ModelVendorSelect } from '../models/ModelVendorSelect'
 import { AppLogo } from '../brand/AppLogo'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUiStore } from '@/stores/uiStore'
@@ -12,24 +13,32 @@ export function TitleBar(): React.ReactElement {
     useSettingsStore()
   const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen)
 
+  const selectedModel = models.find((model) => model.id === settings.model)
+
   const handleModelChange = async (model: string): Promise<void> => {
     const newSettings = { ...settings, model }
     setSettings(newSettings)
     await window.api.settings.save(newSettings)
   }
 
+  const handleVendorChange = async (modelProvider: string): Promise<void> => {
+    const newSettings = { ...settings, modelProvider }
+    setSettings(newSettings)
+    await window.api.settings.save(newSettings)
+  }
+
   return (
-    <div className="drag-region relative flex min-h-11 shrink-0 items-center border-b border-white/5 bg-background/90 px-3 py-1.5 backdrop-blur-xl">
-      <div className="relative z-10 flex shrink-0 items-center gap-2.5 no-drag">
+    <div className="drag-region flex min-h-11 shrink-0 items-center gap-2 border-b border-white/5 bg-background/90 px-3 py-1.5 backdrop-blur-xl">
+      <div className="flex shrink-0 items-center gap-2.5 no-drag">
         <AppLogo size="sm" />
-        <span className="hidden text-sm font-semibold gradient-text sm:inline">{t('appName')}</span>
+        <span className="hidden text-sm font-semibold gradient-text xl:inline">{t('appName')}</span>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 z-20 flex justify-center px-36 no-drag sm:px-44 md:px-52">
+      <div className="no-drag min-w-[8rem] flex-1">
         <button
           type="button"
           onClick={() => setCommandPaletteOpen(true)}
-          className="pointer-events-auto flex h-7 w-full max-w-md items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-left transition-colors hover:border-white/15 hover:bg-white/[0.05]"
+          className="mx-auto flex h-7 w-full max-w-md items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-left transition-colors hover:border-white/15 hover:bg-white/[0.05]"
           title={t('commandPalette.openTooltip')}
         >
           <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
@@ -42,7 +51,7 @@ export function TitleBar(): React.ReactElement {
         </button>
       </div>
 
-      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5 py-0.5 no-drag">
+      <div className="flex shrink-0 items-center gap-1.5 py-0.5 no-drag">
         <ModelPicker
           compact
           value={settings.model}
@@ -50,6 +59,12 @@ export function TitleBar(): React.ReactElement {
           loading={modelsLoading}
           onChange={handleModelChange}
           onRefresh={loadModels}
+        />
+        <ModelVendorSelect
+          modelId={settings.model}
+          value={settings.modelProvider ?? ''}
+          catalogPriceLabel={selectedModel?.priceLabel}
+          onChange={(tag) => void handleVendorChange(tag)}
         />
 
         <Button

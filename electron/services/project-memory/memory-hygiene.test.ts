@@ -40,6 +40,16 @@ describe('memory-hygiene', () => {
     expect(capped[0].content).toBe('note 29')
   })
 
+  it('drops bare file lists and keeps notes that say something', () => {
+    const cleaned = applyMemoryHygiene([
+      entry('Changed files in last run: src/app.ts, src/util.ts', 'note', '2026-03-01T00:00:00.000Z'),
+      entry('Favicon is redrawn so it stays readable at 16px', 'note', '2026-03-02T00:00:00.000Z')
+    ])
+
+    expect(cleaned).toHaveLength(1)
+    expect(cleaned[0].content).toContain('16px')
+  })
+
   it('applies dedupe then caps', () => {
     const cleaned = applyMemoryHygiene([
       entry('Indexer uses SQLite', 'architecture', '2026-02-01T00:00:00.000Z'),

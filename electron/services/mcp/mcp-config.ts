@@ -11,6 +11,14 @@ export {
   type CursorMcpJson,
   type CursorMcpServerEntry
 } from './mcp-config-core'
+export {
+  getWorkspaceOpenRouterMcpPath,
+  readWorkspaceMcpOverride,
+  resolveWorkspaceMcpServers,
+  scheduleWorkspaceMcpReconnect,
+  writeWorkspaceMcpOverride,
+  type WorkspaceMcpResolution
+} from './mcp-workspace'
 
 export function getDefaultCursorMcpPath(): string {
   return join(homedir(), '.cursor', 'mcp.json')

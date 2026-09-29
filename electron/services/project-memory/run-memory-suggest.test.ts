@@ -3,7 +3,7 @@ import { suggestMemoryFromRun } from './run-memory-suggest'
 import type { TimelineItem } from '../../types'
 
 describe('suggestMemoryFromRun', () => {
-  it('suggests changed file paths from completed file tools', () => {
+  it('does not turn a list of edited files into memory', () => {
     const timeline: TimelineItem[] = [
       {
         type: 'tool',
@@ -30,8 +30,8 @@ describe('suggestMemoryFromRun', () => {
     ]
 
     const suggestions = suggestMemoryFromRun(timeline, 'Updated app and util.')
-    expect(suggestions.some((entry) => entry.content.includes('src/app.ts'))).toBe(true)
-    expect(suggestions.some((entry) => entry.content.includes('src/util.ts'))).toBe(true)
+    expect(suggestions.every((entry) => !entry.content.includes('src/app.ts'))).toBe(true)
+    expect(suggestions.every((entry) => !/changed files/i.test(entry.content))).toBe(true)
   })
 
   it('suggests summary when agent did not update memory', () => {
@@ -67,20 +67,8 @@ describe('suggestMemoryFromRun', () => {
   })
 
   it('returns at most three suggestions', () => {
-    const timeline: TimelineItem[] = Array.from({ length: 8 }, (_, index) => ({
-      type: 'tool' as const,
-      id: `t${index}`,
-      toolCall: {
-        id: `c${index}`,
-        name: 'write_file',
-        arguments: '{}',
-        status: 'done' as const,
-        filePath: `src/file-${index}.ts`
-      }
-    }))
-
     const suggestions = suggestMemoryFromRun(
-      timeline,
+      [],
       '- First bullet\n- Second bullet\n- Third bullet\n- Fourth bullet'
     )
 
