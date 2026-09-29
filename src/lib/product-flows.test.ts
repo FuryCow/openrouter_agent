@@ -144,7 +144,7 @@ describe('a running agent in the chat', () => {
     })
   })
 
-  it('offers to remember a run that changed a file, and a short answer stays quiet', () => {
+  it('offers to remember a substantive answer, and a short reply stays quiet', () => {
     const quiet = suggestMemoryFromRun([], 'ok')
     expect(quiet).toEqual([])
 
@@ -164,15 +164,15 @@ describe('a running agent in the chat', () => {
       ],
       'Updated the camera focus so the preview stays sharp.'
     )
-    expect(suggestions[0]?.content).toContain('src/Camera.ts')
+    expect(suggestions[0]?.category).toBe('decision')
+    expect(suggestions[0]?.content).toContain('camera focus')
+    expect(suggestions[0]?.content).not.toContain('src/Camera.ts')
 
     handleAgentEvent({
       type: 'memory_suggest',
       memorySuggest: { id: 'mem-1', entries: suggestions }
     })
-    expect(useChatStore.getState().pendingMemorySuggest?.entries[0]?.content).toContain(
-      'src/Camera.ts'
-    )
+    expect(useChatStore.getState().pendingMemorySuggest?.entries[0]?.content).toContain('camera focus')
 
     useChatStore.getState().setPendingMemorySuggest(null)
     expect(useChatStore.getState().pendingMemorySuggest).toBeNull()
