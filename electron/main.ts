@@ -39,6 +39,14 @@ import { ProjectMemoryService } from './services/project-memory/project-memory-s
 import type { ProjectMemoryCategory, ProjectMemoryEntry } from './types'
 import { getWorkspaceState } from './services/workspace-state'
 import { AppError, AppErrorCode, getAppErrorPayload } from './lib/app-errors'
+import { homedir } from 'os'
+import { SkillLoader } from './services/skills/skill-loader'
+
+// Allow a second dev instance to use an isolated userData directory (worktree runs).
+const userDataOverride = process.env['OPENROUTER_AGENT_USER_DATA']?.trim()
+if (userDataOverride) {
+  app.setPath('userData', userDataOverride)
+}
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
   const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
@@ -87,6 +95,7 @@ const mcpManager = new McpManager(
   (status) => sendToRenderer('mcp:status-changed', status)
 )
 const projectMemoryService = new ProjectMemoryService(app.getPath('userData'))
+const skillLoader = new SkillLoader(join(homedir(), '.openrouter_agent', 'skills'))
 let agentService = new AgentService(
   openRouterClient,
   fsService,
@@ -94,7 +103,8 @@ let agentService = new AgentService(
   webSearchService,
   codebaseIndexer,
   mcpManager,
-  projectMemoryService
+  projectMemoryService,
+  skillLoader
 )
 webSearchService.configure(store.get('settings'))
 
@@ -470,6 +480,7 @@ function registerIpc(): void {
         autoApproveWrites: context.autoApproveWrites ?? settings.autoApproveWrites,
         autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal,
         agentAutoVerify: settings.agentAutoVerify !== false,
+        skillsEnabled: settings.skillsEnabled === true,
         workspaceState:
           mode !== 'ask' && cwd ? getWorkspaceState(cwd).formatted : undefined,
         projectMemory:

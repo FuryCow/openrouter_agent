@@ -7,7 +7,9 @@ import type {
   DirEntry,
   ModelEndpoint,
   ModelInfo,
-  SearchResult
+  SearchResult,
+  SkillInfo,
+  SkillDraft
 } from '../../electron/types'
 
 declare global {
