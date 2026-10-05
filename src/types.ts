@@ -5,11 +5,11 @@ import type {
   AppSettings,
   ChatMessage,
   DirEntry,
+  SkillInfo,
+  SkillDraft,
   ModelEndpoint,
   ModelInfo,
-  SearchResult,
-  SkillInfo,
-  SkillDraft
+  SearchResult
 } from '../../electron/types'
 
 declare global {
@@ -28,6 +28,8 @@ export type {
   ModelEndpoint,
   ModelInfo,
   SearchResult,
+  SkillInfo,
+  SkillDraft,
   TimelineItem,
   ToolCallInfo,
   AgentRunAnalytics,

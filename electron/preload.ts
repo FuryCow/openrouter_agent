@@ -15,7 +15,9 @@ import type {
   McpServerConfig,
   McpStatusSnapshot,
   ProjectMemoryEntry,
-  ProjectMemoryCategory
+  ProjectMemoryCategory,
+  SkillInfo,
+  SkillDraft
 } from './types'
 
 export interface ElectronAPI {
@@ -117,6 +119,12 @@ export interface ElectronAPI {
       input: { content: string; category?: ProjectMemoryCategory; source?: 'user' | 'remember' },
       workspacePath?: string
     ) => Promise<ProjectMemoryEntry>
+  }
+  skills: {
+    list: (workspacePath?: string) => Promise<SkillInfo[]>
+    read: (path: string) => Promise<string>
+    save: (workspacePath: string, name: string, content: string) => Promise<string>
+    delete: (path: string) => Promise<void>
   }
   app: {
     getVersion: () => Promise<string>
@@ -242,6 +250,13 @@ const api: ElectronAPI = {
     saveEntries: (entries, workspacePath) =>
       ipcRenderer.invoke('memory:saveEntries', entries, workspacePath),
     remember: (input, workspacePath) => ipcRenderer.invoke('memory:remember', input, workspacePath)
+  },
+  skills: {
+    list: (workspacePath) => ipcRenderer.invoke('skills:list', workspacePath),
+    read: (path) => ipcRenderer.invoke('skills:read', path),
+    save: (workspacePath, name, content) =>
+      ipcRenderer.invoke('skills:save', workspacePath, name, content),
+    delete: (path) => ipcRenderer.invoke('skills:delete', path)
   },
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),

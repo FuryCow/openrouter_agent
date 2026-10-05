@@ -599,6 +599,26 @@ function registerIpc(): void {
     }
   )
 
+  ipcMain.handle('skills:list', (_event, workspacePath?: string) => {
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    return skillLoader.listSkills(workspace || undefined)
+  })
+
+  ipcMain.handle('skills:read', (_event, path: string) => {
+    return skillLoader.readSkill(path)
+  })
+
+  ipcMain.handle('skills:save', (_event, workspacePath: string, name: string, content: string) => {
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    if (!workspace) throw new AppError(AppErrorCode.WORKSPACE_PATH_REQUIRED)
+    assertAllowedWorkspace(workspace)
+    return skillLoader.saveSkill(workspace, name, content)
+  })
+
+  ipcMain.handle('skills:delete', (_event, path: string) => {
+    return skillLoader.deleteSkill(path)
+  })
+
   ipcMain.handle('analytics:get-runs', (_event, limit?: number) => {
     return getRecentAnalyticsRuns(limit ?? 20)
   })

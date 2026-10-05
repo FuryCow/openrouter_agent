@@ -36,6 +36,10 @@
   "agent": {
     "customPrompt": "Custom system prompt",
     "customPromptPlaceholder": "Optional extra instructions prepended to agent system prompt",
+    "skillsEnabled": {
+      "title": "Native skills",
+      "description": "Progressive disclosure: agent sees skill names, loads SKILL.md via load_skill"
+    },
     "verifyAfterEdits": {
       "title": "Verify after edits",
       "description": "Agent runs tests/lint/tsc after code changes (via run_terminal)"
@@ -151,5 +155,26 @@
     "loadFailed": "Could not load models from OpenRouter. Check your connection and try Refresh.",
     "staleCatalog": "Loaded outdated model list (50 without prices). Close the app completely and run start.bat again.",
     "failed": "Failed to load models"
+  },
+  "skills": {
+    "title": "Project skills",
+    "description": "Markdown instructions in .openrouter/skills (global: ~/.openrouter_agent/skills)",
+    "noWorkspace": "Open a workspace to manage project skills.",
+    "manage": "Manage skills",
+    "count": "{{count}} skills",
+    "empty": "No skills found yet.",
+    "newSkill": "New skill",
+    "name": "Skill name",
+    "namePlaceholder": "react-refactor",
+    "content": "SKILL.md content",
+    "save": "Save skill",
+    "saved": "Saved to {{path}}",
+    "invalidName": "Invalid name — use lowercase letters, digits and dashes (max 64)",
+    "saveFailed": "Failed to save skill",
+    "deleteFailed": "Failed to delete skill",
+    "loadFailed": "Failed to load skills",
+    "readOnlyHint": "Global skills are read-only here — copy the content into a project skill to edit.",
+    "projectBadge": "project",
+    "globalBadge": "global"
   }
 }
