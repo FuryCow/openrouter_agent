@@ -125,6 +125,7 @@ export interface ElectronAPI {
     read: (path: string) => Promise<string>
     save: (workspacePath: string, name: string, content: string) => Promise<string>
     delete: (path: string) => Promise<void>
+    distill: (mode: string, workspacePath?: string) => Promise<SkillDraft | null>
   }
   app: {
     getVersion: () => Promise<string>
@@ -256,7 +257,8 @@ const api: ElectronAPI = {
     read: (path) => ipcRenderer.invoke('skills:read', path),
     save: (workspacePath, name, content) =>
       ipcRenderer.invoke('skills:save', workspacePath, name, content),
-    delete: (path) => ipcRenderer.invoke('skills:delete', path)
+    delete: (path) => ipcRenderer.invoke('skills:delete', path),
+    distill: (mode, workspacePath) => ipcRenderer.invoke('skills:distill', mode, workspacePath)
   },
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),

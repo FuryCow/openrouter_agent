@@ -41,6 +41,7 @@ import { getWorkspaceState } from './services/workspace-state'
 import { AppError, AppErrorCode, getAppErrorPayload } from './lib/app-errors'
 import { homedir } from 'os'
 import { SkillLoader } from './services/skills/skill-loader'
+import { distillSessionIntoSkill } from './services/skills/skill-distill-runner'
 
 // Allow a second dev instance to use an isolated userData directory (worktree runs).
 const userDataOverride = process.env['OPENROUTER_AGENT_USER_DATA']?.trim()
@@ -617,6 +618,35 @@ function registerIpc(): void {
 
   ipcMain.handle('skills:delete', (_event, path: string) => {
     return skillLoader.deleteSkill(path)
+  })
+
+  ipcMain.handle('skills:distill', async (_event, mode: string, workspacePath?: string) => {
+    if (agentService.isRunning) {
+      throw new AppError(AppErrorCode.SETTINGS_SAVE_WHILE_RUNNING)
+    }
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    if (!workspace) throw new AppError(AppErrorCode.WORKSPACE_PATH_REQUIRED)
+    const chatMode = (mode || 'agent') as import('./types').ChatMode
+    const messages = await loadChatMessages(chatMode, workspace)
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === 'assistant' && m.runOutcome === 'success')
+    if (!lastAssistant?.apiMessages?.length) {
+      throw new Error('No successful agent run found in this chat to distill.')
+    }
+    const settings = sanitizeSettings(store.get('settings'))
+    if (!openRouterClient.hasApiKey()) {
+      throw new AppError(AppErrorCode.OPENROUTER_API_KEY_MISSING)
+    }
+    return distillSessionIntoSkill(
+      openRouterClient,
+      {
+        apiMessages: lastAssistant.apiMessages,
+        finalContent: lastAssistant.content,
+        runAnalytics: lastAssistant.runAnalytics
+      },
+      { model: settings.model }
+    )
   })
 
   ipcMain.handle('analytics:get-runs', (_event, limit?: number) => {

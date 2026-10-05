@@ -16,6 +16,7 @@ import { useChatModes } from '@/hooks/useChatModes'
 import { scheduleInAnimationFrame } from '@/lib/animation-frame'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyStateShell } from '@/components/ui/EmptyStateShell'
 import { ChatOnboarding } from './ChatOnboarding'
 import { TokenUsageRing } from './TokenUsageRing'
@@ -38,6 +39,7 @@ import {
   type ChatInputAttachment
 } from '@/lib/chatAttachments'
 import { savePlannerPlanFile } from '@/lib/plannerPlanSave'
+import type { SkillDraft } from '@/types'
 
 function StreamingMessageBubble(): React.ReactElement {
   const activeTimeline = useChatStore((s) => s.activeTimeline)
@@ -105,6 +107,8 @@ export function ChatPanel(): React.ReactElement {
   const chatDraft = useUiStore((s) => s.chatDraft)
   const clearChatDraft = useUiStore((s) => s.clearChatDraft)
   const runCheckpoint = useAgentRunStore((s) => s.checkpoint)
+  const [distillDraft, setDistillDraft] = useState<SkillDraft | null>(null)
+  const [distilling, setDistilling] = useState(false)
 
   const modeConfig = getModeConfig(chatMode)
   const ModeIcon = modeConfig.icon
@@ -424,6 +428,56 @@ export function ChatPanel(): React.ReactElement {
     }
   }
 
+  const handleDistill = async (message: (typeof visibleMessages)[number]): Promise<void> => {
+    if (isStreaming || distilling) return
+    if (!settings.apiKey) {
+      setSettingsOpen(true)
+      return
+    }
+    setDistilling(true)
+    try {
+      const draft = await window.api.skills.distill(chatMode, workingDirectory || undefined)
+      if (!draft) {
+        useToastStore.getState().addToast(t('toast.distillFailed'), 'error')
+        return
+      }
+      setDistillDraft(draft)
+    } catch (err) {
+      useToastStore.getState().addToast(
+        err instanceof Error ? err.message : t('toast.distillFailed'),
+        'error'
+      )
+    } finally {
+      setDistilling(false)
+    }
+  }
+
+  const handleSaveDistilled = async (): Promise<void> => {
+    if (!distillDraft || !workingDirectory) return
+    try {
+      const markdown = ['---',
+        `name: ${distillDraft.name}`,
+        `description: ${distillDraft.description}`,
+        '---',
+        distillDraft.body
+      ].join('\n')
+      await window.api.skills.save(workingDirectory, distillDraft.name, markdown)
+      setDistillDraft(null)
+      useToastStore.getState().addToast(t('toast.skillSaved'), 'success')
+    } catch (err) {
+      useToastStore.getState().addToast(
+        err instanceof Error ? err.message : t('toast.distillFailed'),
+        'error'
+      )
+    }
+  }
+
+  const canDistill =
+    chatMode === 'agent' &&
+    settings.skillsEnabled === true &&
+    !isStreaming &&
+    !distilling
+
   const canRemember =
     chatMode === 'agent' &&
     settings.projectMemoryEnabled !== false &&
@@ -549,6 +603,12 @@ export function ChatPanel(): React.ReactElement {
                   ? () => void rememberMessage(msg)
                   : undefined
               }
+              onDistill={
+                canDistill && msg.role === 'assistant' && msg.runOutcome === 'success' && msg.apiMessages?.length
+                  ? () => void handleDistill(msg)
+                  : undefined
+              }
+              canDistill
               onEdit={
                 msg.role === 'user' && !isStreaming
                   ? () => {
@@ -725,6 +785,38 @@ export function ChatPanel(): React.ReactElement {
           </button>
         </p>
       </div>
+
+      <Dialog open={Boolean(distillDraft)} onOpenChange={(open) => !open && setDistillDraft(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t('distill.title')}</DialogTitle>
+          </DialogHeader>
+          {distillDraft && (
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-zinc-500">{t('distill.name')}</p>
+                <p className="font-mono text-sm text-zinc-200">{distillDraft.name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500">{t('distill.description')}</p>
+                <p className="text-sm text-zinc-300">{distillDraft.description}</p>
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500">{t('distill.body')}</p>
+                <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-black/20 p-3 font-mono text-xs text-zinc-300">{distillDraft.body}</pre>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setDistillDraft(null)}>
+                  {tc('actions.cancel')}
+                </Button>
+                <Button onClick={() => void handleSaveDistilled()}>
+                  {t('distill.save')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={clearConfirmOpen}

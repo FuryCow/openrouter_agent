@@ -11,7 +11,8 @@ import {
   Copy,
   RotateCcw,
   Pencil,
-  Bookmark
+  Bookmark,
+  FlaskConical
 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { useState, useRef, useEffect, useLayoutEffect, memo, useMemo } from 'react'
@@ -640,7 +641,9 @@ export function MessageBubble({
   onCopy,
   onRetry,
   onEdit,
-  onRemember
+  onRemember,
+  onDistill,
+  canDistill
 }: {
   role: 'user' | 'assistant'
   timeline?: TimelineItem[]
@@ -661,6 +664,8 @@ export function MessageBubble({
   onRetry?: () => void
   onEdit?: () => void
   onRemember?: () => void
+  onDistill?: () => void
+  canDistill?: boolean
 }): React.ReactElement | null {
   const { t } = useTranslation('chat')
   const { t: tc } = useTranslation('common')
@@ -736,6 +741,9 @@ export function MessageBubble({
       : []),
     ...(onRemember
       ? [{ label: tc('actions.remember'), icon: <Bookmark className="h-3 w-3" />, onClick: onRemember }]
+      : []),
+    ...(onDistill && canDistill
+      ? [{ label: t('message.distill'), icon: <FlaskConical className="h-3 w-3" />, onClick: onDistill }]
       : [])
   ]
 
@@ -820,7 +828,9 @@ function areMessageBubblePropsEqual(
     prev.interrupted === next.interrupted &&
     prev.runOutcome === next.runOutcome &&
     prev.showImplementPlan === next.showImplementPlan &&
-    prev.showSavePlan === next.showSavePlan
+    prev.showSavePlan === next.showSavePlan &&
+    prev.canDistill === next.canDistill &&
+    prev.onDistill === next.onDistill
   )
 }
 
