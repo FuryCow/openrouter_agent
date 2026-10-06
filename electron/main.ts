@@ -43,6 +43,8 @@ import { homedir } from 'os'
 import { SkillLoader } from './services/skills/skill-loader'
 import {
   UpdateChecker,
+  downloadInstaller,
+  pickInstallerAsset,
   scheduleStartupUpdateCheck,
   shouldNotifyForUpdate
 } from './services/update-checker'
@@ -319,6 +321,35 @@ function registerIpc(): void {
     if (!version || typeof version !== 'string') return
     const settings = sanitizeSettings(store.get('settings'))
     store.set('settings', { ...settings, updateNotificationDismissedFor: version })
+  })
+
+  let installInFlight = false
+  ipcMain.handle('updates:install', async (_event, update: import('./types').UpdateInfo) => {
+    if (installInFlight) return { ok: false, error: 'already_running' }
+    installInFlight = true
+    try {
+      const asset = pickInstallerAsset(
+        update.assets ?? [],
+        process.platform,
+        process.arch
+      )
+      if (!asset) return { ok: false, error: 'no_matching_installer' }
+      const filePath = await downloadInstaller(asset, (progress) => {
+        sendToRenderer('updates:download-progress', {
+          version: update.version,
+          percent: progress.percent,
+          received: progress.received,
+          total: progress.total
+        })
+      })
+      await shell.openPath(filePath)
+      return { ok: true }
+    } catch (err) {
+      console.error('[Updates] Install failed:', err)
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    } finally {
+      installInFlight = false
+    }
   })
 
   ipcMain.handle('window:minimize', () => getWindow().minimize())

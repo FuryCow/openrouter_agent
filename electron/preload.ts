@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AgentContext,
   UpdateInfo,
+  UpdateDownloadProgress,
   AgentEvent,
   AgentRunAnalytics,
   AppSettings,
@@ -132,7 +133,11 @@ export interface ElectronAPI {
     check: () => Promise<UpdateInfo | null>
     getCached: () => Promise<UpdateInfo | null>
     dismiss: (version: string) => Promise<void>
+    install: (update: UpdateInfo) => Promise<{ ok: boolean; error?: string }>
     onAvailable: (callback: (update: UpdateInfo) => void) => () => void
+    onDownloadProgress: (
+      callback: (progress: UpdateDownloadProgress) => void
+    ) => () => void
   }
   app: {
     getVersion: () => Promise<string>
@@ -271,10 +276,19 @@ const api: ElectronAPI = {
     check: () => ipcRenderer.invoke('updates:check'),
     getCached: () => ipcRenderer.invoke('updates:get-cached'),
     dismiss: (version) => ipcRenderer.invoke('updates:dismiss', version),
+    install: (update) => ipcRenderer.invoke('updates:install', update),
     onAvailable: (callback) => {
       const handler = (_event: Electron.IpcRendererEvent, update: UpdateInfo) => callback(update)
       ipcRenderer.on('updates:available', handler)
       return () => ipcRenderer.removeListener('updates:available', handler)
+    },
+    onDownloadProgress: (callback) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        progress: UpdateDownloadProgress
+      ) => callback(progress)
+      ipcRenderer.on('updates:download-progress', handler)
+      return () => ipcRenderer.removeListener('updates:download-progress', handler)
     }
   },
   app: {

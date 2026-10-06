@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Rocket, X } from 'lucide-react'
+import { Download, Loader2, Rocket, X } from 'lucide-react'
 import { Button } from '../ui/button'
-import type { UpdateInfo } from '@/types'
+import { useToastStore } from '@/stores/toastStore'
+import type { UpdateInfo, UpdateDownloadProgress } from '@/types'
 
 /**
  * Bottom-left card announcing a newer GitHub release.
  * Shown when the main process reports an update; "Skip" stores the version
- * in settings so the same release does not nag again.
+ * in settings so the same release does not nag again. "Install" downloads
+ * the platform installer and launches it.
  */
 export function UpdateNotification(): React.ReactElement | null {
   const { t } = useTranslation('layout')
   const [update, setUpdate] = useState<UpdateInfo | null>(null)
+  const [progress, setProgress] = useState<UpdateDownloadProgress | null>(null)
+  const [installing, setInstalling] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -23,10 +27,14 @@ export function UpdateNotification(): React.ReactElement | null {
       if (!cancelled && value) setUpdate(value)
     })
     const unsubscribe = api.onAvailable?.((value: UpdateInfo) => setUpdate(value))
+    const unsubscribeProgress = api.onDownloadProgress?.((value: UpdateDownloadProgress) => {
+      setProgress(value)
+    })
 
     return () => {
       cancelled = true
       unsubscribe?.()
+      unsubscribeProgress?.()
     }
   }, [])
 
@@ -38,6 +46,39 @@ export function UpdateNotification(): React.ReactElement | null {
   const handleOpenRelease = (): void => {
     if (update) void window.api?.shell?.openExternal?.(update.releaseUrl)
   }
+
+  const handleInstall = (): void => {
+    if (!update || installing) return
+    setInstalling(true)
+    setProgress({ version: update.version, percent: 0, received: 0, total: 0 })
+    void window.api?.updates
+      ?.install?.(update)
+      .then((result) => {
+        if (result?.ok) {
+          useToastStore
+            .getState()
+            .addToast(t('updates.installerLaunched', { version: update.version }), 'success')
+          setUpdate(null)
+        } else {
+          useToastStore
+            .getState()
+            .addToast(t('updates.installFailed', { error: result?.error ?? 'unknown' }), 'error')
+        }
+      })
+      .catch(() => {
+        useToastStore.getState().addToast(t('updates.installFailed', { error: 'network' }), 'error')
+      })
+      .finally(() => {
+        setInstalling(false)
+        setProgress(null)
+      })
+  }
+
+  const installLabel = installing
+    ? progress && progress.total > 0
+      ? t('updates.downloading', { percent: progress.percent })
+      : t('updates.preparing')
+    : t('updates.install')
 
   return (
     <AnimatePresence>
@@ -74,13 +115,27 @@ export function UpdateNotification(): React.ReactElement | null {
               {update.releaseNotes.trim().split('\n')[0]}
             </p>
           )}
+          {installing && progress && progress.total > 0 && (
+            <div className="mt-2 px-4">
+              <div className="h-1 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-indigo-400 transition-[width] duration-200"
+                  style={{ width: `${progress.percent}%` }}
+                />
+              </div>
+            </div>
+          )}
           <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/5 px-4 py-2.5">
-            <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={handleDismiss}>
+            <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={handleDismiss} disabled={installing}>
               {t('updates.dismiss')}
             </Button>
-            <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={handleOpenRelease}>
+            <Button variant="secondary" size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={handleOpenRelease}>
               <Rocket className="h-3 w-3" />
               {t('updates.whatsNew')}
+            </Button>
+            <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={handleInstall} disabled={installing}>
+              {installing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+              {installLabel}
             </Button>
           </div>
         </motion.div>

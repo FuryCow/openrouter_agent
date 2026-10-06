@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { compareVersions, isNewerVersion, parseVersion } from './update-checker'
+import {
+  compareVersions,
+  isNewerVersion,
+  parseVersion,
+  pickInstallerAsset,
+  type UpdateAsset
+} from './update-checker'
 
 describe('parseVersion', () => {
   it('parses release versions', () => {
@@ -70,5 +76,46 @@ describe('isNewerVersion', () => {
   it('is false when either side is unparseable', () => {
     expect(isNewerVersion('garbage', '1.0.0')).toBe(false)
     expect(isNewerVersion('1.0.0-alpha.7', '')).toBe(false)
+  })
+})
+
+describe('pickInstallerAsset', () => {
+  const asset = (name: string): UpdateAsset => ({ name, url: `https://x/${name}`, size: 1 })
+
+  it('picks the NSIS Setup exe on Windows', () => {
+    const assets = [
+      asset('OpenRouter.Agent-1.0.0-alpha.7.AppImage'),
+      asset('OpenRouter.Agent.Setup.1.0.0-alpha.7.exe'),
+      asset('OpenRouter.Agent-1.0.0-alpha.7-arm64.dmg')
+    ]
+    expect(pickInstallerAsset(assets, 'win32', 'x64')?.name).toBe(
+      'OpenRouter.Agent.Setup.1.0.0-alpha.7.exe'
+    )
+  })
+
+  it('falls back to any exe on Windows when no Setup file exists', () => {
+    expect(pickInstallerAsset([asset('app-portable.exe')], 'win32', 'x64')?.name).toBe(
+      'app-portable.exe'
+    )
+  })
+
+  it('picks the arm64 dmg on Apple Silicon', () => {
+    const assets = [asset('app-1.0.0.dmg'), asset('app-1.0.0-arm64.dmg')]
+    expect(pickInstallerAsset(assets, 'darwin', 'arm64')?.name).toBe('app-1.0.0-arm64.dmg')
+  })
+
+  it('picks the x64 dmg on Intel Macs', () => {
+    const assets = [asset('app-1.0.0.dmg'), asset('app-1.0.0-arm64.dmg')]
+    expect(pickInstallerAsset(assets, 'darwin', 'x64')?.name).toBe('app-1.0.0.dmg')
+  })
+
+  it('picks the AppImage on Linux', () => {
+    const assets = [asset('app.exe'), asset('app-1.0.0.AppImage')]
+    expect(pickInstallerAsset(assets, 'linux', 'x64')?.name).toBe('app-1.0.0.AppImage')
+  })
+
+  it('returns null for unsupported platforms or empty assets', () => {
+    expect(pickInstallerAsset([], 'win32', 'x64')).toBeNull()
+    expect(pickInstallerAsset([asset('app.exe')], 'freebsd', 'x64')).toBeNull()
   })
 })

@@ -31,6 +31,7 @@ export type {
   SkillInfo,
   SkillDraft,
   UpdateInfo,
+  UpdateDownloadProgress,
   TimelineItem,
   ToolCallInfo,
   AgentRunAnalytics,

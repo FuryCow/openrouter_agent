@@ -6,7 +6,12 @@
   "updates": {
     "title": "Update available",
     "dismiss": "Skip this version",
-    "whatsNew": "What's new"
+    "whatsNew": "What's new",
+    "install": "Install",
+    "preparing": "Preparing…",
+    "downloading": "{{percent}}%",
+    "installerLaunched": "Installer for {{version}} launched",
+    "installFailed": "Install failed: {{error}}"
   },
   "commandPalette": {
     "triggerPlaceholder": "Search files and commands…",

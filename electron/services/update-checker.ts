@@ -1,4 +1,10 @@
 import { app, net } from 'electron'
+import { createWriteStream } from 'node:fs'
+import { mkdir, chmod } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import type { AppSettings } from '../types'
 
 const GITHUB_LATEST_RELEASE_URL =
@@ -6,11 +12,25 @@ const GITHUB_LATEST_RELEASE_URL =
 const REQUEST_TIMEOUT_MS = 10_000
 const RECHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 
+export interface UpdateAsset {
+  name: string
+  url: string
+  size: number
+}
+
 export interface UpdateInfo {
   version: string
   releaseUrl: string
   releaseName: string
   releaseNotes: string
+  assets: UpdateAsset[]
+}
+
+export interface UpdateDownloadProgress {
+  version: string
+  percent: number
+  received: number
+  total: number
 }
 
 interface GithubRelease {
@@ -20,6 +40,7 @@ interface GithubRelease {
   body?: unknown
   draft?: unknown
   prerelease?: unknown
+  assets?: unknown
 }
 
 export interface ParsedVersion {
@@ -88,6 +109,20 @@ function asString(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+function toAssets(value: unknown): UpdateAsset[] {
+  if (!Array.isArray(value)) return []
+  const assets: UpdateAsset[] = []
+  for (const raw of value) {
+    if (typeof raw !== 'object' || raw === null) continue
+    const record = raw as Record<string, unknown>
+    const name = asString(record.name)
+    const url = asString(record.browser_download_url)
+    if (!name || !url) continue
+    assets.push({ name, url, size: typeof record.size === 'number' ? record.size : 0 })
+  }
+  return assets
+}
+
 function toUpdateInfo(release: GithubRelease): UpdateInfo | null {
   const version = asString(release.tag_name)
   const url = asString(release.html_url)
@@ -96,8 +131,80 @@ function toUpdateInfo(release: GithubRelease): UpdateInfo | null {
     version,
     releaseUrl: url,
     releaseName: asString(release.name) || version,
-    releaseNotes: asString(release.body)
+    releaseNotes: asString(release.body),
+    assets: toAssets(release.assets)
   }
+}
+
+/**
+ * Picks the installer asset for the current platform and architecture.
+ * win32 → NSIS Setup exe, darwin → dmg (arm64 build on Apple Silicon),
+ * linux → AppImage. Returns null when the release has no matching asset.
+ */
+export function pickInstallerAsset(
+  assets: UpdateAsset[],
+  platform: NodeJS.Platform,
+  arch: string
+): UpdateAsset | null {
+  if (assets.length === 0) return null
+
+  if (platform === 'win32') {
+    const exes = assets.filter((asset) => asset.name.toLowerCase().endsWith('.exe'))
+    return exes.find((asset) => asset.name.toLowerCase().includes('setup')) ?? exes[0] ?? null
+  }
+
+  if (platform === 'darwin') {
+    const dmgs = assets.filter((asset) => asset.name.toLowerCase().endsWith('.dmg'))
+    const arm64 = dmgs.find((asset) => asset.name.toLowerCase().includes('arm64'))
+    const x64 = dmgs.find((asset) => !asset.name.toLowerCase().includes('arm64'))
+    if (arch === 'arm64') return arm64 ?? x64 ?? dmgs[0] ?? null
+    return x64 ?? arm64 ?? dmgs[0] ?? null
+  }
+
+  if (platform === 'linux') {
+    return assets.find((asset) => asset.name.toLowerCase().endsWith('.appimage')) ?? null
+  }
+
+  return null
+}
+
+export interface DownloadProgress {
+  received: number
+  total: number
+  percent: number
+}
+
+/** Downloads the asset into a temp dir, reporting progress; returns the file path. */
+export async function downloadInstaller(
+  asset: UpdateAsset,
+  onProgress: (progress: DownloadProgress) => void
+): Promise<string> {
+  const dir = join(tmpdir(), 'openrouter-agent-update')
+  await mkdir(dir, { recursive: true })
+  const filePath = join(dir, asset.name)
+
+  const response = await net.fetch(asset.url)
+  if (!response.ok) {
+    throw new Error(`Download failed: HTTP ${response.status}`)
+  }
+  const total = Number(response.headers.get('content-length')) || asset.size
+  let received = 0
+  let lastReportedPercent = -1
+
+  const source = Readable.fromWeb(
+    response.body as import('node:stream/web').ReadableStream<Uint8Array>
+  )
+  source.on('data', (chunk: Buffer) => {
+    received += chunk.length
+    const percent = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0
+    if (percent !== lastReportedPercent) {
+      lastReportedPercent = percent
+      onProgress({ received, total, percent })
+    }
+  })
+
+  await pipeline(source, createWriteStream(filePath))
+  return filePath
 }
 
 export interface UpdateCheckResult {

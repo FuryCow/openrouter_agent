@@ -5,6 +5,14 @@ export interface UpdateInfo {
   releaseUrl: string
   releaseName: string
   releaseNotes: string
+  assets: Array<{ name: string; url: string; size: number }>
+}
+
+export interface UpdateDownloadProgress {
+  version: string
+  percent: number
+  received: number
+  total: number
 }
 
 export interface SkillInfo {
