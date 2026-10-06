@@ -28,7 +28,7 @@
 
 The app runs on your machine. The workspace stays on disk. A request goes to OpenRouter only when you send a message, and it includes the context you attached: the conversation, open files, and tool results.
 
-Current release: [v1.0.0-alpha.5](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.5) · Windows (NSIS), macOS (DMG), Linux (AppImage) · MIT
+Current release: [v1.0.0-alpha.8](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.8) · Windows (NSIS), macOS (DMG), Linux (AppImage) · MIT
 
 ## What you get
 
@@ -56,6 +56,8 @@ A finished plan can be sent to Agent from the chat. Ask and Planner keep going u
 ## Download
 
 Installers are attached to each [GitHub release](https://github.com/FuryCow/openrouter_agent/releases/latest).
+
+Since v1.0.0-alpha.8 the app checks GitHub for new releases and shows a card in the bottom-left corner, with a one-click installer download. If you are on v1.0.0-alpha.7 or older, update manually this one time — from alpha.8 on, the app will tell you about new releases itself. Notifications can be turned off in Settings → General.
 
 On first launch, open **Settings** (`Ctrl+L`) and paste an [OpenRouter API key](https://openrouter.ai/keys). Pick a model from the title bar. The app version is shown in the status bar and at the bottom of Settings.
 
@@ -96,6 +98,7 @@ If the terminal fails after an Electron upgrade on Windows, install the [Spectre
 | Auto-approve terminal | Skip the card for shell commands |
 | MCP servers | External tools. **Test** checks one server. **Save** does not reconnect them |
 | Locale | English |
+| Update notifications | Check GitHub for new releases and show a card with an Install button |
 
 ## Shortcuts
 
