@@ -11,7 +11,8 @@ import {
   Copy,
   RotateCcw,
   Pencil,
-  Bookmark
+  Bookmark,
+  FlaskConical
 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { useState, useRef, useEffect, useLayoutEffect, memo, useMemo } from 'react'
@@ -573,7 +574,7 @@ function MessageActions({
   actions,
   align = 'start'
 }: {
-  actions: Array<{ label: string; icon: React.ReactNode; onClick: () => void }>
+  actions: Array<{ label: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean; loading?: boolean }>
   align?: 'start' | 'end'
 }): React.ReactElement | null {
   if (actions.length === 0) return null
@@ -590,9 +591,13 @@ function MessageActions({
           key={action.label}
           type="button"
           onClick={action.onClick}
-          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30"
+          disabled={action.disabled}
+          className={cn(
+            'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30',
+            'disabled:pointer-events-none disabled:opacity-60'
+          )}
         >
-          {action.icon}
+          {action.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : action.icon}
           {action.label}
         </button>
       ))}
@@ -640,7 +645,11 @@ export function MessageBubble({
   onCopy,
   onRetry,
   onEdit,
-  onRemember
+  onRemember,
+  onDistill,
+  canDistill,
+  distillBusy,
+  distillActive
 }: {
   role: 'user' | 'assistant'
   timeline?: TimelineItem[]
@@ -661,6 +670,10 @@ export function MessageBubble({
   onRetry?: () => void
   onEdit?: () => void
   onRemember?: () => void
+  onDistill?: () => void
+  canDistill?: boolean
+  distillBusy?: boolean
+  distillActive?: boolean
 }): React.ReactElement | null {
   const { t } = useTranslation('chat')
   const { t: tc } = useTranslation('common')
@@ -736,6 +749,17 @@ export function MessageBubble({
       : []),
     ...(onRemember
       ? [{ label: tc('actions.remember'), icon: <Bookmark className="h-3 w-3" />, onClick: onRemember }]
+      : []),
+    ...(onDistill && canDistill
+      ? [
+          {
+            label: t('message.distill'),
+            icon: <FlaskConical className="h-3 w-3" />,
+            onClick: onDistill,
+            disabled: distillBusy,
+            loading: distillActive
+          }
+        ]
       : [])
   ]
 
@@ -820,7 +844,11 @@ function areMessageBubblePropsEqual(
     prev.interrupted === next.interrupted &&
     prev.runOutcome === next.runOutcome &&
     prev.showImplementPlan === next.showImplementPlan &&
-    prev.showSavePlan === next.showSavePlan
+    prev.showSavePlan === next.showSavePlan &&
+    prev.canDistill === next.canDistill &&
+    prev.distillBusy === next.distillBusy &&
+    prev.distillActive === next.distillActive &&
+    prev.onDistill === next.onDistill
   )
 }
 

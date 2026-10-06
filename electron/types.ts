@@ -1,5 +1,19 @@
 import type { ReasoningEffortLevel } from '../shared/reasoning-effort'
 
+export interface SkillInfo {
+  name: string
+  description: string
+  /** Absolute path to the SKILL.md file. */
+  path: string
+  source: 'global' | 'project'
+}
+
+export interface SkillDraft {
+  name: string
+  description: string
+  body: string
+}
+
 export type ChatMode = 'agent' | 'ask' | 'planner'
 
 export type McpTransportType = 'stdio' | 'streamable-http' | 'sse'
@@ -62,6 +76,8 @@ export interface AppSettings {
   mcpRequireApproval?: boolean
   projectMemoryEnabled?: boolean
   projectMemoryAutoLoadDocs?: boolean
+  /** Native skills (progressive disclosure via load_skill). Strictly opt-in: === true. */
+  skillsEnabled?: boolean
   agentAutoVerify?: boolean
   locale?: 'en'
 }
@@ -167,6 +183,8 @@ export interface AgentContext {
   autoApproveWrites?: boolean
   autoApproveTerminal?: boolean
   projectMemory?: string
+  /** Native skills flag. Strictly opt-in: === true. */
+  skillsEnabled?: boolean
   workspaceState?: string
   agentAutoVerify?: boolean
   approvedPlan?: ApprovedPlan

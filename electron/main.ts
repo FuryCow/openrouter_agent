@@ -39,6 +39,15 @@ import { ProjectMemoryService } from './services/project-memory/project-memory-s
 import type { ProjectMemoryCategory, ProjectMemoryEntry } from './types'
 import { getWorkspaceState } from './services/workspace-state'
 import { AppError, AppErrorCode, getAppErrorPayload } from './lib/app-errors'
+import { homedir } from 'os'
+import { SkillLoader } from './services/skills/skill-loader'
+import { distillSessionIntoSkill } from './services/skills/skill-distill-runner'
+
+// Allow a second dev instance to use an isolated userData directory (worktree runs).
+const userDataOverride = process.env['OPENROUTER_AGENT_USER_DATA']?.trim()
+if (userDataOverride) {
+  app.setPath('userData', userDataOverride)
+}
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
   const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
@@ -87,6 +96,7 @@ const mcpManager = new McpManager(
   (status) => sendToRenderer('mcp:status-changed', status)
 )
 const projectMemoryService = new ProjectMemoryService(app.getPath('userData'))
+const skillLoader = new SkillLoader(join(homedir(), '.openrouter_agent', 'skills'))
 let agentService = new AgentService(
   openRouterClient,
   fsService,
@@ -94,7 +104,8 @@ let agentService = new AgentService(
   webSearchService,
   codebaseIndexer,
   mcpManager,
-  projectMemoryService
+  projectMemoryService,
+  skillLoader
 )
 webSearchService.configure(store.get('settings'))
 
@@ -470,6 +481,7 @@ function registerIpc(): void {
         autoApproveWrites: context.autoApproveWrites ?? settings.autoApproveWrites,
         autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal,
         agentAutoVerify: settings.agentAutoVerify !== false,
+        skillsEnabled: settings.skillsEnabled === true,
         workspaceState:
           mode !== 'ask' && cwd ? getWorkspaceState(cwd).formatted : undefined,
         projectMemory:
@@ -587,6 +599,55 @@ function registerIpc(): void {
       })
     }
   )
+
+  ipcMain.handle('skills:list', (_event, workspacePath?: string) => {
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    return skillLoader.listSkills(workspace || undefined)
+  })
+
+  ipcMain.handle('skills:read', (_event, path: string) => {
+    return skillLoader.readSkill(path)
+  })
+
+  ipcMain.handle('skills:save', (_event, workspacePath: string, name: string, content: string) => {
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    if (!workspace) throw new AppError(AppErrorCode.WORKSPACE_PATH_REQUIRED)
+    assertAllowedWorkspace(workspace)
+    return skillLoader.saveSkill(workspace, name, content)
+  })
+
+  ipcMain.handle('skills:delete', (_event, path: string) => {
+    return skillLoader.deleteSkill(path)
+  })
+
+  ipcMain.handle('skills:distill', async (_event, mode: string, workspacePath?: string) => {
+    if (agentService.isRunning) {
+      throw new AppError(AppErrorCode.SETTINGS_SAVE_WHILE_RUNNING)
+    }
+    const workspace = workspacePath?.trim() || getCurrentWorkspace()
+    if (!workspace) throw new AppError(AppErrorCode.WORKSPACE_PATH_REQUIRED)
+    const chatMode = (mode || 'agent') as import('./types').ChatMode
+    const messages = await loadChatMessages(chatMode, workspace)
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === 'assistant' && m.runOutcome === 'success')
+    if (!lastAssistant?.apiMessages?.length) {
+      throw new Error('No successful agent run found in this chat to distill.')
+    }
+    const settings = sanitizeSettings(store.get('settings'))
+    if (!openRouterClient.hasApiKey()) {
+      throw new AppError(AppErrorCode.OPENROUTER_API_KEY_MISSING)
+    }
+    return distillSessionIntoSkill(
+      openRouterClient,
+      {
+        apiMessages: lastAssistant.apiMessages,
+        finalContent: lastAssistant.content,
+        runAnalytics: lastAssistant.runAnalytics
+      },
+      { model: settings.model }
+    )
+  })
 
   ipcMain.handle('analytics:get-runs', (_event, limit?: number) => {
     return getRecentAnalyticsRuns(limit ?? 20)

@@ -3,6 +3,7 @@ import {
   buildSystemPrompt,
   expandHistoryForApi,
   filterHistoryForApi,
+  formatSkillsSection,
   getMaxIterations,
   getToolsForMode,
   isToolAllowedInMode
@@ -282,5 +283,79 @@ describe('buildSystemPrompt', () => {
   it('omits verification workflow when agentAutoVerify is disabled', () => {
     const prompt = buildSystemPrompt({ ...baseContext, agentAutoVerify: false })
     expect(prompt).not.toContain('Verification workflow')
+  })
+})
+
+describe('formatSkillsSection / skills in system prompt', () => {
+  it('returns an empty section when there are no skills', () => {
+    expect(formatSkillsSection([])).toBe('')
+  })
+
+  it('lists skill names and trimmed descriptions without bodies', () => {
+    const section = formatSkillsSection([
+      { name: 'react-refactor', description: 'How to refactor React components.', path: '/s/react-refactor/SKILL.md', source: 'global' }
+    ])
+    expect(section).toContain('Available skills (progressive disclosure):')
+    expect(section).toContain('- react-refactor: How to refactor React components.')
+    expect(section).toContain('load_skill')
+  })
+
+  it('truncates long descriptions and caps the list at 20 with a note', () => {
+    const long = 'x'.repeat(500)
+    const many = Array.from({ length: 25 }, (_, i) => ({
+      name: `skill-${i}`,
+      description: long,
+      path: `/s/skill-${i}/SKILL.md`,
+      source: 'global' as const
+    }))
+    const section = formatSkillsSection(many)
+    expect(section).toContain('x'.repeat(200))
+    expect(section).not.toContain('x'.repeat(201))
+    expect(section).toContain('(+5 more skills omitted)')
+    expect(section).not.toContain('skill-20:')
+  })
+
+  it('injects the skills section between memory and workspace state for agent mode', () => {
+    const prompt = buildSystemPrompt(
+      { ...baseContext, projectMemory: 'Use SQLite' },
+      [],
+      [
+        {
+          name: 'deploy',
+          description: 'Deploy steps.',
+          path: '/s/deploy/SKILL.md',
+          source: 'global'
+        }
+      ]
+    )
+    expect(prompt).toContain('Project memory (workspace-specific')
+    expect(prompt.indexOf('- deploy: Deploy steps.')).toBeGreaterThan(
+      prompt.indexOf('Use SQLite')
+    )
+    expect(prompt.indexOf('- deploy: Deploy steps.')).toBeLessThan(prompt.indexOf('Workspace state:'))
+  })
+
+  it('does not change the prompt when no skills are provided (regression)', () => {
+    const withArg = buildSystemPrompt({ ...baseContext }, [], [])
+    expect(withArg).not.toContain('Available skills')
+  })
+
+  it('keeps load_skill out of read-only and planner tool lists', () => {
+    const withSkill: ToolDefinition[] = [
+      ...ALL_TOOLS,
+      {
+        type: 'function',
+        function: {
+          name: 'load_skill',
+          description: '',
+          parameters: { type: 'object', properties: {} }
+        }
+      }
+    ]
+    expect(getToolsForMode('ask', withSkill).map((t) => t.function.name)).not.toContain('load_skill')
+    expect(getToolsForMode('planner', withSkill).map((t) => t.function.name)).not.toContain('load_skill')
+    expect(isToolAllowedInMode('load_skill', 'ask')).toBe(false)
+    expect(isToolAllowedInMode('load_skill', 'planner')).toBe(false)
+    expect(isToolAllowedInMode('load_skill', 'agent')).toBe(true)
   })
 })

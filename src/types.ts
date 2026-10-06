@@ -5,6 +5,8 @@ import type {
   AppSettings,
   ChatMessage,
   DirEntry,
+  SkillInfo,
+  SkillDraft,
   ModelEndpoint,
   ModelInfo,
   SearchResult
@@ -26,6 +28,8 @@ export type {
   ModelEndpoint,
   ModelInfo,
   SearchResult,
+  SkillInfo,
+  SkillDraft,
   TimelineItem,
   ToolCallInfo,
   AgentRunAnalytics,

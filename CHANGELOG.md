@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.7] — 2026-10-06
+
+### Skills (behind the skillsEnabled flag, off by default)
+
+- **Native skills system:** markdown skills with YAML frontmatter in global (~/.openrouter_agent/skills) and project (<workspace>/.openrouter/skills) directories; project skills override global ones with the same name.
+- **Progressive disclosure:** the agent system prompt lists only skill names and descriptions (cap 20, description up to 200 chars); the full SKILL.md is loaded on demand via the new load_skill tool (agent mode only).
+- **Skills panel in Settings → Agent:** list, view, create, edit, delete project skills; global skills are read-only. Toggle to enable the feature.
+- **Distillation:** "Distill into skill" button on successful agent runs reflects on the session trajectory via LLM and drafts a SKILL.md for preview and one-click save to project skills.
+- **Fixes:** load_skill is registered in tool validation (was rejected as unknown_tool before execution); load_skill accepts a bare skill name or root-relative path, not only an absolute path; the distill button stays visible while distilling (disabled with a spinner and an info toast).
+
+---
+
 ## [1.0.0-alpha.5] — 2026-09-28
 
 ### Index

@@ -21,7 +21,8 @@ const TOOLS_KNOWN: Record<string, true> = {
   read_project_memory: true,
   update_project_memory: true,
   create_task_checklist: true,
-  update_task_checklist: true
+  update_task_checklist: true,
+  load_skill: true
 }
 
 const REQUIRED_ARGS: Record<string, string[]> = {
@@ -39,7 +40,8 @@ const REQUIRED_ARGS: Record<string, string[]> = {
   read_project_memory: [],
   update_project_memory: ['action'],
   create_task_checklist: ['steps'],
-  update_task_checklist: ['step', 'status']
+  update_task_checklist: ['step', 'status'],
+  load_skill: ['path']
 }
 
 export type ToolCallOutcome = 'success' | 'error' | 'invalid_args'

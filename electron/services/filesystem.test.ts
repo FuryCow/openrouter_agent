@@ -45,6 +45,37 @@ describe('FileSystemService', () => {
       await writeFile(file, 'same', 'utf-8')
       await expect(fs.searchReplace(file, 'same', 'same')).rejects.toThrow(/identical/)
     })
+
+    it('replaces multi-line text in a CRLF file without touching line endings', async () => {
+      const file = join(dir, 'crlf.txt')
+      await writeFile(file, 'function a() {\r\n  return 1\r\n}\r\n', 'utf-8')
+      const result = await fs.searchReplace(
+        file,
+        'function a() {\n  return 1\n}',
+        'function a() {\n  return 2\n}'
+      )
+      expect(result.replacements).toBe(1)
+      expect(await fs.readFile(file)).toBe('function a() {\r\n  return 2\r\n}\r\n')
+    })
+
+    it('replaces multi-line text in an LF file', async () => {
+      const file = join(dir, 'lf.txt')
+      await writeFile(file, 'function a() {\n  return 1\n}\n', 'utf-8')
+      const result = await fs.searchReplace(
+        file,
+        'function a() {\r\n  return 1\r\n}',
+        'function a() {\r\n  return 2\r\n}'
+      )
+      expect(result.replacements).toBe(1)
+      expect(await fs.readFile(file)).toBe('function a() {\n  return 2\n}\n')
+    })
+
+    it('keeps mixed-EOL files intact outside the replaced span', async () => {
+      const file = join(dir, 'mixed.txt')
+      await writeFile(file, 'one\r\nkeep\r\nTARGET\nafter', 'utf-8')
+      await fs.searchReplace(file, 'TARGET', 'DONE')
+      expect(await fs.readFile(file)).toBe('one\r\nkeep\r\nDONE\nafter')
+    })
   })
 
   describe('listDir', () => {

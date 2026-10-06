@@ -16,6 +16,7 @@ import { useIndexStore } from '@/stores/indexStore'
 import type { AppSettings, McpServerConfig } from '@/types'
 import { McpSettingsPanel } from './McpSettingsPanel'
 import { ProjectMemorySettings } from './ProjectMemorySettings'
+import { SkillsSettings } from './SkillsSettings'
 import {
   getSettingsSection,
   getSettingsSections,
@@ -69,6 +70,7 @@ function syncFormFromSettings(
     setProjectMemoryEnabled: (v: boolean) => void
     setProjectMemoryAutoLoadDocs: (v: boolean) => void
     setAgentAutoVerify: (v: boolean) => void
+    setSkillsEnabled: (v: boolean) => void
   }
 ): void {
   setters.setApiKey(settings.apiKey ?? '')
@@ -84,6 +86,7 @@ function syncFormFromSettings(
   setters.setProjectMemoryEnabled(settings.projectMemoryEnabled !== false)
   setters.setProjectMemoryAutoLoadDocs(settings.projectMemoryAutoLoadDocs !== false)
   setters.setAgentAutoVerify(settings.agentAutoVerify !== false)
+  setters.setSkillsEnabled(settings.skillsEnabled === true)
 }
 
 export function SettingsModal(): React.ReactElement {
@@ -116,6 +119,7 @@ export function SettingsModal(): React.ReactElement {
     settings.projectMemoryAutoLoadDocs !== false
   )
   const [agentAutoVerify, setAgentAutoVerify] = useState(settings.agentAutoVerify !== false)
+  const [skillsEnabled, setSkillsEnabled] = useState(settings.skillsEnabled === true)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const mcpModalSaveRef = useRef<(() => Promise<McpServerConfig[] | void>) | null>(null)
@@ -153,7 +157,8 @@ export function SettingsModal(): React.ReactElement {
         setSemanticSearchEnabled,
         setProjectMemoryEnabled,
         setProjectMemoryAutoLoadDocs,
-        setAgentAutoVerify
+        setAgentAutoVerify,
+        setSkillsEnabled
       })
     })
   }, [settingsOpen, settingsFocusSection, setSettings])
@@ -183,7 +188,8 @@ export function SettingsModal(): React.ReactElement {
         semanticSearchEnabled,
         projectMemoryEnabled,
         projectMemoryAutoLoadDocs,
-        agentAutoVerify
+        agentAutoVerify,
+        skillsEnabled
       }
       await saveAppSettings({
         draft: newSettings,
@@ -258,6 +264,13 @@ export function SettingsModal(): React.ReactElement {
               onEnabledChange={setProjectMemoryEnabled}
               onAutoLoadDocsChange={setProjectMemoryAutoLoadDocs}
             />
+            <SettingsSwitchRow
+              title={t('agent.skillsEnabled.title')}
+              description={t('agent.skillsEnabled.description')}
+              checked={skillsEnabled}
+              onCheckedChange={setSkillsEnabled}
+            />
+            <SkillsSettings />
             <SettingsSwitchRow
               title={t('agent.verifyAfterEdits.title')}
               description={t('agent.verifyAfterEdits.description')}

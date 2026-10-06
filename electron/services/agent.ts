@@ -29,6 +29,7 @@ import {
 } from './agent-modes'
 import { buildFallbackFileDiffPreview, formatFileChangeDiff, countDiffStats, buildInlineDiffRanges, buildInlineDeleteHighlights, buildDeletedLineHighlights, buildModifiedLineHighlights, buildPureAdditionHighlightRanges } from '../lib/diff'
 import { sanitizeTerminalOutput } from '../lib/strip-ansi'
+import { eolAwareReplace } from '../lib/eol'
 import { normalizeChecklistSteps } from '../lib/checklist-steps'
 import { processToolCallsBatch } from '../lib/tool-call-runner'
 import {
@@ -41,6 +42,7 @@ import type { ProjectMemoryService } from './project-memory/project-memory-servi
 import type { ProjectMemoryCategory } from './project-memory/project-memory-types'
 import { suggestMemoryFromRun } from './project-memory/run-memory-suggest'
 import { isPlannerPlanPath } from './planner-plans'
+import type { SkillLoader } from './skills/skill-loader'
 import { RunTaskChecklist } from './run-task-checklist'
 import { RunCheckpoint } from './run-checkpoint'
 import {
@@ -317,6 +319,25 @@ const TOOLS: ToolDefinition[] = [
         required: ['step', 'status']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'load_skill',
+      description:
+        'Load the full instructions of an available skill (see the Available skills section in the system prompt). Read the skill before applying its workflow.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description:
+              'Skill name from the Available skills section (e.g. "react-refactor") or the path to its SKILL.md file'
+          }
+        },
+        required: ['path']
+      }
+    }
   }
 ]
 
@@ -349,7 +370,8 @@ export class AgentService {
     private webSearch: WebSearchService,
     private indexer: CodebaseIndexer,
     private mcpManager: McpManager,
-    private projectMemory: ProjectMemoryService
+    private projectMemory: ProjectMemoryService,
+    private skills?: SkillLoader
   ) {}
 
   get isRunning(): boolean {
@@ -508,7 +530,13 @@ export class AgentService {
     this.emitRunStatus(emit, 'running')
     this.emitChecklistUpdated(emit)
 
-    const tools = [...getToolsForMode(mode, TOOLS), ...this.mcpManager.getToolsForMode(mode)]
+    const skillsEnabled = context.skillsEnabled === true && this.skills != null
+    const skills =
+      skillsEnabled && this.skills ? await this.skills.listSkills(context.workingDirectory) : []
+    const tools = [
+      ...getToolsForMode(mode, TOOLS),
+      ...this.mcpManager.getToolsForMode(mode)
+    ].filter((tool) => skillsEnabled || tool.function.name !== 'load_skill')
     const maxIterations = getMaxIterations(mode)
     const expandedHistory = expandHistoryForApi(context.history, mode)
     const analytics = new ToolAnalyticsCollector(
@@ -535,7 +563,8 @@ export class AgentService {
 
     const systemPrompt = buildSystemPrompt(
       { ...context, mode },
-      this.mcpManager.getConnectedServerSummaries()
+      this.mcpManager.getConnectedServerSummaries(),
+      skills
     )
     const messages: ChatCompletionMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -966,6 +995,12 @@ export class AgentService {
     }
 
     switch (call.function.name) {
+      case 'load_skill': {
+        if (!this.skills || context.skillsEnabled !== true) {
+          return 'Error: Skills module is disabled'
+        }
+        return this.skills.readSkill(String(args.path ?? ''))
+      }
       case 'read_file': {
         const path = this.resolvePath(String(args.path ?? ''), cwd)
         assertPathNotInAgentApp(path)
@@ -1189,9 +1224,13 @@ export class AgentService {
         current = await this.fs.readFile(path)
       }
 
-      const next = replaceAll
-        ? current.split(oldString).join(newString)
-        : current.replace(oldString, newString)
+      const replaceResult = eolAwareReplace(current, oldString, newString, replaceAll)
+      const next =
+        replaceResult.status === 'ok'
+          ? replaceResult.updated
+          : replaceAll
+            ? current.split(oldString).join(newString)
+            : current.replace(oldString, newString)
 
       return { path: relativePath, fileDiff: formatFileChangeDiff(current, next) }
     } catch {

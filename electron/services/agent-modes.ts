@@ -1,4 +1,4 @@
-import type { AgentContext, ChatMode, ChatMessage, ApiChatMessage } from '../types'
+import type { AgentContext, ChatMode, ChatMessage, ApiChatMessage, SkillInfo } from '../types'
 import type { ToolDefinition } from './openrouter'
 import type { McpManager } from './mcp/mcp-manager'
 import { isMcpQualifiedToolName, parseMcpQualifiedToolName } from './mcp/mcp-tool-mapper'
@@ -223,6 +223,21 @@ const PROJECT_MEMORY_GUIDELINES = `Guidelines for memory:
 - Use update_project_memory to persist important decisions, architecture notes, and recurring pitfalls
 - Do not store secrets, API keys, or tokens in memory`
 
+export function formatSkillsSection(skills: SkillInfo[]): string {
+  if (skills.length === 0) return ''
+  const shown = skills.slice(0, 20)
+  const truncated = skills.length > shown.length
+  const lines = shown.map((s) => `- ${s.name}: ${s.description.slice(0, 200)}`)
+  if (truncated) {
+    lines.push(`- (+${skills.length - shown.length} more skills omitted)`)
+  }
+  return [
+    'Available skills (progressive disclosure):',
+    ...lines,
+    'Call load_skill("<skill-name>") when a skill is relevant to the task — the full instructions are in its file.'
+  ].join('\n')
+}
+
 function formatProjectMemorySection(projectMemory?: string): string {
   const body = projectMemory?.trim() || 'No project memory yet.'
   return `Project memory (workspace-specific; treat as authoritative context):
@@ -241,13 +256,15 @@ Use this context when drafting plans — do not contradict established conventio
 
 export function buildSystemPrompt(
   context: AgentContext,
-  mcpServers: Array<{ id: string; name: string; toolCount: number }> = []
+  mcpServers: Array<{ id: string; name: string; toolCount: number }> = [],
+  skills: SkillInfo[] = []
 ): string {
   const openFilesList = formatOpenFiles(context)
   const workspaceLine = context.workingDirectory
     ? `Working directory: ${context.workingDirectory}`
     : 'Working directory: not set'
   const mcpSection = formatMcpServersSection(mcpServers)
+  const skillsSection = formatSkillsSection(skills)
 
   const attachmentSection = formatAttachedFilesForSystemPrompt(context.attachedFiles)
 
@@ -312,6 +329,7 @@ ${attachmentSection ? `${attachmentSection}\n\n` : ''}Open files:
 ${openFilesList}
 
 ${formatProjectMemorySection(context.projectMemory)}
+${skillsSection}
 
 ${formatWorkspaceStateSection(context.workspaceState)}
 

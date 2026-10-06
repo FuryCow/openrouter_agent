@@ -36,7 +36,10 @@
     "planSaveFailed": "Failed to save plan",
     "clearFailed": "Failed to clear chat",
     "stepsRemaining": "Only {{count}} tool step(s) remaining before the run limit.",
-    "openWorkspaceForPlan": "Open a workspace to save a plan"
+    "openWorkspaceForPlan": "Open a workspace to save a plan",
+    "distillFailed": "Failed to distill the run into a skill",
+    "distillStarted": "Distilling the run into a skill…",
+    "skillSaved": "Skill saved to project"
   },
   "onboarding": {
     "title": "Quick start",
@@ -104,7 +107,8 @@
     "streaming": "Requesting model…",
     "implementPlan": "Implement according to plan",
     "savePlan": "Save plan to project",
-    "attachmentAlt": "attachment"
+    "attachmentAlt": "attachment",
+    "distill": "Distill into skill"
   },
   "imagePreview": {
     "view": "View image",
@@ -223,5 +227,12 @@
     "aborted": "Aborted",
     "max_iterations": "Step limit",
     "error": "Failed"
+  },
+  "distill": {
+    "title": "New skill draft",
+    "name": "name",
+    "description": "description",
+    "body": "body",
+    "save": "Save skill"
   }
 }
