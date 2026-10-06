@@ -71,6 +71,7 @@ function syncFormFromSettings(
     setProjectMemoryAutoLoadDocs: (v: boolean) => void
     setAgentAutoVerify: (v: boolean) => void
     setSkillsEnabled: (v: boolean) => void
+    setUpdateNotificationsEnabled: (v: boolean) => void
   }
 ): void {
   setters.setApiKey(settings.apiKey ?? '')
@@ -87,6 +88,7 @@ function syncFormFromSettings(
   setters.setProjectMemoryAutoLoadDocs(settings.projectMemoryAutoLoadDocs !== false)
   setters.setAgentAutoVerify(settings.agentAutoVerify !== false)
   setters.setSkillsEnabled(settings.skillsEnabled === true)
+  setters.setUpdateNotificationsEnabled(settings.updateNotificationsEnabled !== false)
 }
 
 export function SettingsModal(): React.ReactElement {
@@ -120,6 +122,9 @@ export function SettingsModal(): React.ReactElement {
   )
   const [agentAutoVerify, setAgentAutoVerify] = useState(settings.agentAutoVerify !== false)
   const [skillsEnabled, setSkillsEnabled] = useState(settings.skillsEnabled === true)
+  const [updateNotificationsEnabled, setUpdateNotificationsEnabled] = useState(
+    settings.updateNotificationsEnabled !== false
+  )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const mcpModalSaveRef = useRef<(() => Promise<McpServerConfig[] | void>) | null>(null)
@@ -158,7 +163,8 @@ export function SettingsModal(): React.ReactElement {
         setProjectMemoryEnabled,
         setProjectMemoryAutoLoadDocs,
         setAgentAutoVerify,
-        setSkillsEnabled
+        setSkillsEnabled,
+        setUpdateNotificationsEnabled
       })
     })
   }, [settingsOpen, settingsFocusSection, setSettings])
@@ -189,7 +195,8 @@ export function SettingsModal(): React.ReactElement {
         projectMemoryEnabled,
         projectMemoryAutoLoadDocs,
         agentAutoVerify,
-        skillsEnabled
+        skillsEnabled,
+        updateNotificationsEnabled
       }
       await saveAppSettings({
         draft: newSettings,
@@ -240,6 +247,12 @@ export function SettingsModal(): React.ReactElement {
               />
               <p className="mt-1 text-[11px] text-zinc-500">{t('general.temperatureHint')}</p>
             </div>
+            <SettingsSwitchRow
+              title={t('general.updateNotifications.title')}
+              description={t('general.updateNotifications.description')}
+              checked={updateNotificationsEnabled}
+              onCheckedChange={setUpdateNotificationsEnabled}
+            />
           </div>
         )
 

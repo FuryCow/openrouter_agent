@@ -30,6 +30,8 @@ export type {
   SearchResult,
   SkillInfo,
   SkillDraft,
+  UpdateInfo,
+  UpdateDownloadProgress,
   TimelineItem,
   ToolCallInfo,
   AgentRunAnalytics,

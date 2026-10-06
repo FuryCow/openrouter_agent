@@ -31,7 +31,11 @@
     "apiKey": "OpenRouter API Key",
     "apiKeyPlaceholder": "sk-or-...",
     "temperature": "Temperature",
-    "temperatureHint": "Default creativity for new chat runs."
+    "temperatureHint": "Default creativity for new chat runs.",
+    "updateNotifications": {
+      "title": "Update notifications",
+      "description": "Check GitHub for new releases and show a notification"
+    }
   },
   "agent": {
     "customPrompt": "Custom system prompt",
