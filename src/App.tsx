@@ -24,6 +24,7 @@ import { useIndexStore } from './stores/indexStore'
 import { Toaster } from './components/ui/toaster'
 import { CommandPalette } from './components/layout/CommandPalette'
 import { ShortcutsModal } from './components/layout/ShortcutsModal'
+import { UpdateNotification } from './components/layout/UpdateNotification'
 import { useUiStore } from './stores/uiStore'
 import { useTerminalStore } from './stores/terminalStore'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
@@ -194,6 +195,7 @@ export default function App(): React.ReactElement {
       <MemorySuggestDialog />
       <CommandPalette />
       <ShortcutsModal />
+      <UpdateNotification />
     </div>
   )
 }

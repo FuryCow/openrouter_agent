@@ -1,5 +1,12 @@
 import type { ReasoningEffortLevel } from '../shared/reasoning-effort'
 
+export interface UpdateInfo {
+  version: string
+  releaseUrl: string
+  releaseName: string
+  releaseNotes: string
+}
+
 export interface SkillInfo {
   name: string
   description: string
@@ -78,6 +85,10 @@ export interface AppSettings {
   projectMemoryAutoLoadDocs?: boolean
   /** Native skills (progressive disclosure via load_skill). Strictly opt-in: === true. */
   skillsEnabled?: boolean
+  /** Update notifications (GitHub releases). Opt-out: === false disables. */
+  updateNotificationsEnabled?: boolean
+  /** Version whose update notification the user dismissed. */
+  updateNotificationDismissedFor?: string
   agentAutoVerify?: boolean
   locale?: 'en'
 }

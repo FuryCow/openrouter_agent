@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AgentContext,
+  UpdateInfo,
   AgentEvent,
   AgentRunAnalytics,
   AppSettings,
@@ -126,6 +127,12 @@ export interface ElectronAPI {
     save: (workspacePath: string, name: string, content: string) => Promise<string>
     delete: (path: string) => Promise<void>
     distill: (mode: string, workspacePath?: string) => Promise<SkillDraft | null>
+  }
+  updates: {
+    check: () => Promise<UpdateInfo | null>
+    getCached: () => Promise<UpdateInfo | null>
+    dismiss: (version: string) => Promise<void>
+    onAvailable: (callback: (update: UpdateInfo) => void) => () => void
   }
   app: {
     getVersion: () => Promise<string>
@@ -259,6 +266,16 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('skills:save', workspacePath, name, content),
     delete: (path) => ipcRenderer.invoke('skills:delete', path),
     distill: (mode, workspacePath) => ipcRenderer.invoke('skills:distill', mode, workspacePath)
+  },
+  updates: {
+    check: () => ipcRenderer.invoke('updates:check'),
+    getCached: () => ipcRenderer.invoke('updates:get-cached'),
+    dismiss: (version) => ipcRenderer.invoke('updates:dismiss', version),
+    onAvailable: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, update: UpdateInfo) => callback(update)
+      ipcRenderer.on('updates:available', handler)
+      return () => ipcRenderer.removeListener('updates:available', handler)
+    }
   },
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),

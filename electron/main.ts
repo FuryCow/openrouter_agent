@@ -41,6 +41,11 @@ import { getWorkspaceState } from './services/workspace-state'
 import { AppError, AppErrorCode, getAppErrorPayload } from './lib/app-errors'
 import { homedir } from 'os'
 import { SkillLoader } from './services/skills/skill-loader'
+import {
+  UpdateChecker,
+  scheduleStartupUpdateCheck,
+  shouldNotifyForUpdate
+} from './services/update-checker'
 import { distillSessionIntoSkill } from './services/skills/skill-distill-runner'
 
 // Allow a second dev instance to use an isolated userData directory (worktree runs).
@@ -97,6 +102,7 @@ const mcpManager = new McpManager(
 )
 const projectMemoryService = new ProjectMemoryService(app.getPath('userData'))
 const skillLoader = new SkillLoader(join(homedir(), '.openrouter_agent', 'skills'))
+const updateChecker = new UpdateChecker()
 let agentService = new AgentService(
   openRouterClient,
   fsService,
@@ -292,6 +298,28 @@ function registerIpc(): void {
     finishAppClose()
   })
   ipcMain.handle('app:get-version', () => app.getVersion())
+
+  ipcMain.handle('updates:check', async () => {
+    const settings = sanitizeSettings(store.get('settings'))
+    const result = await updateChecker.check(app.getVersion())
+    if (result.update && shouldNotifyForUpdate(result.update, settings)) {
+      sendToRenderer('updates:available', result.update)
+    }
+    return result.update
+  })
+
+  ipcMain.handle('updates:get-cached', () => {
+    const settings = sanitizeSettings(store.get('settings'))
+    const update = updateChecker.getCached(app.getVersion())
+    if (update && shouldNotifyForUpdate(update, settings)) return update
+    return null
+  })
+
+  ipcMain.handle('updates:dismiss', (_event, version: string) => {
+    if (!version || typeof version !== 'string') return
+    const settings = sanitizeSettings(store.get('settings'))
+    store.set('settings', { ...settings, updateNotificationDismissedFor: version })
+  })
 
   ipcMain.handle('window:minimize', () => getWindow().minimize())
   ipcMain.handle('window:maximize', () => {
@@ -785,6 +813,9 @@ app.whenReady().then(() => {
   applyIndexSettings(settings)
   void mcpManager.initialize().catch((err) => {
     console.error('[MCP] Failed to initialize:', err)
+  })
+  scheduleStartupUpdateCheck(updateChecker, () => sanitizeSettings(store.get('settings')), (update) => {
+    sendToRenderer('updates:available', update)
   })
   codebaseIndexer.onProgress((progress) => {
     sendToRenderer('index:progress', progress)

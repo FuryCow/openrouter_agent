@@ -3,6 +3,11 @@
   "titleBar": {
     "settings": "Settings"
   },
+  "updates": {
+    "title": "Update available",
+    "dismiss": "Skip this version",
+    "whatsNew": "What's new"
+  },
   "commandPalette": {
     "triggerPlaceholder": "Search files and commands…",
     "inputPlaceholder": "Search files and commands (prefix > for commands)",
