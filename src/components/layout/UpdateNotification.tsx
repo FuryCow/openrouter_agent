@@ -88,7 +88,7 @@ export function UpdateNotification(): React.ReactElement | null {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.98 }}
           transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed bottom-10 left-4 z-[90] w-80 overflow-hidden rounded-xl border border-indigo-500/20 bg-surface-elevated/95 shadow-2xl backdrop-blur-xl"
+          className="fixed bottom-10 left-4 z-[90] w-96 overflow-hidden rounded-xl border border-indigo-500/20 bg-surface-elevated/95 shadow-2xl backdrop-blur-xl"
           role="status"
         >
           <div className="flex items-start gap-3 px-4 pt-3.5">
