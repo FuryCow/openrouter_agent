@@ -147,6 +147,24 @@ describe('SkillLoader.readSkill', () => {
     await loader.listSkills(workspace)
     expect(await loader.readSkill(path)).toContain('Local')
   })
+
+  it('resolves a bare skill name or root-relative path across roots', async () => {
+    await createSkill(globalDir, 'named', 'name: named\ndescription: Named', 'Body A')
+    await createSkill(
+      getProjectSkillsDir(workspace),
+      'proj-skill',
+      'name: proj-skill\ndescription: Project',
+      'Body B'
+    )
+    const loader = new SkillLoader(globalDir)
+    await loader.listSkills(workspace)
+
+    expect(await loader.readSkill('named')).toContain('Body A')
+    expect(await loader.readSkill('named/SKILL.md')).toContain('Body A')
+    expect(await loader.readSkill('proj-skill')).toContain('Body B')
+    await expect(loader.readSkill('../escape')).rejects.toThrow('outside skills directories')
+    await expect(loader.readSkill('missing-skill')).rejects.toThrow('Skill file not found')
+  })
 })
 
 describe('SkillLoader.saveSkill', () => {

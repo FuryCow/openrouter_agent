@@ -38,6 +38,7 @@
     "stepsRemaining": "Only {{count}} tool step(s) remaining before the run limit.",
     "openWorkspaceForPlan": "Open a workspace to save a plan",
     "distillFailed": "Failed to distill the run into a skill",
+    "distillStarted": "Distilling the run into a skill…",
     "skillSaved": "Skill saved to project"
   },
   "onboarding": {

@@ -234,7 +234,7 @@ export function formatSkillsSection(skills: SkillInfo[]): string {
   return [
     'Available skills (progressive disclosure):',
     ...lines,
-    'Call load_skill(path) when a skill is relevant to the task — the full instructions are in the file.'
+    'Call load_skill("<skill-name>") when a skill is relevant to the task — the full instructions are in its file.'
   ].join('\n')
 }
 

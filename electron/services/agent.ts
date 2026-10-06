@@ -324,11 +324,15 @@ const TOOLS: ToolDefinition[] = [
     function: {
       name: 'load_skill',
       description:
-        'Load the full instructions of an available skill by its path (see the Available skills section in the system prompt). Read the skill before applying its workflow.',
+        'Load the full instructions of an available skill (see the Available skills section in the system prompt). Read the skill before applying its workflow.',
       parameters: {
         type: 'object',
         properties: {
-          path: { type: 'string', description: 'Absolute path to the skill SKILL.md file' }
+          path: {
+            type: 'string',
+            description:
+              'Skill name from the Available skills section (e.g. "react-refactor") or the path to its SKILL.md file'
+          }
         },
         required: ['path']
       }

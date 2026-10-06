@@ -108,7 +108,8 @@ export function ChatPanel(): React.ReactElement {
   const clearChatDraft = useUiStore((s) => s.clearChatDraft)
   const runCheckpoint = useAgentRunStore((s) => s.checkpoint)
   const [distillDraft, setDistillDraft] = useState<SkillDraft | null>(null)
-  const [distilling, setDistilling] = useState(false)
+  const [distillTargetId, setDistillTargetId] = useState<string | null>(null)
+  const distillBusy = distillTargetId !== null
 
   const modeConfig = getModeConfig(chatMode)
   const ModeIcon = modeConfig.icon
@@ -429,12 +430,13 @@ export function ChatPanel(): React.ReactElement {
   }
 
   const handleDistill = async (message: (typeof visibleMessages)[number]): Promise<void> => {
-    if (isStreaming || distilling) return
+    if (isStreaming || distillBusy) return
     if (!settings.apiKey) {
       setSettingsOpen(true)
       return
     }
-    setDistilling(true)
+    setDistillTargetId(message.id)
+    useToastStore.getState().addToast(t('toast.distillStarted'), 'info')
     try {
       const draft = await window.api.skills.distill(chatMode, workingDirectory || undefined)
       if (!draft) {
@@ -448,7 +450,7 @@ export function ChatPanel(): React.ReactElement {
         'error'
       )
     } finally {
-      setDistilling(false)
+      setDistillTargetId(null)
     }
   }
 
@@ -475,8 +477,7 @@ export function ChatPanel(): React.ReactElement {
   const canDistill =
     chatMode === 'agent' &&
     settings.skillsEnabled === true &&
-    !isStreaming &&
-    !distilling
+    !isStreaming
 
   const canRemember =
     chatMode === 'agent' &&
@@ -609,6 +610,8 @@ export function ChatPanel(): React.ReactElement {
                   : undefined
               }
               canDistill
+              distillBusy={distillBusy}
+              distillActive={distillTargetId === msg.id}
               onEdit={
                 msg.role === 'user' && !isStreaming
                   ? () => {

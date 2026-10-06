@@ -1,5 +1,5 @@
 import { homedir } from 'os'
-import { join, dirname } from 'path'
+import { join, dirname, isAbsolute } from 'path'
 import { readdir, readFile, writeFile, mkdir, rm, access } from 'fs/promises'
 import type { SkillInfo } from '../../types'
 import { assertPathNotInAgentApp, isPathInside } from '../workspace-safety'
@@ -118,8 +118,8 @@ export class SkillLoader {
   }
 
   async readSkill(path: string): Promise<string> {
-    this.assertSkillPath(path)
-    return readFile(path, 'utf-8')
+    const target = await this.resolveSkillPath(path)
+    return readFile(target, 'utf-8')
   }
 
   /** Writes `<workspace>/.openrouter/skills/<name>/SKILL.md` and returns the path. */
@@ -150,10 +150,48 @@ export class SkillLoader {
 
   private assertSkillPath(path: string): void {
     assertPathNotInAgentApp(path)
-    const allowed = this.allowedRoots()
-    if (allowed.length === 0 || !allowed.some((dir) => isPathInside(dir, path))) {
+    if (!this.isAllowedSkillPath(path)) {
       throw new Error(`Skill path is outside skills directories: ${path}`)
     }
+  }
+
+  private isAllowedSkillPath(path: string): boolean {
+    const allowed = this.allowedRoots()
+    return allowed.length > 0 && allowed.some((dir) => isPathInside(dir, path))
+  }
+
+  /**
+   * Accepts an absolute path inside a skills root, a root-relative path
+   * ("name/SKILL.md"), or a bare skill name — models often send just the name.
+   */
+  private async resolveSkillPath(path: string): Promise<string> {
+    const trimmed = path.trim()
+    if (this.isAllowedSkillPath(trimmed)) {
+      assertPathNotInAgentApp(trimmed)
+      return trimmed
+    }
+
+    // Absolute paths outside the roots and any traversal segments are rejected outright.
+    if (isAbsolute(trimmed) || trimmed.includes('..')) {
+      throw new Error(`Skill path is outside skills directories: ${path}`)
+    }
+
+    const normalized = trimmed.replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, '')
+    if (!normalized) {
+      throw new Error(`Skill path is outside skills directories: ${path}`)
+    }
+    const relative = normalized.endsWith(`/${SKILL_FILE_NAME}`)
+      ? normalized
+      : `${normalized}/${SKILL_FILE_NAME}`
+
+    for (const root of this.allowedRoots()) {
+      const target = join(root, relative)
+      if (!this.isAllowedSkillPath(target)) continue
+      assertPathNotInAgentApp(target)
+      if (await fileExists(target)) return target
+    }
+
+    throw new Error(`Skill file not found: ${normalized}`)
   }
 
   private assertInsideDir(dir: string, target: string): void {
