@@ -3,6 +3,7 @@ import { join, dirname, extname } from 'path'
 import type { DirEntry, SearchResult } from '../types'
 import type { CodebaseIndexer } from './indexing/codebase-indexer'
 import { ripgrepSearch } from './indexing/ripgrep-search'
+import { eolAwareReplace } from '../lib/eol'
 
 export class FileSystemService {
   constructor(private indexer: CodebaseIndexer | null = null) {}
@@ -51,23 +52,19 @@ export class FileSystemService {
     }
 
     const content = await readFile(filePath, 'utf-8')
-    const occurrences = content.split(oldString).length - 1
+    const result = eolAwareReplace(content, oldString, newString, replaceAll)
 
-    if (occurrences === 0) {
+    if (result.status === 'not_found') {
       throw new Error('old_string not found in file. Read the file first and copy the exact text to replace.')
     }
-    if (occurrences > 1 && !replaceAll) {
+    if (result.status === 'ambiguous') {
       throw new Error(
-        `old_string matched ${occurrences} times. Include more surrounding context for a unique match, or set replace_all to true.`
+        `old_string matched ${result.count} times. Include more surrounding context for a unique match, or set replace_all to true.`
       )
     }
 
-    const updated = replaceAll
-      ? content.split(oldString).join(newString)
-      : content.replace(oldString, newString)
-
-    await writeFile(filePath, updated, 'utf-8')
-    return { replacements: replaceAll ? occurrences : 1 }
+    await writeFile(filePath, result.updated, 'utf-8')
+    return { replacements: result.replacements }
   }
 
   async createFile(parentDir: string, name: string): Promise<string> {

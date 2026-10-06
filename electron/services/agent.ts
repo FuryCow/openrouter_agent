@@ -29,6 +29,7 @@ import {
 } from './agent-modes'
 import { buildFallbackFileDiffPreview, formatFileChangeDiff, countDiffStats, buildInlineDiffRanges, buildInlineDeleteHighlights, buildDeletedLineHighlights, buildModifiedLineHighlights, buildPureAdditionHighlightRanges } from '../lib/diff'
 import { sanitizeTerminalOutput } from '../lib/strip-ansi'
+import { eolAwareReplace } from '../lib/eol'
 import { normalizeChecklistSteps } from '../lib/checklist-steps'
 import { processToolCallsBatch } from '../lib/tool-call-runner'
 import {
@@ -1223,9 +1224,13 @@ export class AgentService {
         current = await this.fs.readFile(path)
       }
 
-      const next = replaceAll
-        ? current.split(oldString).join(newString)
-        : current.replace(oldString, newString)
+      const replaceResult = eolAwareReplace(current, oldString, newString, replaceAll)
+      const next =
+        replaceResult.status === 'ok'
+          ? replaceResult.updated
+          : replaceAll
+            ? current.split(oldString).join(newString)
+            : current.replace(oldString, newString)
 
       return { path: relativePath, fileDiff: formatFileChangeDiff(current, next) }
     } catch {
