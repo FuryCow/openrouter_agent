@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.8] — 2026-10-06
+
+### Update notifications
+
+- **Release notifications:** when a newer GitHub release is published, a card appears in the bottom-left corner with the release name and the first note line. Checked via the GitHub API 15 seconds after startup and then every 4 hours; results are cached.
+- **One-click install:** the Install button picks the platform installer (Windows → NSIS Setup.exe, macOS → .dmg with arm64/x64 selection, Linux → .AppImage), downloads it with a progress bar and launches it.
+- **Skip this version:** dismisses the card and remembers the choice in settings, so the same release does not nag again.
+- **Opt-out:** Update notifications toggle in Settings → General (enabled by default).
+
+### Tools
+
+- **EOL-aware search_replace:** multi-line old_string now matches CRLF files with LF line endings and vice versa; bytes outside the replaced span are preserved; the diff preview uses the same resolver.
+
+---
+
 ## [1.0.0-alpha.7] — 2026-10-06
 
 ### Skills (behind the skillsEnabled flag, off by default)
