@@ -5,7 +5,7 @@ export interface UpdateInfo {
   releaseUrl: string
   releaseName: string
   releaseNotes: string
-  assets: Array<{ name: string; url: string; size: number }>
+  assets: Array<{ name: string; url: string; size: number; digest?: string }>
 }
 
 export interface UpdateDownloadProgress {

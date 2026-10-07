@@ -1,6 +1,7 @@
 import { app, net } from 'electron'
-import { createWriteStream } from 'node:fs'
-import { mkdir, chmod } from 'node:fs/promises'
+import { createWriteStream, createReadStream } from 'node:fs'
+import { mkdir, chmod, rename, rm, stat } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -16,6 +17,8 @@ export interface UpdateAsset {
   name: string
   url: string
   size: number
+  /** GitHub API digest (`sha256:<hex>`); missing on older releases. */
+  digest?: string
 }
 
 export interface UpdateInfo {
@@ -118,7 +121,13 @@ function toAssets(value: unknown): UpdateAsset[] {
     const name = asString(record.name)
     const url = asString(record.browser_download_url)
     if (!name || !url) continue
-    assets.push({ name, url, size: typeof record.size === 'number' ? record.size : 0 })
+    const digest = asString(record.digest)
+    assets.push({
+      name,
+      url,
+      size: typeof record.size === 'number' ? record.size : 0,
+      ...(digest ? { digest } : {})
+    })
   }
   return assets
 }
@@ -174,7 +183,96 @@ export interface DownloadProgress {
   percent: number
 }
 
-/** Downloads the asset into a temp dir, reporting progress; returns the file path. */
+const DOWNLOAD_ATTEMPTS = 3
+const RETRY_DELAY_MS = 300
+const DOWNLOAD_STALL_TIMEOUT_MS = 30_000
+
+/** Parses the GitHub API asset digest (`sha256:<hex>`); null for other formats. */
+export function parseDigest(
+  raw: string
+): { algorithm: 'sha256' | 'sha512'; value: string } | null {
+  const match = /^(sha256|sha512):([0-9a-fA-F]+)$/.exec(raw.trim())
+  if (!match) return null
+  const expectedLength = match[1] === 'sha256' ? 64 : 128
+  if (match[2].length !== expectedLength) return null
+  return { algorithm: match[1] as 'sha256' | 'sha512', value: match[2].toLowerCase() }
+}
+
+/** Throws when the file is truncated or fails its GitHub sha256/sha512 digest. */
+export async function verifyInstallerFile(
+  filePath: string,
+  asset: Pick<UpdateAsset, 'size' | 'digest'>
+): Promise<void> {
+  const stats = await stat(filePath)
+  if (asset.size > 0 && stats.size !== asset.size) {
+    throw new Error(`Downloaded file is incomplete: expected ${asset.size} bytes, got ${stats.size}`)
+  }
+  const digest = parseDigest(asset.digest ?? '')
+  if (!digest) return
+  const hash = createHash(digest.algorithm)
+  await pipeline(createReadStream(filePath), hash)
+  const actual = hash.digest('hex')
+  if (actual !== digest.value) {
+    throw new Error(`Checksum mismatch: expected ${digest.algorithm} ${digest.value}, got ${actual}`)
+  }
+}
+
+async function downloadOnce(
+  asset: UpdateAsset,
+  destPath: string,
+  onProgress: (progress: DownloadProgress) => void
+): Promise<void> {
+  const controller = new AbortController()
+  let stallTimer: ReturnType<typeof setTimeout> | null = null
+  const armStallTimer = (): void => {
+    if (stallTimer) clearTimeout(stallTimer)
+    stallTimer = setTimeout(() => controller.abort(), DOWNLOAD_STALL_TIMEOUT_MS)
+  }
+  armStallTimer()
+  try {
+    const response = await net.fetch(asset.url, { signal: controller.signal })
+    if (!response.ok) {
+      throw new Error(`Download failed: HTTP ${response.status}`)
+    }
+    const total = Number(response.headers.get('content-length')) || asset.size
+    let received = 0
+    let lastReportedPercent = -1
+
+    const source = Readable.fromWeb(
+      response.body as import('node:stream/web').ReadableStream<Uint8Array>
+    )
+    source.on('data', (chunk: Buffer) => {
+      armStallTimer()
+      received += chunk.length
+      const percent = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0
+      if (percent !== lastReportedPercent) {
+        lastReportedPercent = percent
+        onProgress({ received, total, percent })
+      }
+    })
+
+    await pipeline(source, createWriteStream(destPath))
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error(`Download stalled: no data for ${DOWNLOAD_STALL_TIMEOUT_MS / 1000}s`)
+    }
+    throw err
+  } finally {
+    if (stallTimer) clearTimeout(stallTimer)
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Downloads the asset into a temp dir, reporting progress; returns the file path.
+ * Bytes stream into `<name>.part`, the result is verified against the asset size
+ * and GitHub digest, and only then renamed into place — truncated or corrupted
+ * downloads are retried instead of launched (NSIS answers those with
+ * "Installer integrity check has failed").
+ */
 export async function downloadInstaller(
   asset: UpdateAsset,
   onProgress: (progress: DownloadProgress) => void
@@ -182,29 +280,28 @@ export async function downloadInstaller(
   const dir = join(tmpdir(), 'openrouter-agent-update')
   await mkdir(dir, { recursive: true })
   const filePath = join(dir, asset.name)
+  const partPath = `${filePath}.part`
 
-  const response = await net.fetch(asset.url)
-  if (!response.ok) {
-    throw new Error(`Download failed: HTTP ${response.status}`)
-  }
-  const total = Number(response.headers.get('content-length')) || asset.size
-  let received = 0
-  let lastReportedPercent = -1
-
-  const source = Readable.fromWeb(
-    response.body as import('node:stream/web').ReadableStream<Uint8Array>
-  )
-  source.on('data', (chunk: Buffer) => {
-    received += chunk.length
-    const percent = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0
-    if (percent !== lastReportedPercent) {
-      lastReportedPercent = percent
-      onProgress({ received, total, percent })
+  let lastError: unknown
+  for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt += 1) {
+    try {
+      await downloadOnce(asset, partPath, onProgress)
+      await verifyInstallerFile(partPath, asset)
+      await rm(filePath, { force: true })
+      await rename(partPath, filePath)
+      if (process.platform !== 'win32') {
+        // AppImage needs the executable bit to open via shell.openPath.
+        await chmod(filePath, 0o755).catch(() => {})
+      }
+      return filePath
+    } catch (err) {
+      lastError = err
+      await rm(partPath, { force: true }).catch(() => {})
+      if (attempt < DOWNLOAD_ATTEMPTS) await delay(RETRY_DELAY_MS * attempt)
     }
-  })
-
-  await pipeline(source, createWriteStream(filePath))
-  return filePath
+  }
+  const message = lastError instanceof Error ? lastError.message : String(lastError)
+  throw new Error(`Installer download failed after ${DOWNLOAD_ATTEMPTS} attempts: ${message}`)
 }
 
 export interface UpdateCheckResult {

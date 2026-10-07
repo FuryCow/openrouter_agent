@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.10] — 2026-10-08
+
+### Fixed
+
+- **Installer integrity check:** downloaded installers are now verified against the GitHub asset size and sha256/sha512 digest before launch, streamed into a temporary `.part` file and renamed only after verification; truncated or corrupted downloads are retried (3 attempts, stall timeout 30 s) instead of being handed to NSIS, which answered with "Installer integrity check has failed".
+
+---
+
 ## [1.0.0-alpha.9] — 2026-10-07
 
 ### Fixed

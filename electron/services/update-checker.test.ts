@@ -1,9 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createHash } from 'node:crypto'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   compareVersions,
   isNewerVersion,
+  parseDigest,
   parseVersion,
   pickInstallerAsset,
+  verifyInstallerFile,
   type UpdateAsset
 } from './update-checker'
 
@@ -117,5 +123,85 @@ describe('pickInstallerAsset', () => {
   it('returns null for unsupported platforms or empty assets', () => {
     expect(pickInstallerAsset([], 'win32', 'x64')).toBeNull()
     expect(pickInstallerAsset([asset('app.exe')], 'freebsd', 'x64')).toBeNull()
+  })
+})
+
+describe('parseDigest', () => {
+  it('parses sha256 digests', () => {
+    const hex = '9b23e0a891d64f35b75c8b881f59e7b5191c6ddd50cb22e62fffdbcf8fccc960'
+    expect(parseDigest(`sha256:${hex}`)).toEqual({ algorithm: 'sha256', value: hex })
+  })
+
+  it('parses sha512 digests', () => {
+    const hex = 'a'.repeat(128)
+    expect(parseDigest(`sha512:${hex}`)).toEqual({ algorithm: 'sha512', value: hex })
+  })
+
+  it('lowercases the hex value', () => {
+    expect(parseDigest(`sha256:${'AB'.repeat(32)}`)?.value).toBe('ab'.repeat(32))
+  })
+
+  it('rejects wrong lengths, unsupported algorithms, and garbage', () => {
+    expect(parseDigest('sha256:abc')).toBeNull()
+    expect(parseDigest(`sha256:${'a'.repeat(63)}`)).toBeNull()
+    expect(parseDigest(`sha256:${'a'.repeat(65)}`)).toBeNull()
+    expect(parseDigest(`md5:${'a'.repeat(32)}`)).toBeNull()
+    expect(parseDigest('')).toBeNull()
+    expect(parseDigest('garbage')).toBeNull()
+  })
+})
+
+describe('verifyInstallerFile', () => {
+  let dir: string
+  const content = 'installer-bytes-0123456789'
+  const contentDigest = `sha256:${createHash('sha256').update(content).digest('hex')}`
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'update-checker-test-'))
+  })
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  const write = async (name: string, data: string): Promise<string> => {
+    const filePath = join(dir, name)
+    await writeFile(filePath, data)
+    return filePath
+  }
+
+  it('accepts a file matching size and digest', async () => {
+    const filePath = await write('ok.exe', content)
+    await expect(
+      verifyInstallerFile(filePath, { size: content.length, digest: contentDigest })
+    ).resolves.toBeUndefined()
+  })
+
+  it('rejects a truncated file by size', async () => {
+    const filePath = await write('truncated.exe', content.slice(0, 5))
+    await expect(
+      verifyInstallerFile(filePath, { size: content.length, digest: contentDigest })
+    ).rejects.toThrow(/incomplete/)
+  })
+
+  it('rejects a corrupted file by digest', async () => {
+    const filePath = await write('corrupt.exe', `${content}tampered`)
+    await expect(
+      verifyInstallerFile(filePath, { size: (content + 'tampered').length, digest: contentDigest })
+    ).rejects.toThrow(/Checksum mismatch/)
+  })
+
+  it('skips the hash check when the asset has no digest', async () => {
+    const filePath = await write('legacy.exe', content)
+    await expect(
+      verifyInstallerFile(filePath, { size: content.length })
+    ).resolves.toBeUndefined()
+  })
+
+  it('skips the size check when the asset size is unknown', async () => {
+    const filePath = await write('nosize.exe', content)
+    await expect(
+      verifyInstallerFile(filePath, { size: 0, digest: contentDigest })
+    ).resolves.toBeUndefined()
   })
 })
