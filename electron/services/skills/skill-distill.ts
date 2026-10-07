@@ -78,15 +78,15 @@ export function buildDistillUserPrompt(input: DistillInput): string {
 
   for (const message of input.apiMessages) {
     if (message.role === 'user') {
-      lines.push(`[user] ${preview(message.content ?? '', MAX_USER_MESSAGE_PREVIEW)}`)
+      lines.push(`user: ${preview(message.content ?? '', MAX_USER_MESSAGE_PREVIEW)}`)
     } else if (message.role === 'assistant') {
       if (message.tool_calls?.length) {
         if (message.content) {
-          lines.push(`[assistant] ${preview(message.content, MAX_CONTENT_PREVIEW)}`)
+          lines.push(`assistant: ${preview(message.content, MAX_CONTENT_PREVIEW)}`)
         }
         lines.push(formatToolCalls(message.tool_calls))
       } else if (message.content) {
-        lines.push(`[assistant] ${preview(message.content, MAX_CONTENT_PREVIEW)}`)
+        lines.push(`assistant: ${preview(message.content, MAX_CONTENT_PREVIEW)}`)
       }
     } else if (message.role === 'tool') {
       lines.push(`  → result: ${preview(message.content ?? '', MAX_TOOL_RESULT_PREVIEW)}`)

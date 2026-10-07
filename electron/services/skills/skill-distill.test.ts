@@ -99,7 +99,7 @@ const analytics: AgentRunAnalytics = {
 describe('buildDistillUserPrompt', () => {
   it('includes the trajectory, tool names, and final answer', () => {
     const prompt = buildDistillUserPrompt({ apiMessages: session, finalContent: 'Done.', runAnalytics: analytics })
-    expect(prompt).toContain('[user] Add a dark mode toggle')
+    expect(prompt).toContain('user: Add a dark mode toggle')
     expect(prompt).toContain('tool grep_workspace')
     expect(prompt).toContain('tool search_replace')
     expect(prompt).toContain('path=src/App.tsx')
