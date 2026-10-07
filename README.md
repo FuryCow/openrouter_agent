@@ -132,7 +132,7 @@ If the terminal fails after an Electron upgrade on Windows, install the [Spectre
 
 Search the tree before reading whole files. Shell search through `run_terminal` is blocked; use `grep_workspace` or `codebase_search`.
 
-MCP tools show up as `mcp__<server>__<tool>`.
+MCP tools show up as `mcp__<serverId>__<toolName>`.
 
 ## Security
 
