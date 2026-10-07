@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.9] — 2026-10-07
+
+### Fixed
+
+- **Prompt-injection false positives:** the skill distillation prompt used bracketed role markers ([user] / [assistant]) that OpenRouter's injection detector flags as bracket-role spoofing. Replaced with plain user:/assistant: prefixes.
+- **README:** corrected the MCP tool name format (mcp__<serverId>__<toolName>) and refreshed the stale "Current release" line; documented update notifications and the one-time manual update for alpha.7 users.
+
+---
+
 ## [1.0.0-alpha.8] — 2026-10-06
 
 ### Update notifications
