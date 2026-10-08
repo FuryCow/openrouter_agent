@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Square, Trash2, RotateCcw, Paperclip, Undo2, X } from 'lucide-react'
+import { Send, Square, Trash2, RotateCcw, Paperclip, Undo2, X, ListPlus, ChevronDown, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '../ui/button'
 import { MessageBubble, MemoMessageBubble } from './MessageBubble'
@@ -83,6 +83,9 @@ export function ChatPanel(): React.ReactElement {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [inputIsMultiline, setInputIsMultiline] = useState(false)
+  const [queueMode, setQueueMode] = useState(false)
+  const [sendMenuOpen, setSendMenuOpen] = useState(false)
+  const sendMenuRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -228,6 +231,17 @@ export function ChatPanel(): React.ReactElement {
     return () => container.removeEventListener('scroll', onScroll)
   }, [])
 
+  useEffect(() => {
+    if (!sendMenuOpen) return
+    const onMouseDown = (event: MouseEvent): void => {
+      if (sendMenuRef.current && !sendMenuRef.current.contains(event.target as Node)) {
+        setSendMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [sendMenuOpen])
+
   const addAttachmentFiles = async (files: FileList | File[]): Promise<void> => {
     const list = Array.from(files)
     if (list.length === 0) return
@@ -282,6 +296,24 @@ export function ChatPanel(): React.ReactElement {
     if ((!text && !hasAttachments) || isStreaming) return
     if (!settings.apiKey) {
       setSettingsOpen(true)
+      return
+    }
+
+    if (queueMode) {
+      if (!text) return
+      const [firstLine, ...rest] = text.split('\n')
+      const title = firstLine.trim().slice(0, 120)
+      const prompt = (rest.join('\n').trim() || text).slice(0, 8000)
+      try {
+        await window.api.queue.enqueue({ title, prompt, source: 'user' })
+        setInput('')
+        stickToBottomRef.current = true
+        useToastStore.getState().addToast(t('runQueue.taskAdded'), 'success')
+      } catch (err) {
+        useToastStore
+          .getState()
+          .addToast(err instanceof Error ? err.message : t('runQueue.enqueueFailed'), 'error')
+      }
       return
     }
 
@@ -541,7 +573,6 @@ export function ChatPanel(): React.ReactElement {
       </div>
 
       {chatMode === 'agent' && <AgentRunPanel />}
-      {chatMode === 'agent' && <RunQueuePanel />}
 
       <div
         ref={scrollRef}
@@ -640,8 +671,10 @@ export function ChatPanel(): React.ReactElement {
       <div className="relative z-10 shrink-0 border-t border-white/5 p-3">
         <div
           className={cn(
-            'overflow-hidden rounded-xl border border-white/10 bg-surface-elevated/20 transition-all',
-            'focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20'
+            'overflow-hidden rounded-xl border bg-surface-elevated/20 transition-all',
+            queueMode
+              ? 'border-amber-500/25 focus-within:border-amber-500/40 focus-within:ring-1 focus-within:ring-amber-500/20'
+              : 'border-white/10 focus-within:border-indigo-500/30 focus-within:ring-1 focus-within:ring-indigo-500/20'
           )}
         >
           {chatMode === 'agent' && <RunChangesPanel />}
@@ -744,7 +777,13 @@ export function ChatPanel(): React.ReactElement {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={editingMessageId ? t('editMessagePlaceholder') : modeConfig.placeholder}
+            placeholder={
+              editingMessageId
+                ? t('editMessagePlaceholder')
+                : queueMode
+                  ? t('runQueue.promptPlaceholder')
+                  : modeConfig.placeholder
+            }
             rows={1}
             className="relative z-10 min-h-[36px] flex-1 resize-none overflow-hidden bg-transparent px-1 py-2 text-sm leading-5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
           />
@@ -753,16 +792,72 @@ export function ChatPanel(): React.ReactElement {
               <Square className="h-4 w-4" />
             </Button>
           ) : (
-            <Button
-              size="icon"
-              className="size-9 shrink-0"
-              onClick={handleSend}
-              disabled={!input.trim() && attachments.length === 0}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+            <div ref={sendMenuRef} className="relative shrink-0">
+              <div className="flex items-center">
+                <Button
+                  size="icon"
+                  className={cn(
+                    'size-9 rounded-r-none',
+                    queueMode &&
+                      'bg-amber-600 shadow-amber-600/20 hover:bg-amber-500'
+                  )}
+                  onClick={handleSend}
+                  disabled={!input.trim() && attachments.length === 0}
+                  title={queueMode ? t('runQueue.composerQueue') : t('runQueue.composerSend')}
+                >
+                  {queueMode ? <ListPlus className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                </Button>
+                <button
+                  type="button"
+                  className={cn(
+                    'flex h-9 w-5 items-center justify-center rounded-lg rounded-l-none border-l border-white/25 text-white/80 transition-colors',
+                    queueMode
+                      ? 'bg-amber-600 hover:bg-amber-500'
+                      : 'bg-indigo-600 hover:bg-indigo-500'
+                  )}
+                  onClick={() => setSendMenuOpen((open) => !open)}
+                  aria-label={t('runQueue.sendOptions')}
+                  aria-expanded={sendMenuOpen}
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </div>
+              {sendMenuOpen && (
+                <div className="absolute bottom-full right-0 z-30 mb-1.5 w-60 overflow-hidden rounded-lg border border-white/10 bg-surface shadow-xl shadow-black/40">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-zinc-300 transition-colors hover:bg-white/5"
+                    onClick={() => {
+                      setQueueMode(false)
+                      setSendMenuOpen(false)
+                    }}
+                  >
+                    <Send className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                    <span className="flex-1">{t('runQueue.composerSend')}</span>
+                    {!queueMode && <Check className="h-3.5 w-3.5 shrink-0 text-indigo-400" />}
+                  </button>
+                  {settings.runQueueEnabled === true && chatMode === 'agent' && (
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-zinc-300 transition-colors hover:bg-white/5"
+                      onClick={() => {
+                        setQueueMode(true)
+                        setSendMenuOpen(false)
+                        inputRef.current?.focus()
+                      }}
+                    >
+                      <ListPlus className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                      <span className="flex-1">{t('runQueue.composerQueue')}</span>
+                      {queueMode && <Check className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           </div>
+
+          {chatMode === 'agent' && <RunQueuePanel />}
         </div>
         <p className="mt-2 px-1 text-[10px] text-zinc-600">
           <button
