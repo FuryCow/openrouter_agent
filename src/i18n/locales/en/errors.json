@@ -50,19 +50,5 @@
     "scanning": "Scanning workspace",
     "indexingFiles": "Indexing files",
     "embedding": "Embedding chunks"
-  },
-  "queue": {
-    "disabled": "Task queue is disabled. Enable it in Settings → Agent.",
-    "titleRequired": "Task title is required",
-    "promptRequired": "Task prompt is required",
-    "titleTooLong": "Task title is too long (max 120 characters)",
-    "promptTooLong": "Task prompt is too long (max 8000 characters)",
-    "tooManyPending": "Too many pending tasks (max 20). Clear finished tasks or wait.",
-    "unknownDep": "Unknown dependency: {{id}}",
-    "dependencyCycle": "Task dependencies form a cycle",
-    "agentSourceForbidden": "Tasks from the agent must be enqueued via the enqueue_task tool",
-    "taskNotFound": "Task not found",
-    "taskNotActive": "Task is not active",
-    "restoreWhileBusy": "Cannot restore checkpoint while a run is active. Wait or abort it first."
   }
 }

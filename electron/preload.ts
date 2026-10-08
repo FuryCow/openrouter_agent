@@ -129,21 +129,6 @@ export interface ElectronAPI {
     delete: (path: string) => Promise<void>
     distill: (mode: string, workspacePath?: string) => Promise<SkillDraft | null>
   }
-  queue: {
-    list: () => Promise<import('./types').QueueSnapshot>
-    enqueue: (input: import('./types').QueueEnqueueInput) => Promise<import('./types').QueuedRun>
-    cancel: (runId: string) => Promise<import('./types').QueuedRun>
-    clearFinished: () => Promise<import('./types').QueueSnapshot>
-    approve: (runId: string, approvalId: string, approved: boolean) => Promise<import('./types').QueueSnapshot>
-    getCheckpointDetails: (
-      runId: string
-    ) => Promise<import('./types').RunCheckpointFileDetail[] | null>
-    restoreRunCheckpoint: (
-      runId: string,
-      paths?: string[]
-    ) => Promise<{ restored: number; deleted: number } | null>
-    setPaused: (paused: boolean) => Promise<import('./types').QueueSnapshot>
-  }
   updates: {
     check: () => Promise<UpdateInfo | null>
     getCached: () => Promise<UpdateInfo | null>
@@ -286,18 +271,6 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('skills:save', workspacePath, name, content),
     delete: (path) => ipcRenderer.invoke('skills:delete', path),
     distill: (mode, workspacePath) => ipcRenderer.invoke('skills:distill', mode, workspacePath)
-  },
-  queue: {
-    list: () => ipcRenderer.invoke('queue:list'),
-    enqueue: (input) => ipcRenderer.invoke('queue:enqueue', input),
-    cancel: (runId) => ipcRenderer.invoke('queue:cancel', runId),
-    clearFinished: () => ipcRenderer.invoke('queue:clearFinished'),
-    approve: (runId, approvalId, approved) =>
-      ipcRenderer.invoke('queue:approve', runId, approvalId, approved),
-    getCheckpointDetails: (runId) => ipcRenderer.invoke('queue:getCheckpointDetails', runId),
-    restoreRunCheckpoint: (runId, paths) =>
-      ipcRenderer.invoke('queue:restoreRunCheckpoint', runId, paths),
-    setPaused: (paused) => ipcRenderer.invoke('queue:setPaused', paused)
   },
   updates: {
     check: () => ipcRenderer.invoke('updates:check'),
