@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Send, Square, Trash2, RotateCcw, Paperclip, Undo2, X, ListPlus, ChevronDown, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -85,7 +86,9 @@ export function ChatPanel(): React.ReactElement {
   const [inputIsMultiline, setInputIsMultiline] = useState(false)
   const [queueMode, setQueueMode] = useState(false)
   const [sendMenuOpen, setSendMenuOpen] = useState(false)
+  const [sendMenuPos, setSendMenuPos] = useState<{ right: number; bottom: number } | null>(null)
   const sendMenuRef = useRef<HTMLDivElement>(null)
+  const sendMenuPanelRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -234,12 +237,19 @@ export function ChatPanel(): React.ReactElement {
   useEffect(() => {
     if (!sendMenuOpen) return
     const onMouseDown = (event: MouseEvent): void => {
-      if (sendMenuRef.current && !sendMenuRef.current.contains(event.target as Node)) {
-        setSendMenuOpen(false)
-      }
+      const target = event.target as Node
+      if (sendMenuRef.current?.contains(target) || sendMenuPanelRef.current?.contains(target)) return
+      setSendMenuOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setSendMenuOpen(false)
     }
     document.addEventListener('mousedown', onMouseDown)
-    return () => document.removeEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [sendMenuOpen])
 
   const addAttachmentFiles = async (files: FileList | File[]): Promise<void> => {
@@ -288,6 +298,19 @@ export function ChatPanel(): React.ReactElement {
       void addAttachmentFiles(e.target.files)
     }
     e.target.value = ''
+  }
+
+  const toggleSendMenu = (): void => {
+    if (!sendMenuOpen) {
+      const rect = sendMenuRef.current?.getBoundingClientRect()
+      if (rect) {
+        setSendMenuPos({
+          right: Math.max(8, window.innerWidth - rect.right),
+          bottom: Math.max(8, window.innerHeight - rect.top + 6)
+        })
+      }
+    }
+    setSendMenuOpen((open) => !open)
   }
 
   const handleSend = async (): Promise<void> => {
@@ -803,15 +826,25 @@ export function ChatPanel(): React.ReactElement {
                 <button
                   type="button"
                   className="flex h-9 w-6 items-center justify-center text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-                  onClick={() => setSendMenuOpen((open) => !open)}
+                  onClick={toggleSendMenu}
                   aria-label={t('runQueue.sendOptions')}
                   aria-expanded={sendMenuOpen}
                 >
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
               </div>
-              {sendMenuOpen && (
-                <div className="absolute bottom-full right-0 z-30 mb-1.5 w-60 overflow-hidden rounded-lg border border-white/10 bg-surface shadow-xl shadow-black/40">
+              {sendMenuOpen &&
+                sendMenuPos &&
+                createPortal(
+                  <div
+                    ref={sendMenuPanelRef}
+                    style={{
+                      position: 'fixed',
+                      right: sendMenuPos.right,
+                      bottom: sendMenuPos.bottom
+                    }}
+                    className="z-50 w-60 overflow-hidden rounded-lg border border-white/10 bg-surface shadow-xl shadow-black/40"
+                  >
                   <button
                     type="button"
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-zinc-300 transition-colors hover:bg-white/5"
@@ -839,7 +872,8 @@ export function ChatPanel(): React.ReactElement {
                       {queueMode && <Check className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
                     </button>
                   )}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           )}
