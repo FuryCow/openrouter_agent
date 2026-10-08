@@ -93,6 +93,8 @@ export interface AppSettings {
   projectMemoryAutoLoadDocs?: boolean
   /** Native skills (progressive disclosure via load_skill). Strictly opt-in: === true. */
   skillsEnabled?: boolean
+  /** Task queue (background runs). Strictly opt-in: === true. */
+  runQueueEnabled?: boolean
   /** Update notifications (GitHub releases). Opt-out: === false disables. */
   updateNotificationsEnabled?: boolean
   /** Version whose update notification the user dismissed. */
@@ -204,6 +206,10 @@ export interface AgentContext {
   projectMemory?: string
   /** Native skills flag. Strictly opt-in: === true. */
   skillsEnabled?: boolean
+  /** Task queue flag. Strictly opt-in: === true. */
+  runQueueEnabled?: boolean
+  /** Approval parking timeout in ms. 0 = park until resolved/aborted; undefined = default 5 min. */
+  approvalTimeoutMs?: number
   workspaceState?: string
   agentAutoVerify?: boolean
   approvedPlan?: ApprovedPlan
@@ -440,6 +446,57 @@ export interface TaskChecklistState {
 
 export type AgentRunOutcome = 'success' | 'aborted' | 'max_iterations' | 'error'
 
+export type QueuedRunStatus =
+  | 'queued'
+  | 'running'
+  | 'awaiting_approval'
+  | 'completed'
+  | 'error'
+  | 'aborted'
+  | 'max_iterations'
+  | 'cancelled'
+  | 'interrupted'
+
+export interface QueuedRun {
+  id: string
+  title: string
+  prompt: string
+  status: QueuedRunStatus
+  source: 'user' | 'agent'
+  dependsOn: string[]
+  createdAt: string
+  startedAt?: string
+  endedAt?: string
+  error?: string
+  checkpoint?: RunCheckpointSummary
+  checklist?: TaskChecklistStepState[]
+  approval?: ToolApprovalRequest
+  tail?: string
+  analytics?: AgentRunAnalytics
+}
+
+export interface QueueDrainedSummary {
+  total: number
+  completed: number
+  error: number
+  awaitingApproval: number
+}
+
+export interface QueueSnapshot {
+  tasks: QueuedRun[]
+  paused: boolean
+  pausedReason?: 'foreground' | 'user' | 'disabled'
+  drainedSummary?: QueueDrainedSummary
+  maxConcurrent: number
+}
+
+export interface QueueEnqueueInput {
+  title: string
+  prompt: string
+  dependsOn?: string[]
+  source: 'user' | 'agent'
+}
+
 export interface AgentEvent {
   type:
     | 'stream'
@@ -457,6 +514,7 @@ export interface AgentEvent {
     | 'memory_suggest'
     | 'checklist_updated'
     | 'terminal_output'
+    | 'queue_updated'
   content?: string
   toolCall?: ToolCallInfo
   message?: ChatMessage
@@ -470,6 +528,7 @@ export interface AgentEvent {
   iterationsRemaining?: number
   checkpoint?: RunCheckpointSummary
   checklist?: TaskChecklistState
+  queue?: QueueSnapshot
 }
 
 export interface ModelInfo {

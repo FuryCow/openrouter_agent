@@ -3,6 +3,7 @@ import { useAnalyticsStore } from '@/stores/analyticsStore'
 import { useTokenUsageStore } from '@/stores/tokenUsageStore'
 import { useAgentRunStore } from '@/stores/agentRunStore'
 import { useToastStore } from '@/stores/toastStore'
+import { useRunQueueStore } from '@/stores/runQueueStore'
 import { resolveErrorMessage } from '@/lib/errorMessages'
 import { getT } from '@/i18n/t'
 import type { AgentEvent } from '@/types'
@@ -93,6 +94,18 @@ export function handleAgentEvent(event: AgentEvent): void {
           getT('chat')('toast.stepsRemaining', { count: event.iterationsRemaining }),
           'info'
         )
+      }
+      break
+    case 'queue_updated':
+      // Background queue events never touch chatStore (single active timeline).
+      if (event.queue) {
+        useRunQueueStore.getState().applySnapshot(event.queue)
+        for (const task of event.queue.tasks) {
+          if (task.analytics) {
+            useAnalyticsStore.getState().addRun(task.analytics)
+            useTokenUsageStore.getState().addUsage(task.analytics.tokenUsage)
+          }
+        }
       }
       break
     case 'error': {
