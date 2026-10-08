@@ -583,7 +583,7 @@ export class AgentService {
       return true
     })
     const maxIterations = getMaxIterations(mode)
-    const expandedHistory = expandHistoryForApi(context.history, mode)
+    const expandedHistory = expandHistoryForApi(context.history ?? [], mode)
     const analytics = new ToolAnalyticsCollector(
       mode,
       context.model ?? 'unknown',

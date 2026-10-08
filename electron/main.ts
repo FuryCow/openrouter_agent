@@ -355,6 +355,8 @@ function buildAgentContext(overrides: Partial<AgentContext>, settings: AppSettin
     mode,
     workingDirectory: cwd,
     model,
+    history: overrides.history ?? [],
+    openFiles: overrides.openFiles ?? [],
     temperature: overrides.temperature ?? settings.temperature,
     maxTokens: overrides.maxTokens,
     reasoningEffort: overrides.reasoningEffort ?? settings.reasoningEffort,
