@@ -26,6 +26,13 @@ export default defineConfig({
   },
   renderer: {
     root: '.',
+    // Bind explicitly to IPv4: Node 17+ resolves "localhost" to the first OS answer,
+    // which can be ::1 (IPv6-only listener) while Electron connects to 127.0.0.1
+    // -> ERR_CONNECTION_REFUSED -> permanent grey window.
+    server: {
+      host: '127.0.0.1',
+      strictPort: true
+    },
     build: {
       rollupOptions: {
         input: {
