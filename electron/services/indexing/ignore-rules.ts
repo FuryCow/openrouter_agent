@@ -80,5 +80,9 @@ export function shouldSkipFile(fileName: string, size: number, maxFileSizeBytes:
 }
 
 export function relativePathFromRoot(root: string, absolutePath: string): string {
-  return relative(root, absolutePath).replace(/\\/g, '/')
+  // Normalize separators before relativizing: path.relative is platform-specific,
+  // so Windows-style inputs (C:\repo\...) must not be treated as POSIX segments on Linux CI.
+  const normalizedRoot = root.replace(/\\/g, '/')
+  const normalizedPath = absolutePath.replace(/\\/g, '/')
+  return relative(normalizedRoot, normalizedPath).replace(/\\/g, '/')
 }
