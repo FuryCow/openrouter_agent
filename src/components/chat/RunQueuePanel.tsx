@@ -18,6 +18,7 @@ import {
 import { Button } from '../ui/button'
 import { useRunQueueStore } from '@/stores/runQueueStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useUiStore } from '@/stores/uiStore'
 import { useFileStore } from '@/stores/fileStore'
 import { useToastStore } from '@/stores/toastStore'
 import { openFileWithRunDiff } from '@/lib/openFileInEditor'
@@ -175,7 +176,7 @@ function TaskRow({ task }: { task: QueuedRun }): React.ReactElement {
             <div className="space-y-1.5 border-t border-white/5 px-2 py-2">
               {task.error && <p className="text-[10px] leading-relaxed text-red-400/90">{task.error}</p>}
               {task.tail && (
-                <pre className="max-h-24 overflow-y-auto whitespace-pre-wrap rounded-md bg-black/20 p-2 font-mono text-[10px] text-zinc-400">
+                <pre className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-black/20 p-2 font-mono text-[10px] text-zinc-400">
                   {task.tail}
                 </pre>
               )}
@@ -242,6 +243,8 @@ export function RunQueuePanel(): React.ReactElement | null {
   const pausedReason = useRunQueueStore((s) => s.pausedReason)
   const drainedSummary = useRunQueueStore((s) => s.drainedSummary)
   const runQueueEnabled = useSettingsStore((s) => s.settings.runQueueEnabled === true)
+  const collapsed = useUiStore((s) => s.runQueueCollapsed)
+  const setRunQueueCollapsed = useUiStore((s) => s.setRunQueueCollapsed)
   const [busy, setBusy] = useState(false)
 
   if (!runQueueEnabled && tasks.length === 0) return null
@@ -283,19 +286,32 @@ export function RunQueuePanel(): React.ReactElement | null {
   return (
     <div className="border-t border-white/5">
       <div className="flex h-8 items-center gap-1.5 px-2.5">
-        <ListPlus className="h-3.5 w-3.5 shrink-0 text-zinc-600" />
-        <span className="text-[11px] text-zinc-500">{t('runQueue.title')}</span>
-        {queuedCount > 0 && (
-          <span className="font-mono text-[10px] text-zinc-600">{queuedCount}</span>
-        )}
-        {paused && (
-          <span className="text-[10px] text-amber-400/90">
-            {pausedReason === 'foreground'
-              ? t('runQueue.pausedForeground')
-              : t('runQueue.pausedUser')}
-          </span>
-        )}
-        <div className="min-w-0 flex-1" />
+        <button
+          type="button"
+          onClick={() => setRunQueueCollapsed(!collapsed)}
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500/40"
+          aria-expanded={!collapsed}
+          title={collapsed ? t('runQueue.expand') : t('runQueue.collapse')}
+        >
+          <ChevronRight
+            className={cn(
+              'h-3 w-3 shrink-0 text-zinc-600 transition-transform duration-150',
+              !collapsed && 'rotate-90'
+            )}
+          />
+          <ListPlus className="h-3.5 w-3.5 shrink-0 text-zinc-600" />
+          <span className="text-[11px] text-zinc-500">{t('runQueue.title')}</span>
+          {queuedCount > 0 && (
+            <span className="font-mono text-[10px] text-zinc-600">{queuedCount}</span>
+          )}
+          {paused && (
+            <span className="truncate text-[10px] text-amber-400/90">
+              {pausedReason === 'foreground'
+                ? t('runQueue.pausedForeground')
+                : t('runQueue.pausedUser')}
+            </span>
+          )}
+        </button>
         <button
           type="button"
           onClick={() => void togglePaused()}
@@ -320,7 +336,7 @@ export function RunQueuePanel(): React.ReactElement | null {
         )}
       </div>
 
-      {drainedSummary && (
+      {!collapsed && drainedSummary && (
         <div className="px-2.5 pb-1.5 text-[10px] text-zinc-600">
           {t('runQueue.drainedSummary', {
             total: drainedSummary.total,
@@ -331,8 +347,8 @@ export function RunQueuePanel(): React.ReactElement | null {
         </div>
       )}
 
-      {tasks.length > 0 && (
-        <ul className="max-h-44 space-y-1 overflow-y-auto px-1.5 pb-1.5">
+      {!collapsed && tasks.length > 0 && (
+        <ul className="max-h-[60vh] space-y-1 overflow-y-auto px-1.5 pb-1.5">
           {tasks.map((task) => (
             <TaskRow key={task.id} task={task} />
           ))}

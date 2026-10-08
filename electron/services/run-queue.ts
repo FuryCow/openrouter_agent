@@ -83,6 +83,28 @@ export function resolveDependents(
     }))
 }
 
+export type TailEventKind = 'text' | 'reasoning' | 'terminal' | 'tool'
+
+/** Pure: append stream content to the task tail. Same-kind chunks flow inline;
+ *  a kind change (or a tool lifecycle event) starts a new line. */
+export function appendTailChunk(
+  current: string,
+  lastKind: TailEventKind | undefined,
+  kind: TailEventKind,
+  content: string
+): { tail: string; lastKind: TailEventKind | undefined } {
+  if (!content) {
+    // Tool lifecycle events carry no content but act as line boundaries.
+    return { tail: current, lastKind: kind === 'tool' ? 'tool' : lastKind }
+  }
+  const separator = current && (kind === 'terminal' || lastKind !== kind) ? '\n' : ''
+  const next = `${current}${separator}${content}`
+  return {
+    tail: next.length > TAIL_MAX_LENGTH ? next.slice(-TAIL_MAX_LENGTH) : next,
+    lastKind: kind
+  }
+}
+
 /** Pure: validate enqueue input; throws AppError with queue.* codes. */
 export function validateEnqueueInput(
   input: QueueEnqueueInput,
@@ -208,6 +230,7 @@ export class RunQueueService {
     { service: AgentService; checkpoint: RunCheckpointSummary | null }
   >()
   private taskEnqueuer: TaskEnqueuer | null = null
+  private readonly tailKinds = new Map<string, TailEventKind>()
   private snapshotTimer: ReturnType<typeof setTimeout> | null = null
   private persistTimer: ReturnType<typeof setTimeout> | null = null
   private starting = new Set<string>()
@@ -238,10 +261,13 @@ export class RunQueueService {
   }
 
   enqueue(input: QueueEnqueueInput): QueuedRun {
-    validateEnqueueInput(input, this.tasks)
+    // Derive the title BEFORE validation: an empty title falls back to the
+    // first words of the prompt instead of failing with queue.titleRequired.
+    const title = input.title?.trim() || deriveTaskTitle(input.prompt)
+    validateEnqueueInput({ ...input, title }, this.tasks)
     const task: QueuedRun = {
       id: `qtask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: input.title.trim() || deriveTaskTitle(input.prompt),
+      title,
       prompt: input.prompt.trim(),
       status: 'queued',
       source: input.source,
@@ -290,7 +316,10 @@ export class RunQueueService {
         .map((task) => task.id)
     )
     this.tasks = this.tasks.filter((task) => !finished.has(task.id))
-    for (const id of finished) this.instances.delete(id)
+    for (const id of finished) {
+      this.instances.delete(id)
+      this.tailKinds.delete(id)
+    }
     this.drainedSummary = null
     this.schedulePersist()
     this.emitSnapshot()
@@ -444,9 +473,18 @@ export class RunQueueService {
       case 'tool_start':
       case 'tool_progress':
       case 'tool_done':
-      case 'terminal_output':
-        if (event.content) this.appendTail(task, event.content)
+      case 'terminal_output': {
+        const kind: TailEventKind =
+          event.type === 'stream'
+            ? 'text'
+            : event.type === 'reasoning_stream'
+              ? 'reasoning'
+              : event.type === 'terminal_output'
+                ? 'terminal'
+                : 'tool'
+        this.appendTail(task, kind, event.content ?? '')
         break
+      }
       case 'run_status':
         if (event.runStatus === 'running' || event.runStatus === 'awaiting_approval') {
           task.status = event.runStatus
@@ -524,10 +562,13 @@ export class RunQueueService {
     this.maybeStartNext()
   }
 
-  private appendTail(task: QueuedRun, content: string): void {
+  private appendTail(task: QueuedRun, kind: TailEventKind, content: string): void {
     const current = task.tail ?? ''
-    const next = `${current}${current && !current.endsWith('\n') ? '\n' : ''}${content}`
-    task.tail = next.length > TAIL_MAX_LENGTH ? next.slice(-TAIL_MAX_LENGTH) : next
+    const previous = this.tailKinds.get(task.id)
+    const applied = appendTailChunk(current, previous, kind, content)
+    if (applied.tail === current && applied.lastKind === previous) return
+    task.tail = applied.tail
+    if (applied.lastKind !== undefined) this.tailKinds.set(task.id, applied.lastKind)
     this.scheduleSnapshotEmit()
   }
 

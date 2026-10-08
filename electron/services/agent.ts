@@ -45,7 +45,7 @@ import { isPlannerPlanPath } from './planner-plans'
 import type { SkillLoader } from './skills/skill-loader'
 import { RunTaskChecklist } from './run-task-checklist'
 import { RunCheckpoint } from './run-checkpoint'
-import type { TaskEnqueuer } from './run-queue'
+import { deriveTaskTitle, type TaskEnqueuer } from './run-queue'
 import {
   buildRetryExhaustedError,
   formatToolErrorFromMessage,
@@ -354,7 +354,9 @@ const TOOLS: ToolDefinition[] = [
         properties: {
           title: {
             type: 'string',
-            description: 'Short imperative title, max 120 chars'
+            description:
+              'Optional short imperative title, max 120 chars. ' +
+              'Omit to derive it from the first words of the prompt.'
           },
           prompt: {
             type: 'string',
@@ -369,7 +371,7 @@ const TOOLS: ToolDefinition[] = [
               'Task ids this task depends on. The task starts only after all deps are completed.'
           }
         },
-        required: ['title', 'prompt']
+        required: ['prompt']
       }
     }
   }
@@ -941,7 +943,8 @@ export class AgentService {
       } else if (call.function.name === 'update_project_memory') {
         preview = `Update project memory (${args.action ?? ''})\n${JSON.stringify(args, null, 2)}`
       } else if (call.function.name === 'enqueue_task') {
-        preview = `Enqueue task: ${args.title ?? ''}`
+        const title = String(args.title ?? '').trim()
+        preview = `Enqueue task: ${title || deriveTaskTitle(String(args.prompt ?? ''))}`
       }
     } else if (needsMcpApproval) {
       const parsed = parseMcpQualifiedToolName(call.function.name)

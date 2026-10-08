@@ -127,6 +127,39 @@ describe('enqueue_task tool', () => {
     expect(toolDone?.toolCall?.result).toContain('Write tests')
   })
 
+  it('allows omitting the title — the queue derives it from the prompt', async () => {
+    const dir = workspace()
+    const agent = createAgent(
+      scriptedModel([
+        {
+          content: '',
+          reasoning: '',
+          toolCalls: [enqueueCall({ prompt: 'Add tests for src/app.ts' })],
+          finishReason: 'tool_calls'
+        },
+        { content: 'Enqueued.', reasoning: '', toolCalls: [], finishReason: 'stop' }
+      ])
+    )
+    let receivedTitle: string | null = null
+    agent.setTaskEnqueuer(async (title) => {
+      receivedTitle = title
+      return { id: 'qtask-77', title: 'Add tests for src/app.ts', dependsOn: [] }
+    })
+
+    const events: AgentEvent[] = []
+    await agent.run('split the work', context(dir, { runQueueEnabled: true }), (event) => {
+      events.push(event)
+      if (event.type === 'approval_request' && event.approval) {
+        expect(event.approval.preview).toBe('Enqueue task: Add tests for src/app.ts')
+        queueMicrotask(() => agent.resolveApproval(event.approval!.id, true))
+      }
+    })
+
+    expect(receivedTitle).toBe('')
+    const toolDone = events.find((event) => event.type === 'tool_done')
+    expect(toolDone?.toolCall?.result).toContain('qtask-77')
+  })
+
   it('passes dependsOn through to the bridge', async () => {
     const dir = workspace()
     const agent = createAgent(

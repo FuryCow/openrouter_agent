@@ -43,7 +43,7 @@ const REQUIRED_ARGS: Record<string, string[]> = {
   create_task_checklist: ['steps'],
   update_task_checklist: ['step', 'status'],
   load_skill: ['path'],
-  enqueue_task: ['title', 'prompt']
+  enqueue_task: ['prompt']
 }
 
 export type ToolCallOutcome = 'success' | 'error' | 'invalid_args'

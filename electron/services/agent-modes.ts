@@ -190,6 +190,7 @@ const TASK_QUEUE_WORKFLOW = `Task queue workflow (optional decomposition):
 - You have the enqueue_task tool: it adds a task to a background queue executed after your run finishes.
 - Decompose when it helps: multi-module work, independent sub-tasks, or follow-up verification you cannot finish now.
 - Each task needs a self-contained prompt — the background agent does not see your conversation, but shares the workspace.
+- Give each task a short imperative title; omit title to derive it from the first words of the prompt.
 - Use dependsOn for ordering: pass task ids returned by enqueue_task. Tasks without dependsOn are independent and may run in parallel later.
 - Do not enqueue tasks that edit the same files as your current run without dependsOn — ordering matters for correctness.
 - Do not enqueue trivial follow-ups you can finish yourself in this run — enqueue only genuinely separate work.

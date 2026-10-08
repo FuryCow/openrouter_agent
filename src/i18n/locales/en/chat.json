@@ -237,6 +237,8 @@
   },
   "runQueue": {
     "title": "Task queue",
+    "collapse": "Collapse queue",
+    "expand": "Expand queue",
     "pausedForeground": "paused — chat run in progress",
     "pausedUser": "paused",
     "pause": "Pause queue",

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  RunQueueService,
+  appendTailChunk,
+  deriveTaskTitle,
   hydrateQueueState,
   pickNextTasks,
   resolveDependents,
@@ -198,5 +201,105 @@ describe('serializeQueueState / hydrateQueueState', () => {
   it('restores the paused flag', () => {
     const raw = serializeQueueState([], true)
     expect(hydrateQueueState(raw).paused).toBe(true)
+  })
+})
+
+describe('deriveTaskTitle', () => {
+  it('takes the first words of the prompt and strips newlines', () => {
+    expect(deriveTaskTitle('Fix the login bug\nand add tests')).toBe(
+      'Fix the login bug and add'
+    )
+  })
+
+  it('truncates long derivations to 60 chars with an ellipsis', () => {
+    const prompt = Array.from({ length: 10 }, () => 'x'.repeat(15)).join(' ')
+    const title = deriveTaskTitle(prompt)
+    expect(title.length).toBeLessThanOrEqual(60)
+    expect(title.endsWith('…')).toBe(true)
+  })
+
+  it('falls back to Untitled task for an empty prompt', () => {
+    expect(deriveTaskTitle('   ')).toBe('Untitled task')
+  })
+})
+
+describe('RunQueueService.enqueue title fallback', () => {
+  function createPausedQueue(): RunQueueService {
+    const queue = new RunQueueService({
+      createAgentService: () => {
+        throw new Error('queue must not start tasks in this test')
+      },
+      buildAgentContext: () => {
+        throw new Error('queue must not start tasks in this test')
+      },
+      emit: () => {},
+      isForegroundRunning: () => false
+    })
+    queue.setPaused(true)
+    return queue
+  }
+
+  it('derives the title from the prompt when the title is empty', () => {
+    const created = createPausedQueue().enqueue({
+      title: '',
+      prompt: 'Fix the login bug in auth',
+      source: 'user'
+    })
+    expect(created.title).toBe('Fix the login bug in auth')
+  })
+
+  it('keeps a provided title as-is (trimmed)', () => {
+    const created = createPausedQueue().enqueue({
+      title: '  Custom title  ',
+      prompt: 'Fix the login bug in auth module',
+      source: 'user'
+    })
+    expect(created.title).toBe('Custom title')
+  })
+
+  it('still rejects an empty prompt', () => {
+    expect(() => createPausedQueue().enqueue({ title: '', prompt: '   ', source: 'user' })).toThrow()
+  })
+})
+
+describe('appendTailChunk', () => {
+  it('joins same-kind stream chunks inline into a full-width paragraph', () => {
+    const first = appendTailChunk('', undefined, 'text', 'The')
+    const second = appendTailChunk(first.tail, first.lastKind, 'text', ' user')
+    const third = appendTailChunk(second.tail, second.lastKind, 'text', ' is asking in Russian')
+    expect(third.tail).toBe('The user is asking in Russian')
+    expect(third.lastKind).toBe('text')
+  })
+
+  it('starts a new line when the event kind changes (tool boundary)', () => {
+    const text = appendTailChunk('', undefined, 'text', 'Running checks')
+    const boundary = appendTailChunk(text.tail, text.lastKind, 'tool', '')
+    const after = appendTailChunk(boundary.tail, boundary.lastKind, 'text', 'All green')
+    expect(boundary.tail).toBe('Running checks')
+    expect(boundary.lastKind).toBe('tool')
+    expect(after.tail).toBe('Running checks\nAll green')
+  })
+
+  it('ignores empty stream chunks without losing the boundary', () => {
+    const text = appendTailChunk('', undefined, 'text', 'Working')
+    const boundary = appendTailChunk(text.tail, text.lastKind, 'tool', '')
+    const emptyStream = appendTailChunk(boundary.tail, boundary.lastKind, 'text', '')
+    expect(emptyStream.tail).toBe('Working')
+    expect(emptyStream.lastKind).toBe('tool')
+  })
+
+  it('puts terminal output on its own line', () => {
+    const text = appendTailChunk('', undefined, 'text', 'Working')
+    const term = appendTailChunk(text.tail, text.lastKind, 'terminal', 'pong')
+    expect(term.tail).toBe('Working\npong')
+  })
+
+  it('keeps the tail bounded', () => {
+    let state = appendTailChunk('', undefined, 'text', '')
+    for (let i = 0; i < 100; i += 1) {
+      state = appendTailChunk(state.tail, state.lastKind, 'text', 'x'.repeat(100))
+    }
+    expect(state.tail.length).toBeLessThanOrEqual(2000)
+    expect(state.tail.endsWith('x')).toBe(true)
   })
 })
