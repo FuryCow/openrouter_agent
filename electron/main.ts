@@ -206,10 +206,30 @@ function createWindow(): void {
     mainWindow?.webContents.toggleDevTools()
   })
 
-  if (process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  const rendererUrl = process.env['ELECTRON_RENDERER_URL']
+  if (rendererUrl) {
+    // Dev only: right after the vite banner the server can briefly refuse connections
+    // (port race with a dying previous instance). Retry instead of a permanent grey window.
+    const loadRendererWithRetry = async (attempt: number = 0): Promise<void> => {
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      try {
+        await mainWindow.loadURL(rendererUrl)
+      } catch (err) {
+        const description = String((err as { code?: string; message?: string })?.code ?? err)
+        const transient =
+          attempt < 9 &&
+          /ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ERR_EMPTY_RESPONSE/i.test(description)
+        if (transient) {
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          await loadRendererWithRetry(attempt + 1)
+        } else {
+          console.error('[main] Failed to load renderer URL:', err)
+        }
+      }
+    }
+    void loadRendererWithRetry()
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
