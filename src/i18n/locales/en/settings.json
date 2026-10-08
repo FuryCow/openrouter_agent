@@ -44,6 +44,10 @@
       "title": "Native skills",
       "description": "Progressive disclosure: agent sees skill names, loads SKILL.md via load_skill"
     },
+    "runQueueEnabled": {
+      "title": "Background task queue",
+      "description": "Queue tasks that run in the background one by one, each with its own checkpoint and approvals"
+    },
     "verifyAfterEdits": {
       "title": "Verify after edits",
       "description": "Agent runs tests/lint/tsc after code changes (via run_terminal)"

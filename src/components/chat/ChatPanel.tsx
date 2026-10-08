@@ -31,6 +31,7 @@ import { useAgentRunStore } from '@/stores/agentRunStore'
 import { AgentContextChips } from './AgentContextChips'
 import { AgentRunPanel } from './AgentRunPanel'
 import { RunChangesPanel } from './RunChangesPanel'
+import { RunQueuePanel } from './RunQueuePanel'
 import { FileIcon } from '@/components/ui/FileIcon'
 import {
   CHAT_ATTACHMENT_MAX_COUNT,
@@ -540,6 +541,7 @@ export function ChatPanel(): React.ReactElement {
       </div>
 
       {chatMode === 'agent' && <AgentRunPanel />}
+      {chatMode === 'agent' && <RunQueuePanel />}
 
       <div
         ref={scrollRef}

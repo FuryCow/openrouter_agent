@@ -234,5 +234,31 @@
     "description": "description",
     "body": "body",
     "save": "Save skill"
+  },
+  "runQueue": {
+    "title": "Task queue",
+    "pausedForeground": "paused — chat run in progress",
+    "pausedUser": "paused",
+    "pause": "Pause queue",
+    "resume": "Resume queue",
+    "add": "Add task",
+    "addConfirm": "Add",
+    "cancelAdd": "Cancel",
+    "clearFinished": "Clear finished tasks",
+    "cancel": "Cancel task",
+    "approve": "Approve",
+    "deny": "Deny",
+    "restore": "Restore checkpoint",
+    "titlePlaceholder": "Task title",
+    "promptPlaceholder": "Full task prompt for the background agent…",
+    "drainedSummary": "{{total}} task(s): {{completed}} completed, {{error}} failed, {{awaitingApproval}} awaiting approval",
+    "enqueueFailed": "Failed to add task",
+    "cancelFailed": "Failed to cancel task",
+    "approveFailed": "Failed to resolve approval",
+    "clearFailed": "Failed to clear finished tasks",
+    "pauseFailed": "Failed to change queue state",
+    "diffFailed": "Failed to open task diff",
+    "restoreFailed": "Failed to restore checkpoint",
+    "restored": "Restored {{count}} file change(s)"
   }
 }
