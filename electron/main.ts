@@ -589,11 +589,19 @@ function registerIpc(): void {
       await runQueue.abortAll('foreground')
     }
     runQueue.setPaused(true, 'foreground')
+    const settingsForRun = settings
+    if (settingsForRun.runQueueEnabled === true) {
+      agentService.setTaskEnqueuer(async (title, prompt, dependsOn) => {
+        const created = runQueue.enqueue({ title, prompt, dependsOn, source: 'agent' })
+        return { id: created.id, title: created.title, dependsOn: created.dependsOn }
+      })
+    }
     try {
       await agentService.run(message, buildAgentContext(context, settings), (event) => {
         sendToRenderer('agent:event', event)
       })
     } finally {
+      agentService.setTaskEnqueuer(null)
       if (runQueue.getPaused() && runQueue.list().pausedReason === 'foreground') {
         runQueue.setPaused(false)
       }

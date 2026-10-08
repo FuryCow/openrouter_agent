@@ -45,6 +45,7 @@ import { isPlannerPlanPath } from './planner-plans'
 import type { SkillLoader } from './skills/skill-loader'
 import { RunTaskChecklist } from './run-task-checklist'
 import { RunCheckpoint } from './run-checkpoint'
+import type { TaskEnqueuer } from './run-queue'
 import {
   buildRetryExhaustedError,
   formatToolErrorFromMessage,
@@ -338,6 +339,39 @@ const TOOLS: ToolDefinition[] = [
         required: ['path']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'enqueue_task',
+      description:
+        'Enqueue a follow-up task into the background task queue. ' +
+        'Use for independent sub-tasks of your current work (they may run in parallel later) ' +
+        'or for sequential follow-ups via dependsOn. ' +
+        'Returns the new task id — use it in dependsOn of subsequent enqueue_task calls.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: {
+            type: 'string',
+            description: 'Short imperative title, max 120 chars'
+          },
+          prompt: {
+            type: 'string',
+            description:
+              'Full self-contained prompt for the background agent, max 8000 chars. ' +
+              'Must be self-contained: the background run does not see your conversation.'
+          },
+          dependsOn: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Task ids this task depends on. The task starts only after all deps are completed.'
+          }
+        },
+        required: ['title', 'prompt']
+      }
+    }
   }
 ]
 
@@ -345,7 +379,8 @@ const MUTATING_TOOLS = new Set([
   'write_file',
   'search_replace',
   'run_terminal',
-  'update_project_memory'
+  'update_project_memory',
+  'enqueue_task'
 ])
 const MAX_READ_FILES = 10
 const MAX_CHARS_PER_FILE = 50_000
@@ -362,6 +397,7 @@ export class AgentService {
   private toolRetryCounts = new Map<string, number>()
   private runTaskChecklist = new RunTaskChecklist()
   private runEmit: ((event: AgentEvent) => void) | null = null
+  private taskEnqueuer: TaskEnqueuer | null = null
 
   constructor(
     private openRouter: OpenRouterClient,
@@ -473,6 +509,11 @@ export class AgentService {
     else this.sessionAutoApproveWrites = true
   }
 
+  /** Injected by the run queue (and foreground wiring) while a run is active. */
+  setTaskEnqueuer(enqueuer: TaskEnqueuer | null): void {
+    this.taskEnqueuer = enqueuer
+  }
+
   abort(): void {
     this.abortController?.abort()
   }
@@ -536,7 +577,11 @@ export class AgentService {
     const tools = [
       ...getToolsForMode(mode, TOOLS),
       ...this.mcpManager.getToolsForMode(mode)
-    ].filter((tool) => skillsEnabled || tool.function.name !== 'load_skill')
+    ].filter((tool) => {
+      if (tool.function.name === 'load_skill') return skillsEnabled
+      if (tool.function.name === 'enqueue_task') return context.runQueueEnabled === true
+      return true
+    })
     const maxIterations = getMaxIterations(mode)
     const expandedHistory = expandHistoryForApi(context.history, mode)
     const analytics = new ToolAnalyticsCollector(
@@ -895,6 +940,8 @@ export class AgentService {
         preview = `Run: ${args.command ?? ''}`
       } else if (call.function.name === 'update_project_memory') {
         preview = `Update project memory (${args.action ?? ''})\n${JSON.stringify(args, null, 2)}`
+      } else if (call.function.name === 'enqueue_task') {
+        preview = `Enqueue task: ${args.title ?? ''}`
       }
     } else if (needsMcpApproval) {
       const parsed = parseMcpQualifiedToolName(call.function.name)
@@ -1019,6 +1066,25 @@ export class AgentService {
           return 'Error: Skills module is disabled'
         }
         return this.skills.readSkill(String(args.path ?? ''))
+      }
+      case 'enqueue_task': {
+        if (!this.taskEnqueuer || context.runQueueEnabled !== true) {
+          return 'Error: Task queue is disabled'
+        }
+        const title = String(args.title ?? '').trim()
+        const prompt = String(args.prompt ?? '').trim()
+        const dependsOn = Array.isArray(args.dependsOn)
+          ? args.dependsOn.map((d) => String(d)).filter(Boolean)
+          : []
+        try {
+          const result = await this.taskEnqueuer(title, prompt, dependsOn)
+          return (
+            `Task enqueued: ${result.id} "${result.title}"` +
+            (result.dependsOn.length > 0 ? ` (dependsOn: ${result.dependsOn.join(', ')})` : '')
+          )
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`
+        }
       }
       case 'read_file': {
         const path = this.resolvePath(String(args.path ?? ''), cwd)
