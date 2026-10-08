@@ -31,9 +31,8 @@ if not exist "node_modules\.bin\electron-vite.cmd" (
     )
 )
 
-echo Stopping old Electron processes...
+echo Stopping old Electron dev processes...
 taskkill /F /IM electron.exe >nul 2>&1
-taskkill /F /IM "OpenRouter Agent.exe" >nul 2>&1
 timeout /t 1 /nobreak >nul
 
 echo Building latest version...
