@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
 import type { QueuedRun, QueuedRunStatus } from '@/types'
 
 function StatusIcon({ status }: { status: QueuedRunStatus }): React.ReactElement {
-  const className = 'h-3.5 w-3.5 shrink-0'
+  const className = 'h-4 w-4 shrink-0'
   switch (status) {
     case 'queued':
       return <Clock className={cn(className, 'text-zinc-500')} />
@@ -49,8 +49,6 @@ function StatusIcon({ status }: { status: QueuedRunStatus }): React.ReactElement
 
 function TaskRow({ task }: { task: QueuedRun }): React.ReactElement {
   const { t } = useTranslation('chat')
-  const cancelTask = useRunQueueStore.getState // placeholder to satisfy lint; real handlers below
-  void cancelTask
   const [expanded, setExpanded] = useState(false)
   const [busy, setBusy] = useState(false)
   const active =
@@ -125,29 +123,29 @@ function TaskRow({ task }: { task: QueuedRun }): React.ReactElement {
   }
 
   return (
-    <li className="rounded-lg border border-white/5 bg-white/[0.02]">
-      <div className="flex items-center gap-1.5 px-2 py-1.5">
+    <li className="rounded-lg border border-white/5 bg-white/[0.03]">
+      <div className="flex items-center gap-2 px-2.5 py-2">
         <button
           type="button"
           onClick={() => setExpanded((open) => !open)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
           aria-expanded={expanded}
         >
           <ChevronRight
             className={cn(
-              'h-3 w-3 shrink-0 text-zinc-600 transition-transform duration-150',
+              'h-3.5 w-3.5 shrink-0 text-zinc-600 transition-transform duration-150',
               expanded && 'rotate-90'
             )}
           />
           <StatusIcon status={task.status} />
-          <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-300">{task.title}</span>
+          <span className="min-w-0 flex-1 truncate text-xs text-zinc-200">{task.title}</span>
           {task.checklist && task.checklist.length > 0 && (
-            <span className="shrink-0 font-mono text-[10px] text-zinc-500">
+            <span className="shrink-0 font-mono text-[11px] text-zinc-500">
               {task.checklist.filter((s) => s.status === 'done').length}/{task.checklist.length}
             </span>
           )}
           {task.checkpoint && task.checkpoint.count > 0 && (
-            <span className="shrink-0 font-mono text-[10px] text-zinc-500">
+            <span className="shrink-0 font-mono text-[11px] text-zinc-500">
               {t('runChanges.fileCount', { count: task.checkpoint.count })}
             </span>
           )}
@@ -157,11 +155,11 @@ function TaskRow({ task }: { task: QueuedRun }): React.ReactElement {
             type="button"
             onClick={() => void cancel()}
             disabled={busy}
-            className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400 disabled:opacity-40"
+            className="shrink-0 rounded p-1 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400 disabled:opacity-40"
             title={t('runQueue.cancel')}
             aria-label={t('runQueue.cancel')}
           >
-            <X className="h-3 w-3" />
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
@@ -175,22 +173,22 @@ function TaskRow({ task }: { task: QueuedRun }): React.ReactElement {
             transition={{ duration: 0.15 }}
             className="overflow-hidden"
           >
-            <div className="space-y-1.5 border-t border-white/5 px-2 py-2">
-              {task.error && <p className="text-[10px] text-red-400/90">{task.error}</p>}
+            <div className="space-y-2 border-t border-white/5 px-2.5 py-2.5">
+              {task.error && <p className="text-[11px] text-red-400/90">{task.error}</p>}
               {task.tail && (
-                <pre className="max-h-24 overflow-y-auto whitespace-pre-wrap rounded-md bg-black/20 p-2 font-mono text-[10px] text-zinc-400">
+                <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-md bg-black/20 p-2 font-mono text-[11px] text-zinc-400">
                   {task.tail}
                 </pre>
               )}
               {task.approval && (
-                <div className="flex items-center gap-1.5">
-                  <span className="min-w-0 flex-1 truncate text-[10px] text-amber-300/90">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[11px] text-amber-300/90">
                     {task.approval.name}
                     {task.approval.preview ? ` · ${task.approval.preview}` : ''}
                   </span>
                   <Button
                     variant="secondary"
-                    className="h-6 px-2 text-[10px]"
+                    className="h-7 px-2.5 text-[11px]"
                     onClick={() => void approve(true)}
                     disabled={busy}
                   >
@@ -198,7 +196,7 @@ function TaskRow({ task }: { task: QueuedRun }): React.ReactElement {
                   </Button>
                   <Button
                     variant="ghost"
-                    className="h-6 px-2 text-[10px]"
+                    className="h-7 px-2.5 text-[11px]"
                     onClick={() => void approve(false)}
                     disabled={busy}
                   >
@@ -207,11 +205,11 @@ function TaskRow({ task }: { task: QueuedRun }): React.ReactElement {
                 </div>
               )}
               {task.checkpoint && task.checkpoint.count > 0 && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => void openDiff()}
-                    className="text-[10px] text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline"
+                    className="text-[11px] text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline"
                   >
                     {t('runChanges.review')}
                   </button>
@@ -219,14 +217,14 @@ function TaskRow({ task }: { task: QueuedRun }): React.ReactElement {
                     type="button"
                     onClick={() => void restore()}
                     disabled={busy}
-                    className="text-[10px] text-amber-300/90 underline-offset-2 hover:text-amber-200 hover:underline disabled:opacity-40"
+                    className="text-[11px] text-amber-300/90 underline-offset-2 hover:text-amber-200 hover:underline disabled:opacity-40"
                   >
                     {t('runQueue.restore')}
                   </button>
                 </div>
               )}
               {task.dependsOn.length > 0 && (
-                <p className="font-mono text-[10px] text-zinc-600">
+                <p className="font-mono text-[11px] text-zinc-600">
                   dependsOn: {task.dependsOn.join(', ')}
                 </p>
               )}
@@ -304,14 +302,14 @@ export function RunQueuePanel(): React.ReactElement | null {
 
   return (
     <div className="border-b border-white/5">
-      <div className="flex h-7 items-center gap-1.5 px-2">
-        <ListPlus className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-        <span className="text-[11px] text-zinc-400">{t('runQueue.title')}</span>
-        <span className="font-mono text-[10px] text-zinc-600">
+      <div className="flex h-9 items-center gap-2 px-2.5">
+        <ListPlus className="h-4 w-4 shrink-0 text-zinc-500" />
+        <span className="text-xs text-zinc-300">{t('runQueue.title')}</span>
+        <span className="font-mono text-[11px] text-zinc-600">
           {tasks.filter((task) => task.status === 'queued').length}
         </span>
         {paused && (
-          <span className="text-[10px] text-amber-400/90">
+          <span className="text-[11px] text-amber-400/90">
             {pausedReason === 'foreground'
               ? t('runQueue.pausedForeground')
               : t('runQueue.pausedUser')}
@@ -322,37 +320,37 @@ export function RunQueuePanel(): React.ReactElement | null {
           type="button"
           onClick={() => void togglePaused()}
           disabled={busy}
-          className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400 disabled:opacity-40"
+          className="shrink-0 rounded p-1 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400 disabled:opacity-40"
           title={paused ? t('runQueue.resume') : t('runQueue.pause')}
           aria-label={paused ? t('runQueue.resume') : t('runQueue.pause')}
         >
-          {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+          {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
         </button>
         <button
           type="button"
           onClick={() => setAdding((open) => !open)}
-          className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400"
+          className="shrink-0 rounded p-1 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400"
           title={t('runQueue.add')}
           aria-label={t('runQueue.add')}
         >
-          <Plus className="h-3 w-3" />
+          <Plus className="h-3.5 w-3.5" />
         </button>
         {hasFinished && (
           <button
             type="button"
             onClick={() => void clearFinished()}
             disabled={busy}
-            className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400 disabled:opacity-40"
+            className="shrink-0 rounded p-1 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400 disabled:opacity-40"
             title={t('runQueue.clearFinished')}
             aria-label={t('runQueue.clearFinished')}
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
 
       {drainedSummary && (
-        <div className="px-2 pb-1.5 text-[10px] text-zinc-500">
+        <div className="px-2.5 pb-2 text-[11px] text-zinc-500">
           {t('runQueue.drainedSummary', {
             total: drainedSummary.total,
             completed: drainedSummary.completed,
@@ -371,28 +369,32 @@ export function RunQueuePanel(): React.ReactElement | null {
             transition={{ duration: 0.15 }}
             className="overflow-hidden"
           >
-            <div className="space-y-1.5 px-2 pb-2">
+            <div className="space-y-2 px-2.5 pb-2.5">
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={t('runQueue.titlePlaceholder')}
                 maxLength={120}
-                className="input-field h-8 text-xs"
+                className="input-field h-9 text-xs"
               />
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder={t('runQueue.promptPlaceholder')}
                 maxLength={8000}
-                rows={3}
+                rows={4}
                 className="input-field resize-none text-xs"
               />
-              <div className="flex justify-end gap-1.5">
-                <Button variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setAdding(false)}>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  className="h-7 px-2.5 text-[11px]"
+                  onClick={() => setAdding(false)}
+                >
                   {t('runQueue.cancelAdd')}
                 </Button>
                 <Button
-                  className="h-6 px-2 text-[10px]"
+                  className="h-7 px-2.5 text-[11px]"
                   onClick={() => void enqueue()}
                   disabled={busy || !title.trim() || !prompt.trim()}
                 >
@@ -405,7 +407,7 @@ export function RunQueuePanel(): React.ReactElement | null {
       </AnimatePresence>
 
       {tasks.length > 0 && (
-        <ul className="max-h-48 space-y-1 overflow-y-auto px-1.5 pb-1.5">
+        <ul className="max-h-64 space-y-1.5 overflow-y-auto px-2 pb-2">
           {tasks.map((task) => (
             <TaskRow key={task.id} task={task} />
           ))}
