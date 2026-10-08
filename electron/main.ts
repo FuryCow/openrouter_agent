@@ -295,6 +295,40 @@ function shutdownApp(): void {
   mainWindow = null
 }
 
+function buildAgentContext(overrides: Partial<AgentContext>, settings: AppSettings): AgentContext {
+  const cwd = overrides.workingDirectory || settings.workingDirectory
+  const mode = overrides.mode ?? 'agent'
+  const model = overrides.model || settings.model
+
+  return {
+    ...overrides,
+    mode,
+    workingDirectory: cwd,
+    model,
+    temperature: overrides.temperature ?? settings.temperature,
+    maxTokens: overrides.maxTokens,
+    reasoningEffort: overrides.reasoningEffort ?? settings.reasoningEffort,
+    modelProvider: overrides.modelProvider ?? settings.modelProvider,
+    reasoningMandatory: overrides.reasoningMandatory,
+    reasoningDefaultEffort: overrides.reasoningDefaultEffort,
+    reasoningSupportedEfforts: overrides.reasoningSupportedEfforts,
+    customSystemPrompt: overrides.customSystemPrompt ?? settings.customSystemPrompt,
+    autoApproveWrites: overrides.autoApproveWrites ?? settings.autoApproveWrites,
+    autoApproveTerminal: overrides.autoApproveTerminal ?? settings.autoApproveTerminal,
+    agentAutoVerify: settings.agentAutoVerify !== false,
+    skillsEnabled: settings.skillsEnabled === true,
+    runQueueEnabled: settings.runQueueEnabled === true,
+    workspaceState: mode !== 'ask' && cwd ? getWorkspaceState(cwd).formatted : undefined,
+    projectMemory:
+      settings.projectMemoryEnabled !== false && cwd && (mode === 'agent' || mode === 'planner')
+        ? projectMemoryService.getSnapshot(cwd, {
+            includeDocs: settings.projectMemoryAutoLoadDocs !== false,
+            includeCursorRules: settings.projectMemoryAutoLoadDocs !== false
+          })
+        : undefined
+  }
+}
+
 function registerIpc(): void {
   ipcMain.on('app:flush-complete', () => {
     finishAppClose()
@@ -500,7 +534,6 @@ function registerIpc(): void {
     const settings = sanitizeSettings(store.get('settings'))
     const cwd = settings.workingDirectory || context.workingDirectory
     const mode = context.mode ?? 'agent'
-    const model = context.model || settings.model
 
     if (modeRequiresWorkspace(mode) && !cwd) {
       sendToRenderer('agent:event', {
@@ -522,41 +555,9 @@ function registerIpc(): void {
       }
     }
 
-    await agentService.run(
-      message,
-      {
-        ...context,
-        mode,
-        workingDirectory: cwd,
-        model,
-        temperature: context.temperature ?? settings.temperature,
-        maxTokens: context.maxTokens,
-        reasoningEffort: context.reasoningEffort ?? settings.reasoningEffort,
-        modelProvider: context.modelProvider ?? settings.modelProvider,
-        reasoningMandatory: context.reasoningMandatory,
-        reasoningDefaultEffort: context.reasoningDefaultEffort,
-        reasoningSupportedEfforts: context.reasoningSupportedEfforts,
-        customSystemPrompt: context.customSystemPrompt ?? settings.customSystemPrompt,
-        autoApproveWrites: context.autoApproveWrites ?? settings.autoApproveWrites,
-        autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal,
-        agentAutoVerify: settings.agentAutoVerify !== false,
-        skillsEnabled: settings.skillsEnabled === true,
-        workspaceState:
-          mode !== 'ask' && cwd ? getWorkspaceState(cwd).formatted : undefined,
-        projectMemory:
-          settings.projectMemoryEnabled !== false &&
-          cwd &&
-          (mode === 'agent' || mode === 'planner')
-            ? projectMemoryService.getSnapshot(cwd, {
-                includeDocs: settings.projectMemoryAutoLoadDocs !== false,
-                includeCursorRules: settings.projectMemoryAutoLoadDocs !== false
-              })
-            : undefined
-      },
-      (event) => {
-        sendToRenderer('agent:event', event)
-      }
-    )
+    await agentService.run(message, buildAgentContext(context, settings), (event) => {
+      sendToRenderer('agent:event', event)
+    })
     await mcpManager.flushPendingReconnect()
   })
 

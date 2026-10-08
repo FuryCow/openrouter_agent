@@ -723,7 +723,7 @@ export class AgentService {
             onToolStart: (toolCall) => emit({ type: 'tool_start', toolCall }),
             onToolDone: (toolCall) => emit({ type: 'tool_done', toolCall }),
             onRecordAnalytics: (record) => analytics.recordToolCall(record),
-            requestApproval: (call) => this.waitForApproval(call, context, emit),
+            requestApproval: (call) => this.waitForApproval(call, context, emit, signal),
             requiresApproval: (name) =>
               MUTATING_TOOLS.has(name) || this.mcpManager.requiresApproval(name),
             executeTool: (call) => this.executeTool(call, context, mode),
@@ -858,7 +858,8 @@ export class AgentService {
   private async waitForApproval(
     call: ToolCall,
     context: AgentContext,
-    emit: (event: AgentEvent) => void
+    emit: (event: AgentEvent) => void,
+    signal?: AbortSignal
   ): Promise<boolean> {
     const needsBuiltinApproval = MUTATING_TOOLS.has(call.function.name)
     const needsMcpApproval =
@@ -919,15 +920,33 @@ export class AgentService {
     this.emitRunStatus(emit, 'awaiting_approval')
 
     const approved = await new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(() => {
+      let settled = false
+      const settle = (value: boolean): void => {
+        if (settled) return
+        settled = true
+        signal?.removeEventListener('abort', onAbort)
+        resolve(value)
+      }
+      const onAbort = (): void => {
         this.approvalResolvers.delete(approvalId)
-        resolve(false)
-      }, 5 * 60 * 1000)
+        settle(false)
+      }
+      // approvalTimeoutMs: 0 parks the run until resolved or aborted (background runs);
+      // undefined keeps the historical 5-minute timeout.
+      const timeoutMs = context.approvalTimeoutMs ?? 5 * 60 * 1000
+      const timeout =
+        timeoutMs > 0
+          ? setTimeout(() => {
+              this.approvalResolvers.delete(approvalId)
+              settle(false)
+            }, timeoutMs)
+          : null
 
       this.approvalResolvers.set(approvalId, (value) => {
-        clearTimeout(timeout)
-        resolve(value)
+        if (timeout) clearTimeout(timeout)
+        settle(value)
       })
+      signal?.addEventListener('abort', onAbort)
     })
 
     this.emitRunStatus(emit, 'running')
