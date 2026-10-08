@@ -301,11 +301,8 @@ export function ChatPanel(): React.ReactElement {
 
     if (queueMode) {
       if (!text) return
-      const [firstLine, ...rest] = text.split('\n')
-      const title = firstLine.trim().slice(0, 120)
-      const prompt = (rest.join('\n').trim() || text).slice(0, 8000)
       try {
-        await window.api.queue.enqueue({ title, prompt, source: 'user' })
+        await window.api.queue.enqueue({ title: '', prompt: text, source: 'user' })
         setInput('')
         stickToBottomRef.current = true
         useToastStore.getState().addToast(t('runQueue.taskAdded'), 'success')
@@ -793,14 +790,10 @@ export function ChatPanel(): React.ReactElement {
             </Button>
           ) : (
             <div ref={sendMenuRef} className="relative shrink-0">
-              <div className="flex items-center">
+              <div className="flex items-center overflow-hidden rounded-lg bg-indigo-600 shadow-sm shadow-indigo-600/25 transition-shadow focus-within:shadow-md hover:shadow-md">
                 <Button
                   size="icon"
-                  className={cn(
-                    'size-9 rounded-r-none',
-                    queueMode &&
-                      'bg-amber-600 shadow-amber-600/20 hover:bg-amber-500'
-                  )}
+                  className="size-9 rounded-none bg-transparent shadow-none hover:bg-white/10"
                   onClick={handleSend}
                   disabled={!input.trim() && attachments.length === 0}
                   title={queueMode ? t('runQueue.composerQueue') : t('runQueue.composerSend')}
@@ -809,17 +802,12 @@ export function ChatPanel(): React.ReactElement {
                 </Button>
                 <button
                   type="button"
-                  className={cn(
-                    'flex h-9 w-5 items-center justify-center rounded-lg rounded-l-none border-l border-white/25 text-white/80 transition-colors',
-                    queueMode
-                      ? 'bg-amber-600 hover:bg-amber-500'
-                      : 'bg-indigo-600 hover:bg-indigo-500'
-                  )}
+                  className="flex h-9 w-6 items-center justify-center text-white/70 transition-colors hover:bg-white/10 hover:text-white"
                   onClick={() => setSendMenuOpen((open) => !open)}
                   aria-label={t('runQueue.sendOptions')}
                   aria-expanded={sendMenuOpen}
                 >
-                  <ChevronDown className="h-3 w-3" />
+                  <ChevronDown className="h-3.5 w-3.5" />
                 </button>
               </div>
               {sendMenuOpen && (

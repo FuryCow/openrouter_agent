@@ -241,7 +241,7 @@ export class RunQueueService {
     validateEnqueueInput(input, this.tasks)
     const task: QueuedRun = {
       id: `qtask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: input.title.trim(),
+      title: input.title.trim() || deriveTaskTitle(input.prompt),
       prompt: input.prompt.trim(),
       status: 'queued',
       source: input.source,
@@ -600,4 +600,15 @@ export class RunQueueService {
       console.error('[RunQueue] Failed to persist state:', err)
     }
   }
+}
+
+/** Derive a short task title from the prompt: first meaningful words, no newlines. */
+export function deriveTaskTitle(prompt: string): string {
+  const words = prompt
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+  const title = words.slice(0, 6).join(' ')
+  return title.length > 60 ? title.slice(0, 57) + '…' : title || 'Untitled task'
 }
