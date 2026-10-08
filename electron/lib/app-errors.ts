@@ -27,19 +27,7 @@ export const AppErrorCode = {
   TERMINAL_DESTRUCTIVE_BLOCKED: 'terminal.destructiveBlocked',
   INDEX_SCANNING: 'index.scanning',
   INDEX_INDEXING_FILES: 'index.indexingFiles',
-  INDEX_EMBEDDING: 'index.embedding',
-  QUEUE_DISABLED: 'queue.disabled',
-  QUEUE_TITLE_REQUIRED: 'queue.titleRequired',
-  QUEUE_PROMPT_REQUIRED: 'queue.promptRequired',
-  QUEUE_TITLE_TOO_LONG: 'queue.titleTooLong',
-  QUEUE_PROMPT_TOO_LONG: 'queue.promptTooLong',
-  QUEUE_TOO_MANY_PENDING: 'queue.tooManyPending',
-  QUEUE_UNKNOWN_DEP: 'queue.unknownDep',
-  QUEUE_DEPENDENCY_CYCLE: 'queue.dependencyCycle',
-  QUEUE_AGENT_SOURCE_FORBIDDEN: 'queue.agentSourceForbidden',
-  QUEUE_TASK_NOT_FOUND: 'queue.taskNotFound',
-  QUEUE_TASK_NOT_ACTIVE: 'queue.taskNotActive',
-  QUEUE_RESTORE_WHILE_BUSY: 'queue.restoreWhileBusy'
+  INDEX_EMBEDDING: 'index.embedding'
 } as const
 
 export type AppErrorCodeValue = (typeof AppErrorCode)[keyof typeof AppErrorCode]

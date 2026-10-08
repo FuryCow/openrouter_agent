@@ -71,7 +71,6 @@ function syncFormFromSettings(
     setProjectMemoryAutoLoadDocs: (v: boolean) => void
     setAgentAutoVerify: (v: boolean) => void
     setSkillsEnabled: (v: boolean) => void
-    setRunQueueEnabled: (v: boolean) => void
     setUpdateNotificationsEnabled: (v: boolean) => void
   }
 ): void {
@@ -89,7 +88,6 @@ function syncFormFromSettings(
   setters.setProjectMemoryAutoLoadDocs(settings.projectMemoryAutoLoadDocs !== false)
   setters.setAgentAutoVerify(settings.agentAutoVerify !== false)
   setters.setSkillsEnabled(settings.skillsEnabled === true)
-  setters.setRunQueueEnabled(settings.runQueueEnabled === true)
   setters.setUpdateNotificationsEnabled(settings.updateNotificationsEnabled !== false)
 }
 
@@ -124,7 +122,6 @@ export function SettingsModal(): React.ReactElement {
   )
   const [agentAutoVerify, setAgentAutoVerify] = useState(settings.agentAutoVerify !== false)
   const [skillsEnabled, setSkillsEnabled] = useState(settings.skillsEnabled === true)
-  const [runQueueEnabled, setRunQueueEnabled] = useState(settings.runQueueEnabled === true)
   const [updateNotificationsEnabled, setUpdateNotificationsEnabled] = useState(
     settings.updateNotificationsEnabled !== false
   )
@@ -167,7 +164,6 @@ export function SettingsModal(): React.ReactElement {
         setProjectMemoryAutoLoadDocs,
         setAgentAutoVerify,
         setSkillsEnabled,
-        setRunQueueEnabled,
         setUpdateNotificationsEnabled
       })
     })
@@ -200,7 +196,6 @@ export function SettingsModal(): React.ReactElement {
         projectMemoryAutoLoadDocs,
         agentAutoVerify,
         skillsEnabled,
-        runQueueEnabled,
         updateNotificationsEnabled
       }
       await saveAppSettings({
@@ -289,12 +284,6 @@ export function SettingsModal(): React.ReactElement {
               onCheckedChange={setSkillsEnabled}
             />
             <SkillsSettings />
-            <SettingsSwitchRow
-              title={t('agent.runQueueEnabled.title')}
-              description={t('agent.runQueueEnabled.description')}
-              checked={runQueueEnabled}
-              onCheckedChange={setRunQueueEnabled}
-            />
             <SettingsSwitchRow
               title={t('agent.verifyAfterEdits.title')}
               description={t('agent.verifyAfterEdits.description')}

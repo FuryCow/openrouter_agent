@@ -49,8 +49,6 @@ import {
   shouldNotifyForUpdate
 } from './services/update-checker'
 import { distillSessionIntoSkill } from './services/skills/skill-distill-runner'
-import { RunQueueService } from './services/run-queue'
-import type { QueueEnqueueInput } from './types'
 
 // Allow a second dev instance to use an isolated userData directory (worktree runs).
 const userDataOverride = process.env['OPENROUTER_AGENT_USER_DATA']?.trim()
@@ -107,27 +105,16 @@ const mcpManager = new McpManager(
 const projectMemoryService = new ProjectMemoryService(app.getPath('userData'))
 const skillLoader = new SkillLoader(join(homedir(), '.openrouter_agent', 'skills'))
 const updateChecker = new UpdateChecker()
-function createAgentService(): AgentService {
-  return new AgentService(
-    openRouterClient,
-    fsService,
-    terminalService,
-    webSearchService,
-    codebaseIndexer,
-    mcpManager,
-    projectMemoryService,
-    skillLoader
-  )
-}
-
-let agentService = createAgentService()
-const runQueue = new RunQueueService({
-  createAgentService,
-  buildAgentContext: (overrides) => buildAgentContext(overrides, sanitizeSettings(store.get('settings'))),
-  emit: (event) => sendToRenderer('agent:event', event),
-  isForegroundRunning: () => agentService.isRunning,
-  statePath: join(app.getPath('userData'), 'queue-state.json')
-})
+let agentService = new AgentService(
+  openRouterClient,
+  fsService,
+  terminalService,
+  webSearchService,
+  codebaseIndexer,
+  mcpManager,
+  projectMemoryService,
+  skillLoader
+)
 webSearchService.configure(store.get('settings'))
 
 function applyIndexSettings(settings: AppSettings): void {
@@ -189,7 +176,6 @@ function createWindow(): void {
   mainWindow.webContents.on('render-process-gone', () => {
     rendererAlive = false
     agentService.abort()
-    void runQueue.abortAll('renderer-gone')
     if (!mainWindow || mainWindow.isDestroyed()) return
     mainWindow.webContents.reload()
   })
@@ -254,14 +240,6 @@ function requestRendererFlushAndClose(): void {
   closeFlushTimer = setTimeout(() => finishAppClose(), 3000)
 }
 
-function sendToRendererSafe(channel: string, ...args: unknown[]): void {
-  try {
-    if (canSendToRenderer()) mainWindow!.webContents.send(channel, ...args)
-  } catch {
-    // Renderer is gone — nothing to notify; queue state persists on disk.
-  }
-}
-
 function applyWorkspaceSelection(workspacePath: string): AppSettings {
   assertAllowedWorkspace(workspacePath)
   const next = withRecentWorkspace(sanitizeSettings(store.get('settings')), workspacePath)
@@ -311,52 +289,10 @@ function getCurrentWorkspace(): string {
 
 function shutdownApp(): void {
   agentService.abort()
-  void runQueue.abortAll('shutdown')
   workspaceWatcher.stop()
   terminalService.destroyAll()
   void mcpManager.shutdown()
   mainWindow = null
-}
-
-function assertQueueEnabled(): void {
-  const settings = sanitizeSettings(store.get('settings'))
-  if (settings.runQueueEnabled !== true) {
-    throw new AppError(AppErrorCode.QUEUE_DISABLED)
-  }
-}
-
-function buildAgentContext(overrides: Partial<AgentContext>, settings: AppSettings): AgentContext {
-  const cwd = overrides.workingDirectory || settings.workingDirectory
-  const mode = overrides.mode ?? 'agent'
-  const model = overrides.model || settings.model
-
-  return {
-    ...overrides,
-    mode,
-    workingDirectory: cwd,
-    model,
-    temperature: overrides.temperature ?? settings.temperature,
-    maxTokens: overrides.maxTokens,
-    reasoningEffort: overrides.reasoningEffort ?? settings.reasoningEffort,
-    modelProvider: overrides.modelProvider ?? settings.modelProvider,
-    reasoningMandatory: overrides.reasoningMandatory,
-    reasoningDefaultEffort: overrides.reasoningDefaultEffort,
-    reasoningSupportedEfforts: overrides.reasoningSupportedEfforts,
-    customSystemPrompt: overrides.customSystemPrompt ?? settings.customSystemPrompt,
-    autoApproveWrites: overrides.autoApproveWrites ?? settings.autoApproveWrites,
-    autoApproveTerminal: overrides.autoApproveTerminal ?? settings.autoApproveTerminal,
-    agentAutoVerify: settings.agentAutoVerify !== false,
-    skillsEnabled: settings.skillsEnabled === true,
-    runQueueEnabled: settings.runQueueEnabled === true,
-    workspaceState: mode !== 'ask' && cwd ? getWorkspaceState(cwd).formatted : undefined,
-    projectMemory:
-      settings.projectMemoryEnabled !== false && cwd && (mode === 'agent' || mode === 'planner')
-        ? projectMemoryService.getSnapshot(cwd, {
-            includeDocs: settings.projectMemoryAutoLoadDocs !== false,
-            includeCursorRules: settings.projectMemoryAutoLoadDocs !== false
-          })
-        : undefined
-  }
 }
 
 function registerIpc(): void {
@@ -426,7 +362,7 @@ function registerIpc(): void {
 
   ipcMain.handle('settings:get', () => sanitizeSettings(store.get('settings')))
   ipcMain.handle('settings:save', async (_event, settings: AppSettings) => {
-    if (agentService.isRunning || runQueue.hasActiveRuns()) {
+    if (agentService.isRunning) {
       throw new AppError(AppErrorCode.SETTINGS_SAVE_WHILE_RUNNING)
     }
     const normalized = sanitizeSettings({
@@ -564,6 +500,7 @@ function registerIpc(): void {
     const settings = sanitizeSettings(store.get('settings'))
     const cwd = settings.workingDirectory || context.workingDirectory
     const mode = context.mode ?? 'agent'
+    const model = context.model || settings.model
 
     if (modeRequiresWorkspace(mode) && !cwd) {
       sendToRenderer('agent:event', {
@@ -585,27 +522,41 @@ function registerIpc(): void {
       }
     }
 
-    if (runQueue.hasActiveRuns()) {
-      await runQueue.abortAll('foreground')
-    }
-    runQueue.setPaused(true, 'foreground')
-    const settingsForRun = settings
-    if (settingsForRun.runQueueEnabled === true) {
-      agentService.setTaskEnqueuer(async (title, prompt, dependsOn) => {
-        const created = runQueue.enqueue({ title, prompt, dependsOn, source: 'agent' })
-        return { id: created.id, title: created.title, dependsOn: created.dependsOn }
-      })
-    }
-    try {
-      await agentService.run(message, buildAgentContext(context, settings), (event) => {
+    await agentService.run(
+      message,
+      {
+        ...context,
+        mode,
+        workingDirectory: cwd,
+        model,
+        temperature: context.temperature ?? settings.temperature,
+        maxTokens: context.maxTokens,
+        reasoningEffort: context.reasoningEffort ?? settings.reasoningEffort,
+        modelProvider: context.modelProvider ?? settings.modelProvider,
+        reasoningMandatory: context.reasoningMandatory,
+        reasoningDefaultEffort: context.reasoningDefaultEffort,
+        reasoningSupportedEfforts: context.reasoningSupportedEfforts,
+        customSystemPrompt: context.customSystemPrompt ?? settings.customSystemPrompt,
+        autoApproveWrites: context.autoApproveWrites ?? settings.autoApproveWrites,
+        autoApproveTerminal: context.autoApproveTerminal ?? settings.autoApproveTerminal,
+        agentAutoVerify: settings.agentAutoVerify !== false,
+        skillsEnabled: settings.skillsEnabled === true,
+        workspaceState:
+          mode !== 'ask' && cwd ? getWorkspaceState(cwd).formatted : undefined,
+        projectMemory:
+          settings.projectMemoryEnabled !== false &&
+          cwd &&
+          (mode === 'agent' || mode === 'planner')
+            ? projectMemoryService.getSnapshot(cwd, {
+                includeDocs: settings.projectMemoryAutoLoadDocs !== false,
+                includeCursorRules: settings.projectMemoryAutoLoadDocs !== false
+              })
+            : undefined
+      },
+      (event) => {
         sendToRenderer('agent:event', event)
-      })
-    } finally {
-      agentService.setTaskEnqueuer(null)
-      if (runQueue.getPaused() && runQueue.list().pausedReason === 'foreground') {
-        runQueue.setPaused(false)
       }
-    }
+    )
     await mcpManager.flushPendingReconnect()
   })
 
@@ -619,47 +570,6 @@ function registerIpc(): void {
 
   ipcMain.handle('agent:abort', () => {
     agentService.abort()
-  })
-
-  ipcMain.handle('queue:list', () => runQueue.list())
-
-  ipcMain.handle('queue:enqueue', (_event, input: QueueEnqueueInput) => {
-    assertQueueEnabled()
-    if (input?.source === 'agent') throw new AppError(AppErrorCode.QUEUE_AGENT_SOURCE_FORBIDDEN)
-    return runQueue.enqueue({ ...input, source: 'user' })
-  })
-
-  ipcMain.handle('queue:cancel', (_event, runId: string) => {
-    assertQueueEnabled()
-    return runQueue.cancel(String(runId ?? ''))
-  })
-
-  ipcMain.handle('queue:clearFinished', () => {
-    assertQueueEnabled()
-    runQueue.clearFinished()
-    return runQueue.list()
-  })
-
-  ipcMain.handle('queue:approve', (_event, runId: string, approvalId: string, approved: boolean) => {
-    assertQueueEnabled()
-    runQueue.resolveApproval(String(runId ?? ''), String(approvalId ?? ''), approved === true)
-    return runQueue.list()
-  })
-
-  ipcMain.handle('queue:getCheckpointDetails', async (_event, runId: string) => {
-    assertQueueEnabled()
-    return runQueue.getRunCheckpointDetails(String(runId ?? ''))
-  })
-
-  ipcMain.handle('queue:restoreRunCheckpoint', async (_event, runId: string, paths?: string[]) => {
-    assertQueueEnabled()
-    return runQueue.restoreRunCheckpoint(String(runId ?? ''), paths)
-  })
-
-  ipcMain.handle('queue:setPaused', (_event, paused: boolean) => {
-    assertQueueEnabled()
-    runQueue.setPaused(paused === true, 'user')
-    return runQueue.list()
   })
 
   ipcMain.handle('agent:getRunCheckpoint', () => {
@@ -770,7 +680,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('skills:distill', async (_event, mode: string, workspacePath?: string) => {
-    if (agentService.isRunning || runQueue.hasActiveRuns()) {
+    if (agentService.isRunning) {
       throw new AppError(AppErrorCode.SETTINGS_SAVE_WHILE_RUNNING)
     }
     const workspace = workspacePath?.trim() || getCurrentWorkspace()
@@ -895,7 +805,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('mcp:reconnect', async () => {
-    if (agentService.isRunning || runQueue.hasActiveRuns()) {
+    if (agentService.isRunning) {
       mcpManager.queueReconnectAfterRun()
       return mcpManager.getStatus()
     }
@@ -907,7 +817,6 @@ function registerIpc(): void {
 process.on('unhandledRejection', (reason) => {
   console.error('[main] Unhandled rejection:', reason)
   if (agentService.isRunning) agentService.abort()
-  void runQueue.abortAll('shutdown')
 })
 
 app.whenReady().then(() => {
@@ -933,7 +842,6 @@ app.whenReady().then(() => {
   })
 
   applyIndexSettings(settings)
-  void runQueue.load()
   void mcpManager.initialize().catch((err) => {
     console.error('[MCP] Failed to initialize:', err)
   })

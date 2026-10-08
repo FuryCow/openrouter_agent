@@ -186,15 +186,6 @@ const CHECKLIST_WORKFLOW = `Task checklist workflow (multi-step tasks):
 - Mark the active step in_progress before editing; mark done when finished
 - Do not skip checklist updates on long runs — they keep execution on track`
 
-const TASK_QUEUE_WORKFLOW = `Task queue workflow (optional decomposition):
-- You have the enqueue_task tool: it adds a task to a background queue executed after your run finishes.
-- Decompose when it helps: multi-module work, independent sub-tasks, or follow-up verification you cannot finish now.
-- Each task needs a self-contained prompt — the background agent does not see your conversation, but shares the workspace.
-- Use dependsOn for ordering: pass task ids returned by enqueue_task. Tasks without dependsOn are independent and may run in parallel later.
-- Do not enqueue tasks that edit the same files as your current run without dependsOn — ordering matters for correctness.
-- Do not enqueue trivial follow-ups you can finish yourself in this run — enqueue only genuinely separate work.
-- After enqueueing, continue your current work; the queue starts tasks after your run finishes.`
-
 function formatApprovedPlanSection(plan: AgentContext['approvedPlan']): string {
   if (!plan) return ''
 
@@ -343,7 +334,7 @@ ${skillsSection}
 ${formatWorkspaceStateSection(context.workspaceState)}
 
 ${formatApprovedPlanSection(context.approvedPlan)}
-${context.runQueueEnabled === true ? `\n${TASK_QUEUE_WORKFLOW}\n` : ''}
+
 ${EXPLORATION_WORKFLOW}
 
 ${EDITING_WORKFLOW}
