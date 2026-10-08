@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-alpha.11] — 2026-10-09
+
+### Task queue (background runs)
+
+- **Queue service:** background agent runs with dependencies (`dependsOn`), pause/resume, persistence across restarts (unfinished tasks marked as interrupted); the queue pauses while a foreground chat run is active and resumes after it.
+- **Composer queue mode:** the send button splits into Send / Add task to queue; tasks are written in the same input, and the title is derived from the first words of the prompt when omitted.
+- **`enqueue_task` tool:** the agent can decompose work into background tasks with `dependsOn` ordering (agent mode, behind the `runQueueEnabled` flag); the title argument is optional.
+- **Queue panel:** live statuses, stream tail, approvals (approve/deny), per-run diffs and checkpoint restore; the panel is collapsible and stretches up to 60% of the window before scrolling.
+- **Titles:** an empty title falls back to the first words of the prompt instead of failing validation; stream tail joins same-kind chunks inline instead of one word per line.
+
+### Fixed
+
+- **Indexing on POSIX CI:** path separators are normalized before `path.relative` so Windows-style paths resolve correctly.
+- **Dev experience:** renderer URL load retries on transient connection errors (no more grey screen), the vite renderer server binds to `127.0.0.1`, and `start.bat` no longer kills the installed release executable.
+
+---
+
 ## [1.0.0-alpha.10] — 2026-10-08
 
 ### Fixed
