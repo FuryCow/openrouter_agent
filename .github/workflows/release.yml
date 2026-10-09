@@ -122,10 +122,12 @@ jobs:
       - name: List installers
         run: find artifacts -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) -ls
 
-      - name: Delete previous release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release delete "${{ github.ref_name }}" --yes || true
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          find . -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) \
+            -exec sha256sum {} \; | sed 's|\./||' > SHASUMS.txt
+          cat SHASUMS.txt
 
       - name: Create release
         uses: softprops/action-gh-release@v2
@@ -135,6 +137,6 @@ jobs:
             artifacts/**/*.exe
             artifacts/**/*.dmg
             artifacts/**/*.AppImage
+            artifacts/SHASUMS.txt
           generate_release_notes: true
-          overwrite_files: true
           fail_on_unmatched_files: true
