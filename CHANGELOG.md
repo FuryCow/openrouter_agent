@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.0-alpha.12
+
+### Added
+- Context-aware tool limits: read/history budgets now scale with the model's context_length (fallback 128k), read_files raised to 20 paths per call.
+- Explicit `[truncated N chars]` markers on read_file/read_files output instead of silent truncation.
+- Terminal output cap (30k chars, head+tail) — large command output no longer floods the context.
+
+### Fixed
+- Silent read truncation breaking search_replace with text the model never saw.
+
+
 All notable changes to this project are documented in this file.
 
 ## [1.0.0-alpha.11] — 2026-10-09
