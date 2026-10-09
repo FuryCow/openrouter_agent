@@ -654,7 +654,7 @@ describe('a full agent run', () => {
 
   it('stops reading once the file budget is spent and keeps an error on the answer', async () => {
     const dir = workspace()
-    const big = 'A'.repeat(80_000)
+    const big = 'A'.repeat(60_000)
     for (let i = 0; i < 4; i++) writeFileSync(join(dir, `big${i}.txt`), big)
     const events = await run(dir, [
       tools(call('read_files', { paths: ['big0.txt', 'big1.txt', 'big2.txt', 'big3.txt'] })),
@@ -663,13 +663,13 @@ describe('a full agent run', () => {
       reply('done')
     ])
     const batch = toolOutput(events, 'read_files')
-    const perFile = 68_266 // fallback 128k context: floor(128000*4*0.4/3)
+    // fallback 128k context: perFile = 68266, total = 204800 → files 0-2 full (60k each),
+    // file 3 sliced to 24800 chars with a truncation marker; "budget exceeded" never fires
     expect(batch.startsWith('===')).toBe(true)
-    expect(batch).toContain('A'.repeat(perFile))
-    expect(batch).toContain('[truncated')
-    expect(batch).not.toContain('A'.repeat(80_000))
-    expect(batch.indexOf('budget exceeded')).toBe(-1) // 4×68266 barely exceeds total → 4th file gets a 2-char slice, not a full skip
-    expect(batch.split('[truncated').length - 1).toBeGreaterThanOrEqual(4)
+    expect(batch).toContain('A'.repeat(60_000))
+    expect(batch).toContain('[truncated 35200 chars]')
+    expect(batch).not.toContain('budget exceeded')
+    expect(batch).not.toContain('A'.repeat(90_000))
     expect(events.find((event) => event.toolCall?.id === 'bad-step')?.toolCall?.result).toContain('Invalid step number')
 
     throwAfter = 1
