@@ -219,6 +219,8 @@ export interface AgentContext {
   reasoningSupportedEfforts?: string[] | null
   /** OpenRouter endpoint tag. Empty means Auto routing. */
   modelProvider?: string
+  /** Parsed context_length from OpenRouter for the active model. Undefined = unknown. */
+  modelContextLength?: number
 }
 
 export interface ChatFileAttachment {

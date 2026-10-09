@@ -29,6 +29,7 @@ import {
 } from './agent-modes'
 import { buildFallbackFileDiffPreview, formatFileChangeDiff, countDiffStats, buildInlineDiffRanges, buildInlineDeleteHighlights, buildDeletedLineHighlights, buildModifiedLineHighlights, buildPureAdditionHighlightRanges } from '../lib/diff'
 import { sanitizeTerminalOutput } from '../lib/strip-ansi'
+import { resolveContextBudget, resolveReadBudgetChars } from '../lib/tokens'
 import { eolAwareReplace } from '../lib/eol'
 import { normalizeChecklistSteps } from '../lib/checklist-steps'
 import { processToolCallsBatch } from '../lib/tool-call-runner'
@@ -78,14 +79,14 @@ const TOOLS: ToolDefinition[] = [
     function: {
       name: 'read_files',
       description:
-        'Primary read tool: load 1–10 files in one call. Workflow: search/grep to gather scope → one read_files with all needed paths → edit. Do not read files one-by-one while exploring.',
+        'Primary read tool: load 1–20 files in one call. Workflow: search/grep to gather scope → one read_files with all needed paths → edit. Do not read files one-by-one while exploring.',
       parameters: {
         type: 'object',
         properties: {
           paths: {
             type: 'array',
             items: { type: 'string' },
-            description: 'File paths relative to workspace (max 10)'
+            description: 'File paths relative to workspace (max 20)'
           }
         },
         required: ['paths']
@@ -384,9 +385,7 @@ const MUTATING_TOOLS = new Set([
   'update_project_memory',
   'enqueue_task'
 ])
-const MAX_READ_FILES = 10
-const MAX_CHARS_PER_FILE = 50_000
-const MAX_TOTAL_READ_FILES_CHARS = 150_000
+const MAX_TERMINAL_CHARS = 30_000
 
 export class AgentService {
   private abortController: AbortController | null = null
@@ -411,6 +410,10 @@ export class AgentService {
     private projectMemory: ProjectMemoryService,
     private skills?: SkillLoader
   ) {}
+
+  private readLimits(context: AgentContext) {
+    return resolveReadBudgetChars(context.modelContextLength)
+  }
 
   get isRunning(): boolean {
     return this.running
@@ -585,7 +588,11 @@ export class AgentService {
       return true
     })
     const maxIterations = getMaxIterations(mode)
-    const expandedHistory = expandHistoryForApi(context.history ?? [], mode)
+    const expandedHistory = expandHistoryForApi(
+      context.history ?? [],
+      mode,
+      resolveContextBudget(context.modelContextLength)
+    )
     const analytics = new ToolAnalyticsCollector(
       mode,
       context.model ?? 'unknown',
@@ -1093,15 +1100,21 @@ export class AgentService {
         const path = this.resolvePath(String(args.path ?? ''), cwd)
         assertPathNotInAgentApp(path)
         const content = await this.fs.readFile(path)
-        return content.slice(0, MAX_CHARS_PER_FILE)
+        const { perFile } = this.readLimits(context)
+        if (content.length <= perFile) return content
+        return (
+          content.slice(0, perFile) +
+          `\n\n[truncated ${content.length - perFile} chars — file is larger; use grep_workspace/codebase_search to target a section]`
+        )
       }
       case 'read_files': {
+        const { perFile, total, maxFiles } = this.readLimits(context)
         const rawPaths = args.paths
         if (!Array.isArray(rawPaths) || rawPaths.length === 0) {
           return 'Error: paths must be a non-empty array'
         }
-        if (rawPaths.length > MAX_READ_FILES) {
-          return `Error: read_files supports at most ${MAX_READ_FILES} paths per call`
+        if (rawPaths.length > maxFiles) {
+          return `Error: read_files supports at most ${maxFiles} paths per call`
         }
 
         const resolvedPaths = rawPaths.map((p) => {
@@ -1120,15 +1133,20 @@ export class AgentService {
             continue
           }
 
-          const remaining = MAX_TOTAL_READ_FILES_CHARS - totalChars
+          const remaining = total - totalChars
           if (remaining <= 0) {
             parts.push(`=== ${item.path} ===\n[truncated: total read_files budget exceeded]`)
             continue
           }
 
-          const slice = (item.content ?? '').slice(0, Math.min(MAX_CHARS_PER_FILE, remaining))
+          const content = item.content ?? ''
+          const slice = content.slice(0, Math.min(perFile, remaining))
           totalChars += slice.length
-          parts.push(`=== ${item.path} ===\n${slice}`)
+          const marker =
+            slice.length < content.length
+              ? `\n[truncated ${content.length - slice.length} chars]`
+              : ''
+          parts.push(`=== ${item.path} ===\n${slice}${marker}`)
         }
 
         return parts.join('\n\n')
@@ -1198,7 +1216,15 @@ export class AgentService {
       case 'run_terminal': {
         if (!cwd) return 'Error: No working directory set'
         assertSafeTerminalCommand(String(args.command ?? ''))
-        return await this.terminal.runCommand(String(args.command ?? ''), cwd)
+        const output = await this.terminal.runCommand(String(args.command ?? ''), cwd)
+        if (output.length <= MAX_TERMINAL_CHARS) return output
+        const head = 10_000
+        const tail = MAX_TERMINAL_CHARS - head - 40
+        return (
+          output.slice(0, head) +
+          `\n...[truncated ${output.length - MAX_TERMINAL_CHARS} chars]...\n` +
+          output.slice(-tail)
+        )
       }
       case 'web_search': {
         const results = await this.webSearch.search(String(args.query ?? ''))
