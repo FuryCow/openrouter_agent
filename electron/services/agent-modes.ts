@@ -146,7 +146,7 @@ const EXPLORATION_WORKFLOW = `Code exploration workflow:
 1. codebase_search (mode hybrid) — find relevant files, symbols, and semantic matches first
 2. grep_workspace — regex search across the workspace (class names, string literals, imports); use instead of shell grep
 3. Gather a file scope from search hits — list the paths you actually need; do NOT read files one-by-one while exploring
-4. read_files — read the whole scope in one call (1–10 paths). Even a single file: read_files with paths: ["that/file"]
+4. read_files — read the whole scope in one call (1–20 paths). Even a single file: read_files with paths: ["that/file"]
 5. get_open_files — check editor tabs before re-reading the same paths
 6. list_directory — only if the index is not ready or you need one folder's layout; do not walk the repo tree
 7. search_files is deprecated — use grep_workspace or codebase_search
@@ -313,7 +313,7 @@ Code exploration workflow:
 1. codebase_search (mode hybrid) — find where logic lives; symbol for definitions; text for regex
 2. grep_workspace — regex search when you need exact patterns (CSS classes, config keys)
 3. Gather file scope from hits — decide which paths matter for the plan; do not read while still searching
-4. read_files — one batch call with every path you need (1–10). Single file: still use read_files
+4. read_files — one batch call with every path you need (1–20). Single file: still use read_files
 5. list_directory — only if the index is empty or you need folder structure; never scan the repo file-by-file
 6. search_files / read_file are deprecated — use grep_workspace and read_files
 

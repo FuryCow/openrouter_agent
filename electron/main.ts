@@ -96,6 +96,7 @@ const workspaceWatcher = new WorkspaceWatcher()
 const terminalService = new TerminalService()
 const webSearchService = new WebSearchService()
 let openRouterClient = new OpenRouterClient(store.get('settings'))
+let modelsCache: ModelInfo[] = []
 const mcpManager = new McpManager(
   () => {
     const settings = sanitizeSettings(store.get('settings'))
@@ -349,12 +350,15 @@ function buildAgentContext(overrides: Partial<AgentContext>, settings: AppSettin
   const cwd = overrides.workingDirectory || settings.workingDirectory
   const mode = overrides.mode ?? 'agent'
   const model = overrides.model || settings.model
+  const modelContextLength =
+    overrides.modelContextLength ?? modelsCache.find((m) => m.id === model)?.contextLength
 
   return {
     ...overrides,
     mode,
     workingDirectory: cwd,
     model,
+    modelContextLength,
     history: overrides.history ?? [],
     openFiles: overrides.openFiles ?? [],
     temperature: overrides.temperature ?? settings.temperature,
@@ -469,6 +473,7 @@ function registerIpc(): void {
 
   ipcMain.handle('models:list', async () => {
     const models = await openRouterClient.listModels()
+    modelsCache = models
     console.log(
       `[OpenRouter Agent] Loaded ${models.length} models. Example: ${models[0]?.id} → ${models[0]?.priceLabel}`
     )

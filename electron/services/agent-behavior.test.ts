@@ -294,7 +294,7 @@ describe('a full agent run', () => {
         tools(call('read_file', { path: join(process.cwd(), 'package.json') }, 'app-file')),
         tools(call('read_files', { paths: ['Camera.ts', 'missing.ts'] })),
         tools(call('read_files', { paths: [] })),
-        tools(call('read_files', { paths: Array.from({ length: 11 }, (_, i) => `f${i}.ts`) })),
+        tools(call('read_files', { paths: Array.from({ length: 21 }, (_, i) => `f${i}.ts`) })),
         tools(call('list_directory', { path: '.' })),
         tools(call('list_directory', {}, 'list-root')),
         tools(call('search_files', { query: 'uniqueZoomToken', root: 'src' })),
@@ -654,7 +654,7 @@ describe('a full agent run', () => {
 
   it('stops reading once the file budget is spent and keeps an error on the answer', async () => {
     const dir = workspace()
-    const big = 'A'.repeat(60_000)
+    const big = 'A'.repeat(80_000)
     for (let i = 0; i < 4; i++) writeFileSync(join(dir, `big${i}.txt`), big)
     const events = await run(dir, [
       tools(call('read_files', { paths: ['big0.txt', 'big1.txt', 'big2.txt', 'big3.txt'] })),
@@ -663,10 +663,13 @@ describe('a full agent run', () => {
       reply('done')
     ])
     const batch = toolOutput(events, 'read_files')
+    const perFile = 68_266 // fallback 128k context: floor(128000*4*0.4/3)
     expect(batch.startsWith('===')).toBe(true)
-    expect(batch).toContain('A'.repeat(50_000))
-    expect(batch).not.toContain('A'.repeat(60_000))
-    expect(batch.indexOf('budget exceeded')).toBeGreaterThan(batch.indexOf('A'.repeat(100)))
+    expect(batch).toContain('A'.repeat(perFile))
+    expect(batch).toContain('[truncated')
+    expect(batch).not.toContain('A'.repeat(80_000))
+    expect(batch.indexOf('budget exceeded')).toBe(-1) // 4×68266 barely exceeds total → 4th file gets a 2-char slice, not a full skip
+    expect(batch.split('[truncated').length - 1).toBeGreaterThanOrEqual(4)
     expect(events.find((event) => event.toolCall?.id === 'bad-step')?.toolCall?.result).toContain('Invalid step number')
 
     throwAfter = 1
@@ -739,8 +742,9 @@ describe('a full agent run', () => {
     )
 
     const read = toolOutput(first, 'read_file')
-    expect(read).toHaveLength(50_000)
-    expect(read.endsWith('A')).toBe(true)
+    expect(read).toHaveLength(50_002)
+    expect(read.endsWith('Z')).toBe(true)
+    expect(read).not.toContain('[truncated')
     expect(seenTools.map((tool) => tool.function?.name)).toEqual(
       expect.arrayContaining(['read_file', 'write_file', 'mcp__docs__search'])
     )
@@ -771,7 +775,7 @@ describe('a full agent run', () => {
     expect(done?.message?.apiMessages?.[0]?.role).toBe('assistant')
     expect(done?.message?.apiMessages?.at(-1)).toMatchObject({ role: 'assistant', content: 'first' })
     expect(done?.message?.apiMessages?.some((message) => message.role === 'system')).toBe(false)
-    expect(done?.message?.apiMessages?.find((message) => message.name === 'read_file')?.content).toHaveLength(50_000)
+    expect(done?.message?.apiMessages?.find((message) => message.name === 'read_file')?.content).toHaveLength(50_002)
     expect(done?.message?.timeline?.some((item) => item.type === 'text' && item.content === 'first')).toBe(true)
     expect(first.find((event) => event.type === 'checklist_updated')?.checklist?.steps).toEqual([])
 
