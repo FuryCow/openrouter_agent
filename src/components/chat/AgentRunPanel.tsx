@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
+import { CheckCircle2, Circle, Loader2, ChevronRight } from 'lucide-react'
 import { useChatStore } from '@/stores/chatStore'
 import { useAgentRunStore } from '@/stores/agentRunStore'
 import { formatRunStatusLine } from '@/lib/agentRunUi'
@@ -62,39 +62,64 @@ export function AgentRunPanel(): React.ReactElement | null {
         </div>
       )}
 
-      {showChecklist && (
-        <div className="space-y-1">
-          <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-            {t('agentRun.checklistTitle')}
-          </span>
-          <ul className="space-y-0.5">
-            {checklist!.map((step, index) => (
-              <li
-                key={`${index}-${step.text}`}
-                className={cn(
-                  'flex items-start gap-2 text-[11px] leading-snug',
-                  step.status === 'done' && 'text-zinc-500 line-through',
-                  step.status === 'in_progress' && 'text-zinc-200',
-                  step.status === 'pending' && 'text-zinc-400'
-                )}
-              >
-                <ChecklistStepIcon status={step.status} />
-                <span className="min-w-0 flex-1">{step.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {showChecklist && <ChecklistSection checklist={checklist!} />}
+    </div>
+  )
+}
 
-      {lastTerminalOutput && (
-        <div className="mt-2">
-          <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-            {t('agentRun.terminalOutput')}
-          </span>
-          <pre className="mt-1 max-h-32 overflow-auto rounded-md border border-white/5 bg-black/20 p-2 font-mono text-[10px] leading-relaxed text-zinc-400 whitespace-pre-wrap break-words">
-            {lastTerminalOutput}
-          </pre>
-        </div>
+/** Collapsed by default: one-line header, expands into the step list. */
+function ChecklistSection({ checklist }: { checklist: TaskChecklistStepState[] }): React.ReactElement {
+  const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation('chat')
+
+  const doneCount = checklist.filter((step) => step.status === 'done').length
+  const total = checklist.length
+  const allDone = doneCount === total
+  const activeStep = checklist.find((step) => step.status === 'in_progress')
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="group flex w-full items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-white/[0.04]"
+        aria-expanded={expanded}
+      >
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 shrink-0 text-zinc-500 transition-transform duration-200',
+            expanded && 'rotate-90'
+          )}
+        />
+        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+          {t('agentRun.checklistTitle')}
+        </span>
+        <span className="ml-auto text-[11px] text-zinc-600">
+          {allDone ? '✓' : `${doneCount}/${total}`}
+          {activeStep && !allDone && (
+            <span className="ml-2 hidden truncate text-zinc-500 sm:inline">
+              {activeStep.text}
+            </span>
+          )}
+        </span>
+      </button>
+      {expanded && (
+        <ul className="space-y-0.5 pb-1 pl-6">
+          {checklist.map((step, index) => (
+            <li
+              key={`${index}-${step.text}`}
+              className={cn(
+                'flex items-start gap-2 text-[11px] leading-snug',
+                step.status === 'done' && 'text-zinc-500 line-through',
+                step.status === 'in_progress' && 'text-zinc-200',
+                step.status === 'pending' && 'text-zinc-400'
+              )}
+            >
+              <ChecklistStepIcon status={step.status} />
+              <span className="min-w-0 flex-1">{step.text}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

@@ -56,6 +56,36 @@ function safeFit(fitAddon: FitAddon | null, container: HTMLElement | null | unde
   }
 }
 
+/**
+ * xterm swallows Ctrl+C/V as ^C/^V keystrokes for the shell. Intercept the
+ * clipboard combos (Ctrl+Shift+C/V, Ctrl+Insert/Shift+Insert) and route
+ * them to the system clipboard instead.
+ */
+function attachClipboardShortcuts(term: Terminal): void {
+  term.attachCustomKeyEventHandler((event): boolean => {
+    if (event.type !== 'keydown') return true
+    if (!event.ctrlKey && !event.metaKey) return true
+
+    const key = event.key.toLowerCase()
+    const hasSelection = term.hasSelection()
+
+    // Copy: Ctrl+Shift+C always; plain Ctrl+C only when text is selected
+    // (otherwise Ctrl+C must reach the shell as SIGINT).
+    if ((key === 'c' && event.shiftKey) || (key === 'c' && hasSelection)) {
+      void navigator.clipboard.writeText(term.getSelection())
+      return false
+    }
+    // Paste: Ctrl+V and Ctrl+Shift+V.
+    if (key === 'v') {
+      void navigator.clipboard.readText().then((text) => {
+        if (text) term.paste(text)
+      })
+      return false
+    }
+    return true
+  })
+}
+
 export function TerminalTabView({
   tabId,
   cwd,
@@ -73,6 +103,7 @@ export function TerminalTabView({
 
     const { term, fitAddon } = createTerminal()
     fitAddonRef.current = fitAddon
+    attachClipboardShortcuts(term)
     term.open(container)
 
     let disposed = false

@@ -1,8 +1,31 @@
-import { memo } from 'react'
+import { memo, useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
+import { Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+function CopyCodeButton({ getText }: { getText: () => string }): React.ReactElement {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(getText()).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    })
+  }, [getText])
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-zinc-500 transition-colors group-hover/code:text-zinc-200 hover:!text-zinc-100 focus-visible:text-zinc-200"
+      aria-label="Copy code"
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  )
+}
 
 const markdownComponents: Components = {
   a: ({ href, children }) => (
@@ -17,7 +40,32 @@ const markdownComponents: Components = {
     >
       {children}
     </a>
-  )
+  ),
+  pre: ({ children, ...props }) => (
+    <div className="group/code relative">
+      <CopyCodeButton getText={() => extractPreText(children)} />
+      <pre {...props}>{children}</pre>
+    </div>
+  )}
+
+/** Extract raw text from a <pre> React children tree (code element inside). */
+function extractPreText(children: React.ReactNode): string {
+  let text = ''
+  const walk = (node: React.ReactNode): void => {
+    if (node === null || node === undefined || typeof node === 'boolean') return
+    if (typeof node === 'string' || typeof node === 'number') {
+      text += String(node)
+      return
+    }
+    if (Array.isArray(node)) {
+      node.forEach(walk)
+      return
+    }
+    const props = (node as { props?: { children?: React.ReactNode } }).props
+    if (props?.children) walk(props.children)
+  }
+  walk(children)
+  return text
 }
 
 export const MarkdownContent = memo(function MarkdownContent({
