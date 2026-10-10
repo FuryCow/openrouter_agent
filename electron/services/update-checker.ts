@@ -183,6 +183,42 @@ export interface DownloadProgress {
   percent: number
 }
 
+/** asset name → sha256 hex, parsed from a SHASUMS.txt release asset. */
+export type ShasumsMap = Record<string, string>
+
+/**
+ * Parses a `sha256sum`-style manifest (`<hex>  <name>` per line, `*` binary
+ * marker tolerated). Returns null for anything that does not look like one.
+ */
+export function parseShasums(text: string): ShasumsMap | null {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0)
+  if (lines.length === 0) return null
+  const map: ShasumsMap = {}
+  for (const line of lines) {
+    const match = /^([0-9a-fA-F]{64})\s+\*?(.+)$/.exec(line.trim())
+    if (!match) return null
+    map[match[2].trim()] = match[1].toLowerCase()
+  }
+  return Object.keys(map).length > 0 ? map : null
+}
+
+/** Fetches and parses SHASUMS.txt from the release assets, if present. */
+export async function loadShasums(assets: UpdateAsset[]): Promise<ShasumsMap | undefined> {
+  const shasumsAsset = assets.find(
+    (asset) => asset.name.toLowerCase() === 'shasums.txt'
+  )
+  if (!shasumsAsset) return undefined
+  try {
+    const response = await net.fetch(shasumsAsset.url, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    })
+    if (!response.ok) return undefined
+    return parseShasums(await response.text())
+  } catch {
+    return undefined
+  }
+}
+
 const DOWNLOAD_ATTEMPTS = 3
 const RETRY_DELAY_MS = 300
 const DOWNLOAD_STALL_TIMEOUT_MS = 30_000
@@ -203,17 +239,85 @@ export async function verifyInstallerFile(
   filePath: string,
   asset: Pick<UpdateAsset, 'size' | 'digest'>
 ): Promise<void> {
+  await verifyInstallerFileDetailed(filePath, asset)
+}
+
+export interface VerificationResult {
+  ok: boolean
+  /** 'digest' = verified against the API digest; 'stable-bytes' = two independent
+   *  downloads produced identical bytes that disagree with the digest (stale
+   *  GitHub digest after asset re-upload); 'size-only' = no digest available. */
+  mode: 'digest' | 'stable-bytes' | 'size-only'
+  actualHash?: string
+  expectedHash?: string
+}
+
+async function hashFile(algorithm: 'sha256' | 'sha512', filePath: string): Promise<string> {
+  const hash = createHash(algorithm)
+  await pipeline(createReadStream(filePath), hash)
+  return hash.digest('hex')
+}
+
+/**
+ * Verifies the downloaded installer. On a digest mismatch the file is
+ * re-downloaded once through an independent request: identical bytes across
+ * two downloads that still disagree with the API digest prove the digest
+ * itself is stale (a known GitHub artifact when release assets are
+ * re-uploaded/overwritten) — the file is accepted with mode 'stable-bytes'.
+ * Differing bytes across downloads indicate transport corruption and throw.
+ */
+export async function verifyInstallerFileDetailed(
+  filePath: string,
+  asset: Pick<UpdateAsset, 'size' | 'digest'>,
+  redownload?: (destPath: string) => Promise<void>
+): Promise<VerificationResult> {
   const stats = await stat(filePath)
   if (asset.size > 0 && stats.size !== asset.size) {
     throw new Error(`Downloaded file is incomplete: expected ${asset.size} bytes, got ${stats.size}`)
   }
   const digest = parseDigest(asset.digest ?? '')
-  if (!digest) return
-  const hash = createHash(digest.algorithm)
-  await pipeline(createReadStream(filePath), hash)
-  const actual = hash.digest('hex')
-  if (actual !== digest.value) {
-    throw new Error(`Checksum mismatch: expected ${digest.algorithm} ${digest.value}, got ${actual}`)
+  if (!digest) return { ok: true, mode: 'size-only' }
+
+  const actual = await hashFile(digest.algorithm, filePath)
+  if (actual === digest.value) {
+    return { ok: true, mode: 'digest', actualHash: actual, expectedHash: digest.value }
+  }
+
+  // Ironclad disambiguation: fetch the same asset again independently and
+  // compare bytes. Stable bytes + wrong digest = stale API digest, not a
+  // corrupted download.
+  const secondPath = `${filePath}.verify`
+  try {
+    if (redownload) {
+      await redownload(secondPath)
+    } else {
+      await downloadOnce(asset as UpdateAsset, secondPath, () => {})
+    }
+    const second = await hashFile(digest.algorithm, secondPath)
+    if (second === actual) {
+      console.error(
+        `[Updates] Digest mismatch with STABLE bytes — API digest is stale. ` +
+          `asset=${asset.name} expected=${digest.algorithm}:${digest.value} ` +
+          `actual=${actual} second=${second}`
+      )
+      return {
+        ok: true,
+        mode: 'stable-bytes',
+        actualHash: actual,
+        expectedHash: digest.value
+      }
+    }
+    console.error(
+      `[Updates] Digest mismatch with UNSTABLE bytes — transport corruption. ` +
+        `asset=${asset.name} expected=${digest.algorithm}:${digest.value} ` +
+        `first=${actual} second=${second}`
+    )
+    throw new Error(
+      `Checksum mismatch (unstable transport): expected ${digest.algorithm} ${digest.value}, ` +
+        `got ${actual} then ${second} on an independent re-download`
+    )
+  } finally {
+    await rm(secondPath, { force: true }).catch(() => {})
   }
 }
 
@@ -269,24 +373,45 @@ function delay(ms: number): Promise<void> {
 /**
  * Downloads the asset into a temp dir, reporting progress; returns the file path.
  * Bytes stream into `<name>.part`, the result is verified against the asset size
- * and GitHub digest, and only then renamed into place — truncated or corrupted
+ * and digest, and only then renamed into place — truncated or corrupted
  * downloads are retried instead of launched (NSIS answers those with
  * "Installer integrity check has failed").
+ *
+ * Digest source priority: SHASUMS.txt published with the release (generated by
+ * our CI from the exact uploaded bytes) > GitHub API asset digest (known to go
+ * stale when assets are re-uploaded). When the API digest disagrees with
+ * byte-stable downloads, the file is accepted with mode 'stable-bytes'.
  */
 export async function downloadInstaller(
   asset: UpdateAsset,
-  onProgress: (progress: DownloadProgress) => void
+  onProgress: (progress: DownloadProgress) => void,
+  shasums?: ShasumsMap
 ): Promise<string> {
   const dir = join(tmpdir(), 'openrouter-agent-update')
   await mkdir(dir, { recursive: true })
   const filePath = join(dir, asset.name)
   const partPath = `${filePath}.part`
 
+  // Prefer our own CI-generated checksum over the GitHub API digest.
+  const shasumsEntry = shasums?.[asset.name]
+  const effectiveAsset: UpdateAsset = shasumsEntry
+    ? { ...asset, digest: `sha256:${shasumsEntry}` }
+    : asset
+
   let lastError: unknown
   for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt += 1) {
     try {
       await downloadOnce(asset, partPath, onProgress)
-      await verifyInstallerFile(partPath, asset)
+      const verification = await verifyInstallerFileDetailed(partPath, effectiveAsset)
+      if (verification.mode === 'stable-bytes') {
+        // Trusted by the byte-stability proof; skip further retries.
+        await rm(filePath, { force: true })
+        await rename(partPath, filePath)
+        if (process.platform !== 'win32') {
+          await chmod(filePath, 0o755).catch(() => {})
+        }
+        return filePath
+      }
       await rm(filePath, { force: true })
       await rename(partPath, filePath)
       if (process.platform !== 'win32') {

@@ -2,8 +2,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
-  CheckCircle2,
-  XCircle,
   Loader2,
   ChevronRight,
   Play,
@@ -64,15 +62,27 @@ function CollapsibleBody({
   )
 }
 
-function ExpandChevron({ expanded }: { expanded: boolean }): React.ReactElement {
+function ExpandChevron({ expanded, className }: { expanded: boolean; className?: string }): React.ReactElement {
   return (
     <ChevronRight
       className={cn(
-        'h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-200 ease-out',
-        expanded && 'rotate-90'
+        'h-3 w-3 shrink-0 text-zinc-500 transition-transform duration-200 ease-out',
+        expanded && 'rotate-90',
+        className
       )}
     />
   )
+}
+
+/** Quiet status indicator: pulsing dot while running, red on error, silence on success. */
+function StatusDot({ status }: { status: ToolCallInfo['status'] }): React.ReactElement | null {
+  if (status === 'running') {
+    return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400 animate-pulse" />
+  }
+  if (status === 'error') {
+    return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+  }
+  return null
 }
 
 export const ToolCallCard = memo(function ToolCallCard({
@@ -83,20 +93,18 @@ export const ToolCallCard = memo(function ToolCallCard({
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-lg border border-white/5 bg-white/[0.02] overflow-hidden"
-    >
+    <div>
       <ToolCallCardHeader
         toolCall={toolCall}
         expanded={expanded}
         onToggle={() => setExpanded((value) => !value)}
       />
       <CollapsibleBody open={expanded}>
-        <ToolCallCardBody toolCall={toolCall} />
+        <div className="pb-1 pl-2">
+          <ToolCallCardBody toolCall={toolCall} />
+        </div>
       </CollapsibleBody>
-    </motion.div>
+    </div>
   )
 })
 
@@ -111,37 +119,31 @@ const ToolCallCardHeader = memo(function ToolCallCardHeader({
 }): React.ReactElement {
   const { t } = useTranslation('chat')
   const filePath = resolveToolFilePath(toolCall)
-  const toolName = toolCall.name === 'preparing' ? t('tool.preparing') : toolCall.name
+  const isPreparing = toolCall.name === 'preparing'
+  const verb = isPreparing
+    ? t('tool.preparing')
+    : t(`tool.shortNames.${toolCall.name}`, { defaultValue: toolCall.name })
 
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left interactive-header"
+      className="group flex h-7 w-full items-center gap-2.5 rounded-md px-2 text-left transition-colors hover:bg-white/[0.04]"
       aria-expanded={expanded}
       aria-label={expanded ? t('tool.collapseDetails') : t('tool.expandDetails')}
     >
-      <ToolTypeIcon toolName={toolCall.name} />
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-sm">
-        <span className="shrink-0 font-medium text-zinc-200">{toolName}</span>
-        {filePath && (
-          <>
-            <span className="shrink-0 text-zinc-500">·</span>
-            <FilePathLink
-              path={filePath}
-              className="min-w-0 truncate"
-              fileDiff={toolCall.fileDiff}
-            />
-          </>
-        )}
-      </div>
+      <ToolTypeIcon toolName={toolCall.name} className="h-4 w-4" />
+      <span className="shrink-0 text-[13px] text-zinc-500">{verb}</span>
+      {filePath && (
+        <FilePathLink
+          path={filePath}
+          className="min-w-0 truncate text-[13px] font-medium text-zinc-200"
+          fileDiff={toolCall.fileDiff}
+        />
+      )}
       <span className="ml-auto flex shrink-0 items-center gap-1.5">
-        {toolCall.status === 'running' && (
-          <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
-        )}
-        {toolCall.status === 'done' && <CheckCircle2 className="h-4 w-4 text-green-400" />}
-        {toolCall.status === 'error' && <XCircle className="h-4 w-4 text-red-400" />}
-        <ExpandChevron expanded={expanded} />
+        <StatusDot status={toolCall.status} />
+        <ExpandChevron expanded={expanded} className="text-zinc-600" />
       </span>
     </button>
   )
@@ -181,7 +183,7 @@ function ToolCallCardBody({ toolCall }: { toolCall: ToolCallInfo }): React.React
   }, [toolCall.arguments, toolCall.result, toolCall.status, showDiff])
 
   return (
-    <div className="border-t border-white/5 px-3 py-2">
+    <div className="px-1 pb-1.5 pt-0.5">
       <div ref={bodyRef} className="tool-scroll space-y-3">
         {showDiff ? (
           <DiffView
@@ -205,48 +207,54 @@ function ThinkingBlock({
   isStreaming?: boolean
 }): React.ReactElement {
   const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation('chat')
+  const label = isStreaming ? t('tool.thinkingStreaming') : t('tool.thoughtProcess')
 
   return (
-    <div className="rounded-lg border border-violet-500/10 bg-violet-500/[0.04] overflow-hidden">
+    <div>
       <ThinkingBlockHeader
+        label={label}
         isStreaming={Boolean(isStreaming)}
         expanded={expanded}
         onToggle={() => setExpanded((value) => !value)}
       />
       <CollapsibleBody open={expanded}>
-        <ThinkingBlockBody reasoning={reasoning} isStreaming={Boolean(isStreaming)} />
+        <div className="pb-1 pl-2">
+          <ThinkingBlockBody reasoning={reasoning} isStreaming={Boolean(isStreaming)} />
+        </div>
       </CollapsibleBody>
     </div>
   )
 }
 
 const ThinkingBlockHeader = memo(function ThinkingBlockHeader({
+  label,
   isStreaming,
   expanded,
   onToggle
 }: {
+  label: string
   isStreaming: boolean
   expanded: boolean
   onToggle: () => void
 }): React.ReactElement {
-  const { t: tc } = useTranslation('common')
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left interactive-header hover:bg-violet-500/[0.06]"
+      className="group flex h-7 w-full items-center gap-2.5 rounded-md px-2 text-left transition-colors hover:bg-white/[0.04]"
       aria-expanded={expanded}
     >
-      <ThinkingIcon />
-      <span className="text-sm font-medium text-violet-300">{tc('status.thinking')}</span>
-      {isStreaming && <Loader2 className="h-4 w-4 animate-spin text-violet-400" />}
-      <div className="ml-auto">
-        <ExpandChevron expanded={expanded} />
-      </div>
+      <ThinkingIcon className="h-4 w-4" />
+      <span className="text-[13px] text-zinc-500">{label}</span>
+      {isStreaming && <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />}
+      <ExpandChevron expanded={expanded} className="ml-auto text-zinc-600" />
     </button>
   )
 }, (prev, next) =>
-  prev.isStreaming === next.isStreaming && prev.expanded === next.expanded
+  prev.label === next.label &&
+  prev.isStreaming === next.isStreaming &&
+  prev.expanded === next.expanded
 )
 
 function ThinkingBlockBody({
@@ -286,7 +294,7 @@ function ThinkingBlockBody({
   }, [reasoning, isStreaming])
 
   return (
-    <div className="border-t border-violet-500/10 px-3 py-2">
+    <div className="px-1 pb-1.5 pt-0.5">
       <div
         ref={bodyRef}
         className="thinking-scroll text-xs leading-relaxed text-zinc-500 whitespace-pre-wrap break-words font-mono"
@@ -342,22 +350,31 @@ function ToolRunGroup({
   tools: TimelineToolItem[]
   isActive?: boolean
 }): React.ReactElement {
-  const [expanded, setExpanded] = useState(false)
+  const toolCount = countToolCalls(tools)
+
+  // Finished groups collapse into a single "Ran N tools" line.
+  if (!isActive) {
+    return <HistoryGroup items={tools} toolCount={toolCount} />
+  }
+
+  // Active (streaming) group stays expanded as a live log.
+  const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
+  const expanded = userExpanded ?? tools.length <= 4
 
   if (tools.length === 1) {
     return <ToolCallCard toolCall={tools[0].toolCall} />
   }
 
   return (
-    <div className="rounded-lg border border-white/5 bg-white/[0.02] overflow-hidden">
+    <div>
       <ToolRunGroupHeader
         tools={tools}
         expanded={expanded}
-        isActive={Boolean(isActive)}
-        onToggle={() => setExpanded((value) => !value)}
+        isActive
+        onToggle={() => setUserExpanded(!expanded)}
       />
       <CollapsibleBody open={expanded}>
-        <div className="space-y-2 border-t border-white/5 px-2 py-2">
+        <div className="space-y-px">
           {tools.map((item) => (
             <ToolCallCard key={item.id} toolCall={item.toolCall} />
           ))}
@@ -386,6 +403,9 @@ function ToolSummarySegmentContent({
   }
 
   const filePath = resolveToolFilePath(segment.item.toolCall)
+  const verb = t(`tool.shortNames.${segment.item.toolCall.name}`, {
+    defaultValue: segment.item.toolCall.name
+  })
   return (
     <>
       <ToolTypeIcon toolName={segment.item.toolCall.name} className="h-3.5 w-3.5" />
@@ -393,10 +413,10 @@ function ToolSummarySegmentContent({
         <FilePathLink
           path={filePath}
           fileDiff={segment.item.toolCall.fileDiff}
-          className="text-xs"
+          className="text-[13px]"
         />
       ) : (
-        <span className="text-zinc-400">{getToolDisplayLabel(segment.item.toolCall)}</span>
+        <span className="text-zinc-400">{verb}</span>
       )}
     </>
   )
@@ -419,53 +439,35 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
   const sharedToolName = tools.every((item) => item.toolCall.name === tools[0].toolCall.name)
     ? tools[0].toolCall.name
     : null
-  const compactLabels = shouldCompactToolGroupLabels(tools)
   const summarySegments = useMemo(() => buildToolSummarySegments(tools), [tools])
-  const title =
-    sharedToolName && sharedToolName !== 'preparing'
-      ? sharedToolName
-      : t('tool.groupCount', { count: tools.length })
 
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left interactive-header"
+      className="group flex h-7 w-full items-center gap-2.5 rounded-md px-2 text-left transition-colors hover:bg-white/[0.04]"
       aria-expanded={expanded}
       aria-label={expanded ? t('tool.collapseTools') : t('tool.expandTools')}
     >
       {sharedToolName ? (
-        <ToolTypeIcon toolName={sharedToolName} />
+        <ToolTypeIcon toolName={sharedToolName} className="h-4 w-4" />
       ) : (
-        <ToolTypeIcon kind="group" />
+        <ToolTypeIcon kind="group" className="h-4 w-4" />
       )}
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-zinc-200">
-          {title}
-          {compactLabels && (
-            <span className="ml-1.5 text-xs font-normal text-zinc-500">×{tools.length}</span>
-          )}
-        </div>
-        {!compactLabels && (
-          <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-relaxed">
-            {summarySegments.map((segment, index) => (
-              <span key={segment.key} className="inline-flex items-center gap-1">
-                {index > 0 && <span className="text-zinc-600">·</span>}
-                <ToolSummarySegmentContent segment={segment} t={t} />
-              </span>
-            ))}
-          </div>
-        )}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] leading-none">
+        {summarySegments.map((segment, index) => (
+          <span key={segment.key} className="inline-flex items-center gap-1.5">
+            {index > 0 && <span className="text-zinc-600">·</span>}
+            <ToolSummarySegmentContent segment={segment} t={t} />
+          </span>
+        ))}
       </div>
       <span className="ml-auto flex shrink-0 items-center gap-1.5">
-        {showSpinner && <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />}
-        {!showSpinner && tools.every((item) => item.toolCall.status === 'done') && (
-          <CheckCircle2 className="h-4 w-4 text-green-400" />
-        )}
+        {showSpinner && <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />}
         {!showSpinner && tools.some((item) => item.toolCall.status === 'error') && (
-          <XCircle className="h-4 w-4 text-red-400" />
+          <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
         )}
-        <ExpandChevron expanded={expanded} />
+        <ExpandChevron expanded={expanded} className="text-zinc-600" />
       </span>
     </button>
   )
@@ -475,97 +477,208 @@ const ToolRunGroupHeader = memo(function ToolRunGroupHeader({
   toolsHeaderEqual(prev.tools, next.tools)
 )
 
-function TimelineDot({ className }: { className: string }): React.ReactElement {
-  return (
-    <span
-      className={cn(
-        'absolute -left-[13px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ring-2 ring-background',
-        className
-      )}
-    />
-  )
-}
-
 function StreamingPlaceholder(): React.ReactElement {
   const { t } = useTranslation('chat')
   return (
     <span className="inline-flex items-center gap-2 text-xs text-zinc-500">
-      <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400/70" />
+      <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
       {t('message.streaming')}
     </span>
   )
 }
 
+function countChangedFiles(tools: TimelineToolItem[]): number {
+  const paths = new Set<string>()
+  for (const item of tools) {
+    if (!FILE_CHANGE_TOOLS.has(item.toolCall.name)) continue
+    const filePath = resolveToolFilePath(item.toolCall)
+    if (filePath) paths.add(filePath)
+  }
+  return paths.size
+}
+
+function countToolCalls(tools: TimelineToolItem[]): number {
+  return tools.filter((item) => item.toolCall.name !== 'preparing').length
+}
+
+/**
+ * Finished-run view: each tool batch collapses into its own "Ran N tools"
+ * line, model text stays visible between them — the chronological
+ * narrative (tools → text → tools → text) is preserved.
+ */
+function FinishedRunView({
+  timeline,
+  fallbackText,
+  isError
+}: {
+  timeline: TimelineItem[]
+  fallbackText?: string
+  isError?: boolean
+}): React.ReactElement {
+  const segments = useMemo(() => segmentTimeline(timeline), [timeline])
+
+  // Trailing text = the final answer, rendered outside any collapsible.
+  let cut = segments.length
+  while (cut > 0 && segments[cut - 1].kind === 'text') cut -= 1
+  const activitySegments = segments.slice(0, cut)
+  let finalSegments = segments.slice(cut)
+  if (finalSegments.length === 0 && !timeline.some((item) => item.type === 'text') && fallbackText?.trim()) {
+    finalSegments = [
+      {
+        kind: 'text',
+        item: { id: 'final-text-fallback', type: 'text' as const, content: fallbackText }
+      }
+    ]
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {activitySegments.map((segment) => {
+        if (segment.kind === 'tools') {
+          return <ToolRunGroup key={segment.id} tools={segment.items} />
+        }
+        if (segment.kind === 'reasoning') {
+          return <ThinkingBlock key={segment.item.id} reasoning={segment.item.content} />
+        }
+        return (
+          <div key={segment.item.id} className="py-0.5">
+            <MarkdownContent content={segment.item.content} isError={isError} />
+          </div>
+        )
+      })}
+      {finalSegments.map((segment) =>
+        segment.kind === 'text' ? (
+          <div key={segment.item.id} className="py-0.5">
+            <MarkdownContent content={segment.item.content} isError={isError} />
+          </div>
+        ) : null
+      )}
+    </div>
+  )
+}
+
+/**
+ * Expanded run history: a flat chronological list — one row per action
+ * (tool or thinking), all from the same left edge, no group headers.
+ */
+function ActivityFlatList({ items }: { items: TimelineItem[] }): React.ReactElement {
+  return (
+    <div className="space-y-px pb-1">
+      {items.map((item) => {
+        if (item.type === 'tool') {
+          return <ToolCallCard key={item.id} toolCall={item.toolCall} />
+        }
+        if (item.type === 'reasoning') {
+          return <ThinkingBlock key={item.id} reasoning={item.content} />
+        }
+        return (
+          <div key={item.id} className="pl-2 py-0.5 text-[13px] text-zinc-400">
+            <MarkdownContent content={item.content} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function TimelineView({
   timeline,
+  fallbackText,
   isStreaming,
   isError
 }: {
   timeline: TimelineItem[]
+  fallbackText?: string
   isStreaming?: boolean
   isError?: boolean
 }): React.ReactElement {
+  if (!isStreaming) {
+    return (
+      <FinishedRunView
+        timeline={timeline}
+        fallbackText={fallbackText}
+        isError={isError}
+      />
+    )
+  }
+
   const segments = useMemo(() => segmentTimeline(timeline), [timeline])
   const lastSegmentIndex = segments.length - 1
+  // While streaming, only the last segment is the live part; everything
+  // earlier collapses into a clickable "Ran N tools" summary.
+  const historyEnd = lastSegmentIndex > 0 ? lastSegmentIndex : 0
+  const historySegments = segments.slice(0, historyEnd)
+  const liveSegments = segments.slice(historyEnd)
+
+  const historyItems: TimelineItem[] = historySegments.flatMap((segment) =>
+    segment.kind === 'tools' ? segment.items.map((item) => item) : [segment.item]
+  )
+  const historyToolCount = historyItems.filter((item) => item.type === 'tool').length
 
   return (
-    <div className="relative space-y-3 border-l border-white/10 pl-3">
-      {segments.map((segment, index) => {
-        const isLastSegment = index === lastSegmentIndex
+    <div className="space-y-1.5">
+      {historyItems.length > 0 && (
+        <HistoryGroup items={historyItems} toolCount={historyToolCount} />
+      )}
 
+      {liveSegments.map((segment) => {
         if (segment.kind === 'reasoning') {
-          return (
-            <div key={segment.item.id} className="relative">
-              <TimelineDot className="bg-violet-400/80" />
-              <ThinkingBlock
-                reasoning={segment.item.content}
-                isStreaming={Boolean(
-                  isStreaming && isLastSegment && segment.item.id === timeline[timeline.length - 1]?.id
-                )}
-              />
-            </div>
-          )
+          return <ThinkingBlock key={segment.item.id} reasoning={segment.item.content} isStreaming />
         }
 
         if (segment.kind === 'tools') {
-          return (
-            <div key={segment.id} className="relative">
-              <TimelineDot className="bg-indigo-400/80" />
-              <ToolRunGroup
-                tools={segment.items}
-                isActive={Boolean(isStreaming && isLastSegment)}
-              />
-            </div>
-          )
+          return <ToolRunGroup key={segment.id} tools={segment.items} isActive />
         }
 
         const item = segment.item
         return (
-          <div key={item.id} className="relative">
-            <TimelineDot className={isError ? 'bg-red-400/80' : 'bg-emerald-400/80'} />
-            {isStreaming && isLastSegment ? (
-              <div
-                className={cn(
-                  'whitespace-pre-wrap break-words text-sm leading-relaxed',
-                  isError ? 'text-red-200' : 'text-zinc-300'
-                )}
-              >
-                {item.content}
-                <span className="inline-block w-1.5 h-4 ml-0.5 align-text-bottom bg-indigo-400 animate-pulse rounded-sm" />
-              </div>
-            ) : (
-              <MarkdownContent content={item.content} isError={isError} />
-            )}
+          <div
+            key={item.id}
+            className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-zinc-100"
+          >
+            {item.content}
+            <span className="inline-block w-1.5 h-4 ml-0.5 align-text-bottom bg-indigo-400 animate-pulse rounded-sm" />
           </div>
         )
       })}
 
-      {isStreaming && timeline.length === 0 && (
-        <div className="relative">
-          <TimelineDot className="bg-zinc-500" />
-          <StreamingPlaceholder />
-        </div>
-      )}
+      {timeline.length === 0 && <StreamingPlaceholder />}
+    </div>
+  )
+}
+
+/**
+ * Collapsed history of earlier activity: one clickable "Ran N tools" line
+ * that expands into the flat chronological list. Used both mid-run
+ * (everything except the live segment) and after completion (RunSummary).
+ */
+function HistoryGroup({
+  items,
+  toolCount
+}: {
+  items: TimelineItem[]
+  toolCount: number
+}): React.ReactElement {
+  const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation('chat')
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="group flex h-7 w-full items-center gap-2.5 rounded-md px-2 text-left transition-colors hover:bg-white/[0.04]"
+        aria-expanded={expanded}
+      >
+        <ToolTypeIcon kind="group" className="h-4 w-4" />
+        <span className="text-[13px] text-zinc-500">
+          {t('tool.runSummaryTools', { count: toolCount })}
+        </span>
+        <ExpandChevron expanded={expanded} className="ml-auto text-zinc-600" />
+      </button>
+      <CollapsibleBody open={expanded}>
+        <ActivityFlatList items={items} />
+      </CollapsibleBody>
     </div>
   )
 }
@@ -608,19 +721,28 @@ function MessageActions({
 function RunOutcomeBadge({ outcome }: { outcome: AgentRunOutcome }): React.ReactElement {
   const { t } = useTranslation('chat')
   const styles: Record<AgentRunOutcome, string> = {
-    success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
-    aborted: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-    max_iterations: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-    error: 'border-red-500/30 bg-red-500/10 text-red-300'
+    success: 'text-emerald-400/90',
+    aborted: 'text-amber-400/90',
+    max_iterations: 'text-amber-400/90',
+    error: 'text-red-400/90'
+  }
+  const marks: Record<AgentRunOutcome, string> = {
+    success: '✓',
+    aborted: '⚠',
+    max_iterations: '⚠',
+    error: '✕'
+  }
+
+  // Success is the norm — silence. Only exceptional outcomes get a line.
+  if (outcome === 'success') {
+    return <span />
   }
 
   return (
-    <div
-      className={cn(
-        'mb-2 inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
-        styles[outcome]
-      )}
-    >
+    <div className={cn('mb-1 inline-flex h-7 items-center gap-2.5 pl-2 text-xs', styles[outcome])}>
+      <span aria-hidden className="inline-flex w-4 shrink-0 items-center justify-center">
+        {marks[outcome]}
+      </span>
       {t(`runOutcome.${outcome}`)}
     </div>
   )
@@ -770,23 +892,26 @@ export function MessageBubble({
       transition={{ duration: 0.2 }}
       className="flex justify-start"
     >
-      <div className="flex max-w-[90%] flex-col items-start">
+      <div className="flex w-full flex-col items-start">
         <div
           className={cn(
-            'w-full rounded-xl px-4 py-3',
-            isError
-              ? 'bg-red-500/[0.08] border border-red-500/20'
-              : 'border border-white/10 bg-surface/40'
+            'w-full rounded-xl px-3.5 py-2.5',
+            isError && 'bg-red-500/[0.08] border border-red-500/20'
           )}
         >
           {runOutcome && !isStreaming && <RunOutcomeBadge outcome={runOutcome} />}
           {interrupted && !runOutcome && (
-            <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-amber-400/80">
-              {tc('status.interrupted')}
+            <div className="mb-1.5 text-[11px] text-amber-400/90">
+              ⚠ {tc('status.interrupted')}
             </div>
           )}
           {hasTimeline ? (
-            <TimelineView timeline={resolvedTimeline} isStreaming={isStreaming} isError={isError} />
+            <TimelineView
+              timeline={resolvedTimeline}
+              fallbackText={content}
+              isStreaming={isStreaming}
+              isError={isError}
+            />
           ) : isStreaming ? (
             <StreamingPlaceholder />
           ) : null}

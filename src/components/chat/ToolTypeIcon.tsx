@@ -20,21 +20,21 @@ type ToolIconKind =
 const ICON_SIZE_CLASS = 'h-5 w-5'
 
 const ICON_STYLES: Record<ToolIconKind, string> = {
-  read: 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]',
-  write: 'text-emerald-400 drop-shadow-[0_0_4px_rgba(52,211,153,0.6)]',
-  patch: 'text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]',
-  folder: 'text-sky-400 drop-shadow-[0_0_4px_rgba(56,189,248,0.6)]',
-  search: 'text-violet-400 drop-shadow-[0_0_4px_rgba(167,139,250,0.6)]',
-  grep: 'text-orange-400 drop-shadow-[0_0_4px_rgba(251,146,60,0.6)]',
-  terminal: 'text-lime-400 drop-shadow-[0_0_4px_rgba(163,230,53,0.6)]',
-  web: 'text-blue-400 drop-shadow-[0_0_4px_rgba(96,165,250,0.6)]',
-  tabs: 'text-indigo-400 drop-shadow-[0_0_4px_rgba(129,140,248,0.6)]',
-  'memory-read': 'text-fuchsia-400 drop-shadow-[0_0_4px_rgba(232,121,249,0.6)]',
-  'memory-write': 'text-pink-400 drop-shadow-[0_0_4px_rgba(244,114,182,0.6)]',
-  mcp: 'text-teal-400 drop-shadow-[0_0_4px_rgba(45,212,191,0.6)]',
-  preparing: 'text-zinc-400 drop-shadow-[0_0_3px_rgba(161,161,170,0.4)]',
-  group: 'text-indigo-300 drop-shadow-[0_0_4px_rgba(165,180,252,0.5)]',
-  generic: 'text-slate-400 drop-shadow-[0_0_3px_rgba(148,163,184,0.4)]'
+  read: 'text-cyan-400/80',
+  write: 'text-emerald-400/80',
+  patch: 'text-amber-400/80',
+  folder: 'text-sky-400/80',
+  search: 'text-violet-400/80',
+  grep: 'text-orange-400/80',
+  terminal: 'text-lime-400/80',
+  web: 'text-blue-400/80',
+  tabs: 'text-indigo-400/80',
+  'memory-read': 'text-fuchsia-400/80',
+  'memory-write': 'text-pink-400/80',
+  mcp: 'text-teal-400/80',
+  preparing: 'text-zinc-400',
+  group: 'text-indigo-300/80',
+  generic: 'text-slate-400/80'
 }
 
 export function resolveToolIconKind(toolName: string): ToolIconKind {
@@ -310,7 +310,7 @@ export function ToolTypeIcon({
 
 export function ThinkingIcon({ className }: SvgProps): React.ReactElement {
   return (
-    <NeonSvg className={cn('text-violet-400 drop-shadow-[0_0_4px_rgba(167,139,250,0.6)]', className)}>
+    <NeonSvg className={cn('text-violet-400/80', className)}>
       <circle cx="4.5" cy="8" r="1.4" stroke="currentColor" strokeWidth="1.35" />
       <circle cx="8" cy="5" r="1.4" stroke="currentColor" strokeWidth="1.35" />
       <circle cx="11.5" cy="8" r="1.4" stroke="currentColor" strokeWidth="1.35" />

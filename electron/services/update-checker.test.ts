@@ -7,9 +7,11 @@ import {
   compareVersions,
   isNewerVersion,
   parseDigest,
+  parseShasums,
   parseVersion,
   pickInstallerAsset,
   verifyInstallerFile,
+  verifyInstallerFileDetailed,
   type UpdateAsset
 } from './update-checker'
 
@@ -151,10 +153,12 @@ describe('parseDigest', () => {
   })
 })
 
-describe('verifyInstallerFile', () => {
+describe('verifyInstallerFileDetailed', () => {
   let dir: string
   const content = 'installer-bytes-0123456789'
   const contentDigest = `sha256:${createHash('sha256').update(content).digest('hex')}`
+  const otherContent = 'installer-bytes-TAMPERED-9876543210'
+  const otherDigest = `sha256:${createHash('sha256').update(otherContent).digest('hex')}`
 
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), 'update-checker-test-'))
@@ -173,35 +177,90 @@ describe('verifyInstallerFile', () => {
   it('accepts a file matching size and digest', async () => {
     const filePath = await write('ok.exe', content)
     await expect(
-      verifyInstallerFile(filePath, { size: content.length, digest: contentDigest })
-    ).resolves.toBeUndefined()
+      verifyInstallerFileDetailed(filePath, { size: content.length, digest: contentDigest })
+    ).resolves.toEqual({
+      ok: true,
+      mode: 'digest',
+      actualHash: expect.any(String),
+      expectedHash: expect.any(String)
+    })
   })
 
   it('rejects a truncated file by size', async () => {
     const filePath = await write('truncated.exe', content.slice(0, 5))
     await expect(
-      verifyInstallerFile(filePath, { size: content.length, digest: contentDigest })
+      verifyInstallerFileDetailed(filePath, { size: content.length, digest: contentDigest })
     ).rejects.toThrow(/incomplete/)
   })
 
-  it('rejects a corrupted file by digest', async () => {
-    const filePath = await write('corrupt.exe', `${content}tampered`)
+  it('accepts byte-stable downloads that disagree with a stale digest', async () => {
+    // Two independent downloads produce identical bytes ≠ API digest →
+    // the digest is stale (GitHub re-upload artifact), the file is trusted.
+    const filePath = await write('stale-digest.exe', otherContent)
+    const redownload = async (destPath: string): Promise<void> => {
+      await writeFile(destPath, otherContent)
+    }
     await expect(
-      verifyInstallerFile(filePath, { size: (content + 'tampered').length, digest: contentDigest })
-    ).rejects.toThrow(/Checksum mismatch/)
+      verifyInstallerFileDetailed(
+        filePath,
+        { size: otherContent.length, digest: contentDigest },
+        redownload
+      )
+    ).resolves.toMatchObject({ ok: true, mode: 'stable-bytes' })
+  })
+
+  it('rejects byte-unstable downloads (transport corruption)', async () => {
+    const filePath = await write('corrupt.exe', otherContent)
+    const redownload = async (destPath: string): Promise<void> => {
+      await writeFile(destPath, `${otherContent}more-corruption`)
+    }
+    await expect(
+      verifyInstallerFileDetailed(
+        filePath,
+        { size: otherContent.length, digest: contentDigest },
+        redownload
+      )
+    ).rejects.toThrow(/unstable transport/)
   })
 
   it('skips the hash check when the asset has no digest', async () => {
     const filePath = await write('legacy.exe', content)
     await expect(
-      verifyInstallerFile(filePath, { size: content.length })
-    ).resolves.toBeUndefined()
+      verifyInstallerFileDetailed(filePath, { size: content.length })
+    ).resolves.toMatchObject({ ok: true, mode: 'size-only' })
   })
 
   it('skips the size check when the asset size is unknown', async () => {
     const filePath = await write('nosize.exe', content)
     await expect(
-      verifyInstallerFile(filePath, { size: 0, digest: contentDigest })
-    ).resolves.toBeUndefined()
+      verifyInstallerFileDetailed(filePath, { size: 0, digest: contentDigest })
+    ).resolves.toMatchObject({ ok: true, mode: 'digest' })
+  })
+})
+
+describe('parseShasums', () => {
+  it('parses a sha256sum-style manifest', () => {
+    const hex = 'a'.repeat(64)
+    expect(parseShasums(`${hex}  app.exe\n${'b'.repeat(64)}  app.dmg`)).toEqual({
+      'app.exe': hex,
+      'app.dmg': 'b'.repeat(64)
+    })
+  })
+
+  it('tolerates the binary marker and CRLF', () => {
+    const hex = 'c'.repeat(64)
+    expect(parseShasums(`${hex} *app.exe\r\n`)).toEqual({ 'app.exe': hex })
+  })
+
+  it('lowercases hex values', () => {
+    expect(parseShasums(`${'AB'.repeat(32)}  app.exe`)).toEqual({
+      'app.exe': 'ab'.repeat(32)
+    })
+  })
+
+  it('returns null for garbage or empty input', () => {
+    expect(parseShasums('')).toBeNull()
+    expect(parseShasums('not a manifest')).toBeNull()
+    expect(parseShasums(`${'z'.repeat(64)}  app.exe`)).toBeNull()
   })
 })

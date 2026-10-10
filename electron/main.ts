@@ -44,6 +44,7 @@ import { SkillLoader } from './services/skills/skill-loader'
 import {
   UpdateChecker,
   downloadInstaller,
+  loadShasums,
   pickInstallerAsset,
   scheduleStartupUpdateCheck,
   shouldNotifyForUpdate
@@ -424,14 +425,20 @@ function registerIpc(): void {
         process.arch
       )
       if (!asset) return { ok: false, error: 'no_matching_installer' }
-      const filePath = await downloadInstaller(asset, (progress) => {
-        sendToRenderer('updates:download-progress', {
-          version: update.version,
-          percent: progress.percent,
-          received: progress.received,
-          total: progress.total
-        })
-      })
+      // Prefer our CI-generated SHASUMS.txt over the (sometimes stale) API digest.
+      const shasums = await loadShasums(update.assets ?? [])
+      const filePath = await downloadInstaller(
+        asset,
+        (progress) => {
+          sendToRenderer('updates:download-progress', {
+            version: update.version,
+            percent: progress.percent,
+            received: progress.received,
+            total: progress.total
+          })
+        },
+        shasums
+      )
       await shell.openPath(filePath)
       return { ok: true }
     } catch (err) {

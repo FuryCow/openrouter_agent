@@ -1,6 +1,6 @@
 {
   "name": "openrouter-agent",
-  "version": "1.0.0-alpha.12",
+  "version": "1.0.0-alpha.13",
   "description": "LLM agent desktop app with chat, file browser, editor, and tools via OpenRouter",
   "author": "FuryCow",
   "license": "MIT",
