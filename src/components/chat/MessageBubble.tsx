@@ -672,7 +672,9 @@ function HistoryGroup({
       >
         <ToolTypeIcon kind="group" className="h-4 w-4" />
         <span className="text-[13px] text-zinc-500">
-          {t('tool.runSummaryTools', { count: toolCount })}
+          {toolCount === 1
+            ? t('tool.runSummaryTool', { count: toolCount })
+            : t('tool.runSummaryTools', { count: toolCount })}
         </span>
         <ExpandChevron expanded={expanded} className="ml-auto text-zinc-600" />
       </button>
