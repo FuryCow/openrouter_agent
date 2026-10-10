@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.0-alpha.13](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.13) - 2026-01-01
+
+### Added
+
+- **Run history UX:** finished runs collapse per tool batch ("Ran N tools" per batch) with model text visible between batches; the final answer is always visible outside collapsibles; "✓ Success" badge removed (silence on success).
+- **Code copy button:** every markdown code block in chat answers gets an always-visible copy button (brightens on hover).
+- **Terminal clipboard:** Ctrl+Shift+C / Ctrl+C-with-selection to copy, Ctrl+V / Ctrl+Shift+V to paste in the integrated terminal.
+- **Agent run panel:** task checklist collapsed by default with done/total counter; terminal output block removed.
+
 ## v1.0.0-alpha.12
 
 ### Added
