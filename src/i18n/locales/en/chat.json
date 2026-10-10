@@ -142,17 +142,13 @@
     "collapseTools": "Collapse tools",
     "thinkingStreaming": "Thinking…",
     "thoughtProcess": "Thought process",
-    "runSummaryTools_one": "Ran {{count}} tool",
-    "runSummaryTools_other": "Ran {{count}} tools",
-    "runSummaryFiles_one": "{{count}} file changed",
-    "runSummaryFiles_other": "{{count}} files changed",
-    "earlierActivity_one": "{{count}} earlier step",
-    "earlierActivity_other": "{{count}} earlier steps",
     "replaceAll": "Replace all occurrences",
     "matches": "Matches ({{count}})",
     "hits": "Hits ({{count}})",
     "entries": "Entries ({{count}})",
-    "results": "Results ({{count}})"
+    "results": "Results ({{count}})",
+    "runSummaryTool": "Ran {{count}} tool",
+    "runSummaryTools": "Ran {{count}} tools"
   },
   "approval": {
     "title": "Approval: {{toolName}}",
