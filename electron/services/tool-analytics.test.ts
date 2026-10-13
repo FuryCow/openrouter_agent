@@ -141,6 +141,16 @@ describe('validateToolArguments', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('rejects update_project_memory append without content', () => {
+    const result = validateToolArguments(
+      'update_project_memory',
+      JSON.stringify({ action: 'append' }),
+      'agent'
+    )
+    expect(result.ok).toBe(false)
+    expect(result.issues).toContain('missing_required_argument')
+  })
+
   it('blocks update_project_memory in planner mode', () => {
     const result = validateToolArguments(
       'update_project_memory',

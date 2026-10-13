@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-alpha.14](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.14) - 2026-10-13
+
+### Fixed
+
+- **Lost tool batches:** consecutive same-tool calls (e.g. a run of terminal commands) no longer disappear from the chat — grouped rows ("N × Terminal") render both mid-run and after completion; the red error dot now also shows on group rows.
+- **Streaming text visibility:** model narration ("Emulator is not running — I will start it…") stays visible as plain text while streaming instead of being folded into the Thought process block; nothing "jumps in" after the run finishes.
+- **Literal "null" chunks:** some providers emit the string "null" as content around tool calls — it is now filtered out of the answer and the timeline.
+- **Memory tool schema:** update_project_memory now declares content in required (schema-level), with a conditional validator (content required for append/update, not delete) and a concrete fix-it hint — stops the "content is required" retry loops.
+
+### Added
+
+- **Tool run grouping:** runs of 3+ consecutive same-tool calls collapse into one clickable "N × Terminal" line (keyed by tool name + file path) that expands into the flat call list.
+
 ## [1.0.0-alpha.13](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.13) - 2026-01-01
 
 ### Added

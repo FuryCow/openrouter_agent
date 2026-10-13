@@ -17,7 +17,13 @@ import { useState, useRef, useEffect, useLayoutEffect, memo, useMemo } from 'rea
 import type { TimelineItem, ToolCallInfo, AgentRunOutcome, ChatFileAttachment } from '@/types'
 import { cn, getFileName } from '@/lib/utils'
 import { FileIcon } from '@/components/ui/FileIcon'
-import { resolveMessageTimeline, segmentTimeline, type TimelineToolItem } from '@/lib/timeline'
+import {
+  groupTimelineTools,
+  resolveMessageTimeline,
+  segmentTimeline,
+  type TimelineToolGroupItem,
+  type TimelineToolItem
+} from '@/lib/timeline'
 import {
   buildToolSummarySegments,
   formatCompactToolSummaryLabel,
@@ -384,6 +390,40 @@ function ToolRunGroup({
   )
 }
 
+/** Finished run: one clickable "N × Terminal" line that expands into the flat list of its calls. */
+function ToolGroupRow({ group }: { group: TimelineToolGroupItem }): React.ReactElement {
+  const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation('chat')
+  const hasError = group.items.some((item) => item.toolCall.status === 'error')
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="group flex h-7 w-full items-center gap-2.5 rounded-md px-2 text-left transition-colors hover:bg-white/[0.04]"
+        aria-expanded={expanded}
+        aria-label={expanded ? t('tool.collapseTools') : t('tool.expandTools')}
+      >
+        <ToolTypeIcon toolName={group.toolName} className="h-4 w-4" />
+        <span className="text-[13px] text-zinc-500">
+          {t('tool.groupedCount', {
+            name: t(`tool.shortNames.${group.toolName}`, { defaultValue: group.toolName }),
+            count: group.count
+          })}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          {hasError && <span className="h-1.5 w-1.5 rounded-full bg-red-400" />}
+          <ExpandChevron expanded={expanded} className="text-zinc-600" />
+        </span>
+      </button>
+      <CollapsibleBody open={expanded}>
+        <ActivityFlatList items={group.items} />
+      </CollapsibleBody>
+    </div>
+  )
+}
+
 function ToolSummarySegmentContent({
   segment,
   t
@@ -502,9 +542,9 @@ function countToolCalls(tools: TimelineToolItem[]): number {
 }
 
 /**
- * Finished-run view: each tool batch collapses into its own "Ran N tools"
- * line, model text stays visible between them — the chronological
- * narrative (tools → text → tools → text) is preserved.
+ * Finished-run view: consecutive same-tool calls collapse into one
+ * "N × Terminal" line, model text stays visible between them — the
+ * chronological narrative (tools → text → tools → text) is preserved.
  */
 function FinishedRunView({
   timeline,
@@ -515,7 +555,8 @@ function FinishedRunView({
   fallbackText?: string
   isError?: boolean
 }): React.ReactElement {
-  const segments = useMemo(() => segmentTimeline(timeline), [timeline])
+  const grouped = useMemo(() => groupTimelineTools(timeline), [timeline])
+  const segments = useMemo(() => segmentTimeline(grouped), [grouped])
 
   // Trailing text = the final answer, rendered outside any collapsible.
   let cut = segments.length
@@ -536,6 +577,9 @@ function FinishedRunView({
       {activitySegments.map((segment) => {
         if (segment.kind === 'tools') {
           return <ToolRunGroup key={segment.id} tools={segment.items} />
+        }
+        if (segment.kind === 'tool-group') {
+          return <ToolGroupRow key={segment.item.id} group={segment.item} />
         }
         if (segment.kind === 'reasoning') {
           return <ThinkingBlock key={segment.item.id} reasoning={segment.item.content} />
@@ -559,14 +603,20 @@ function FinishedRunView({
 
 /**
  * Expanded run history: a flat chronological list — one row per action
- * (tool or thinking), all from the same left edge, no group headers.
+ * (tool, tool group, or thinking), all from the same left edge, no group
+ * headers. Same-tool runs are collapsed into a single "N × Terminal" row.
  */
 function ActivityFlatList({ items }: { items: TimelineItem[] }): React.ReactElement {
+  const grouped = useMemo(() => groupTimelineTools(items), [items])
+
   return (
     <div className="space-y-px pb-1">
-      {items.map((item) => {
+      {grouped.map((item) => {
         if (item.type === 'tool') {
           return <ToolCallCard key={item.id} toolCall={item.toolCall} />
+        }
+        if (item.type === 'tool-group') {
+          return <ToolGroupRow key={item.id} group={item} />
         }
         if (item.type === 'reasoning') {
           return <ThinkingBlock key={item.id} reasoning={item.content} />
@@ -602,32 +652,33 @@ function TimelineView({
     )
   }
 
-  const segments = useMemo(() => segmentTimeline(timeline), [timeline])
+  const grouped = useMemo(() => groupTimelineTools(timeline), [timeline])
+  const segments = useMemo(() => segmentTimeline(grouped), [grouped])
   const lastSegmentIndex = segments.length - 1
-  // While streaming, only the last segment is the live part; everything
-  // earlier collapses into a clickable "Ran N tools" summary.
-  const historyEnd = lastSegmentIndex > 0 ? lastSegmentIndex : 0
-  const historySegments = segments.slice(0, historyEnd)
-  const liveSegments = segments.slice(historyEnd)
-
-  const historyItems: TimelineItem[] = historySegments.flatMap((segment) =>
-    segment.kind === 'tools' ? segment.items.map((item) => item) : [segment.item]
-  )
-  const historyToolCount = historyItems.filter((item) => item.type === 'tool').length
-
+  // While streaming, every finished batch collapses into its own "Ran N
+  // tools" line (same layout as the finished run) and model text stays
+  // visible between batches; only the last segment renders live.
   return (
     <div className="space-y-1.5">
-      {historyItems.length > 0 && (
-        <HistoryGroup items={historyItems} toolCount={historyToolCount} />
-      )}
+      {segments.map((segment, index) => {
+        const isLive = index === lastSegmentIndex
 
-      {liveSegments.map((segment) => {
         if (segment.kind === 'reasoning') {
-          return <ThinkingBlock key={segment.item.id} reasoning={segment.item.content} isStreaming />
+          return (
+            <ThinkingBlock
+              key={segment.item.id}
+              reasoning={segment.item.content}
+              isStreaming={isLive}
+            />
+          )
         }
 
         if (segment.kind === 'tools') {
-          return <ToolRunGroup key={segment.id} tools={segment.items} isActive />
+          return <ToolRunGroup key={segment.id} tools={segment.items} isActive={isLive} />
+        }
+
+        if (segment.kind === 'tool-group') {
+          return <ToolGroupRow key={segment.item.id} group={segment.item} />
         }
 
         const item = segment.item
@@ -636,8 +687,14 @@ function TimelineView({
             key={item.id}
             className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-zinc-100"
           >
-            {item.content}
-            <span className="inline-block w-1.5 h-4 ml-0.5 align-text-bottom bg-indigo-400 animate-pulse rounded-sm" />
+            {isLive ? (
+              <>
+                {item.content}
+                <span className="inline-block w-1.5 h-4 ml-0.5 align-text-bottom bg-indigo-400 animate-pulse rounded-sm" />
+              </>
+            ) : (
+              <MarkdownContent content={item.content} />
+            )}
           </div>
         )
       })}
@@ -661,6 +718,9 @@ function HistoryGroup({
 }): React.ReactElement {
   const [expanded, setExpanded] = useState(false)
   const { t } = useTranslation('chat')
+  const hasError = items.some(
+    (item) => item.type === 'tool' && item.toolCall.status === 'error'
+  )
 
   return (
     <div>
@@ -676,7 +736,10 @@ function HistoryGroup({
             ? t('tool.runSummaryTool', { count: toolCount })
             : t('tool.runSummaryTools', { count: toolCount })}
         </span>
-        <ExpandChevron expanded={expanded} className="ml-auto text-zinc-600" />
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          {hasError && <span className="h-1.5 w-1.5 rounded-full bg-red-400" />}
+          <ExpandChevron expanded={expanded} className="ml-auto text-zinc-600" />
+        </span>
       </button>
       <CollapsibleBody open={expanded}>
         <ActivityFlatList items={items} />

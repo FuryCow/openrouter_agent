@@ -1,4 +1,5 @@
 import type { ChatMessage, TimelineItem, ToolCallInfo } from '@/types'
+import { resolveToolFilePath } from '@/lib/toolGroupSummary'
 
 export function appendTimelineChunk(
   timeline: TimelineItem[],
@@ -7,36 +8,12 @@ export function appendTimelineChunk(
 ): TimelineItem[] {
   if (!chunk) return timeline
 
-  const resolvedType = resolveStreamChunkType(timeline, type, chunk)
   const last = timeline[timeline.length - 1]
-  if (last?.type === resolvedType) {
+  if (last?.type === type) {
     return [...timeline.slice(0, -1), { ...last, content: last.content + chunk }]
   }
 
-  return [...timeline, { id: `${resolvedType}-${Date.now()}-${Math.random()}`, type: resolvedType, content: chunk }]
-}
-
-export function shouldFoldTextIntoReasoning(
-  last: TimelineItem | undefined,
-  chunk: string
-): boolean {
-  if (last?.type !== 'reasoning') return false
-  if (chunk.includes('\n')) return false
-  const trimmed = chunk.trimStart()
-  if (!trimmed || trimmed.startsWith('#')) return false
-  if (trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+\./.test(trimmed)) return false
-  return true
-}
-
-function resolveStreamChunkType(
-  timeline: TimelineItem[],
-  type: 'reasoning' | 'text',
-  chunk: string
-): 'reasoning' | 'text' {
-  if (type === 'text' && shouldFoldTextIntoReasoning(timeline[timeline.length - 1], chunk)) {
-    return 'reasoning'
-  }
-  return type
+  return [...timeline, { id: `${type}-${Date.now()}-${Math.random()}`, type, content: chunk }]
 }
 
 export function upsertTimelineTool(
@@ -127,11 +104,13 @@ export function mergeTimelineFromMessage(
 export type TimelineToolItem = Extract<TimelineItem, { type: 'tool' }>
 export type TimelineReasoningItem = Extract<TimelineItem, { type: 'reasoning' }>
 export type TimelineTextItem = Extract<TimelineItem, { type: 'text' }>
+export type TimelineToolGroupItem = Extract<TimelineItem, { type: 'tool-group' }>
 
 export type TimelineSegment =
   | { kind: 'reasoning'; item: TimelineReasoningItem }
   | { kind: 'text'; item: TimelineTextItem }
   | { kind: 'tools'; id: string; items: TimelineToolItem[] }
+  | { kind: 'tool-group'; item: TimelineToolGroupItem }
 
 export function segmentTimeline(timeline: TimelineItem[]): TimelineSegment[] {
   const segments: TimelineSegment[] = []
@@ -158,9 +137,66 @@ export function segmentTimeline(timeline: TimelineItem[]): TimelineSegment[] {
       segments.push({ kind: 'reasoning', item })
     } else if (item.type === 'text') {
       segments.push({ kind: 'text', item })
+    } else if (item.type === 'tool-group') {
+      segments.push({ kind: 'tool-group', item })
     }
   }
 
   flushTools()
   return segments
+}
+
+/**
+ * Collapse runs of consecutive same-tool calls into one grouped item.
+ * A run is keyed by tool name + resolved file path (file edits to the same
+ * file group together, terminal calls group by name). Runs shorter than
+ * minRunLength stay as individual items. Non-tool items break runs.
+ */
+export function groupTimelineTools(
+  timeline: TimelineItem[],
+  minRunLength = 3
+): TimelineItem[] {
+  const result: TimelineItem[] = []
+  let run: TimelineToolItem[] = []
+
+  const flushRun = (): void => {
+    if (run.length === 0) return
+    if (run.length >= minRunLength) {
+      result.push({
+        id: `tool-group-${run[0].id}-${run[run.length - 1].id}`,
+        type: 'tool-group',
+        toolName: run[0].toolCall.name,
+        count: run.length,
+        items: run
+      })
+    } else {
+      for (const item of run) result.push(item)
+    }
+    run = []
+  }
+
+  for (const item of timeline) {
+    if (item.type === 'tool') {
+      const key = groupKeyForTool(item.toolCall)
+      const prev = run[run.length - 1]
+      if (prev && groupKeyForTool(prev.toolCall) === key) {
+        run.push(item)
+      } else {
+        flushRun()
+        run = [item]
+      }
+      continue
+    }
+
+    flushRun()
+    result.push(item)
+  }
+
+  flushRun()
+  return result
+}
+
+function groupKeyForTool(toolCall: ToolCallInfo): string {
+  const filePath = resolveToolFilePath(toolCall)
+  return filePath ? `${toolCall.name}:${filePath}` : toolCall.name
 }

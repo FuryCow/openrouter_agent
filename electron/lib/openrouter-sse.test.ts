@@ -3,7 +3,8 @@ import {
   extractReasoningFromDelta,
   mergeToolCallDelta,
   parseSseDataLine,
-  splitSseBuffer
+  splitSseBuffer,
+  type SseStreamChunk
 } from './openrouter-sse'
 import type { ToolCall } from '../services/openrouter'
 
@@ -36,5 +37,27 @@ describe('openrouter-sse', () => {
     ])
     mergeToolCallDelta(map, [{ index: 0, function: { arguments: '"/tmp/a"}' } }])
     expect(map.get(0)?.function.arguments).toBe('{"path":"/tmp/a"}')
+  })
+
+  it('treats a literal "null" content delta as noise, not as answer text', () => {
+    // Mirrors the streamCompletion filter: providers emit content:"null"
+    // around tool calls; it must not reach the answer or the timeline.
+    const chunks: SseStreamChunk[] = [
+      { choices: [{ finish_reason: null, delta: { content: 'null' } }] },
+      { choices: [{ finish_reason: null, delta: { content: '  null  ' } }] },
+      { choices: [{ finish_reason: null, delta: { content: 'nullish' } }] },
+      { choices: [{ finish_reason: null, delta: { content: 'real text' } }] }
+    ]
+
+    let content = ''
+    for (const parsed of chunks) {
+      const delta = parsed.choices?.[0]?.delta
+      if (!delta) continue
+      if (delta.content && delta.content.trim() !== 'null') {
+        content += delta.content
+      }
+    }
+
+    expect(content).toBe('nullishreal text')
   })
 })

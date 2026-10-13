@@ -118,6 +118,7 @@
     "preparing": "Preparing tool call…",
     "preparingArgs": "Preparing arguments…",
     "groupCount": "{{count}} tools",
+    "groupedCount": "{{name}} × {{count}}",
     "compactCount": "{{name}} × {{count}}",
     "compactFileCount": "{{name}} · {{file}} × {{count}}",
     "shortNames": {

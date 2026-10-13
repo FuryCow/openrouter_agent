@@ -15,7 +15,6 @@ import type {
 import {
   appendTimelineChunk,
   mergeTimelineFromMessage,
-  shouldFoldTextIntoReasoning,
   timelineToLegacyFields,
   upsertTimelineTool
 } from '../lib/timeline'
@@ -95,7 +94,7 @@ function applyStreamEvents(timeline: TimelineItem[]): TimelineItem[] {
       continue
     }
     let chunk = event.chunk
-    if (event.kind === 'reasoning' || shouldFoldTextIntoReasoning(next[next.length - 1], chunk)) {
+    if (event.kind === 'reasoning') {
       const room = MAX_STREAMING_REASONING_CHARS - reasoningChars
       if (room <= 0) continue
       if (chunk.length > room) chunk = chunk.slice(0, room)
