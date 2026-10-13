@@ -17,7 +17,9 @@
     "badArgsCount": "{{count}} bad args",
     "toolStats": "{{name}}: {{success}}/{{total}}",
     "iteration": "#{{n}} {{name}}",
-    "duration": "{{ms}}ms"
+    "duration": "{{ms}}ms",
+    "tokens": "{{tokens}} tokens",
+    "cost": "Cost (est.): {{cost}}"
   },
   "issues": {
     "invalidArgumentsJson": "Invalid JSON args",

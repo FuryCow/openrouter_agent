@@ -177,6 +177,7 @@
     "total": "Total",
     "input": "Input",
     "output": "Output",
+    "cost": "Cost (est.)",
     "resetSession": "Reset session",
     "ariaLabel": "Tokens: context {{contextPercent}}%, session {{sessionTotal}}"
   },

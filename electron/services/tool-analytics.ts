@@ -269,7 +269,11 @@ export class ToolAnalyticsCollector {
     this.tokenUsage = {
       promptTokens: this.tokenUsage.promptTokens + usage.promptTokens,
       completionTokens: this.tokenUsage.completionTokens + usage.completionTokens,
-      totalTokens: this.tokenUsage.totalTokens + usage.totalTokens
+      totalTokens: this.tokenUsage.totalTokens + usage.totalTokens,
+      // Sum exact provider-reported costs; drop the field when no step had one.
+      ...(typeof usage.costUsd === 'number'
+        ? { costUsd: (this.tokenUsage.costUsd ?? 0) + usage.costUsd }
+        : {})
     }
   }
 

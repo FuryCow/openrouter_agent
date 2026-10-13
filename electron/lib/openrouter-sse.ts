@@ -22,6 +22,8 @@ export interface SseStreamChunk {
     prompt_tokens?: number
     completion_tokens?: number
     total_tokens?: number
+    /** USD cost of this request, when the provider reports it (usage: { include: true }). */
+    cost?: number
   }
   choices?: SseStreamChoice[]
 }

@@ -4,6 +4,8 @@ import { useTokenUsageStore } from '@/stores/tokenUsageStore'
 import { useAgentRunStore } from '@/stores/agentRunStore'
 import { useToastStore } from '@/stores/toastStore'
 import { useRunQueueStore } from '@/stores/runQueueStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { estimateRunCostUsd } from '@/lib/pricing'
 import { resolveErrorMessage } from '@/lib/errorMessages'
 import { getT } from '@/i18n/t'
 import type { AgentEvent } from '@/types'
@@ -54,7 +56,12 @@ export function handleAgentEvent(event: AgentEvent): void {
     case 'run_analytics':
       if (event.analytics) {
         useAnalyticsStore.getState().addRun(event.analytics)
-        useTokenUsageStore.getState().addUsage(event.analytics.tokenUsage)
+        useTokenUsageStore
+          .getState()
+          .addUsage(
+            event.analytics.tokenUsage,
+            estimateRunCostUsd(event.analytics, useSettingsStore.getState().models)
+          )
       }
       break
     case 'approval_request':
@@ -103,7 +110,12 @@ export function handleAgentEvent(event: AgentEvent): void {
         for (const task of event.queue.tasks) {
           if (task.analytics) {
             useAnalyticsStore.getState().addRun(task.analytics)
-            useTokenUsageStore.getState().addUsage(task.analytics.tokenUsage)
+            useTokenUsageStore
+              .getState()
+              .addUsage(
+                task.analytics.tokenUsage,
+                estimateRunCostUsd(task.analytics, useSettingsStore.getState().models)
+              )
           }
         }
       }
