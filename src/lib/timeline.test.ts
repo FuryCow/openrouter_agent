@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { appendTimelineChunk, segmentTimeline, upsertTimelineTool } from './timeline'
+import {
+  appendTimelineChunk,
+  groupTimelineTools,
+  segmentTimeline,
+  upsertTimelineTool
+} from './timeline'
 
 describe('timeline', () => {
   it('appends text chunks to the same item', () => {
@@ -12,13 +17,12 @@ describe('timeline', () => {
     }
   })
 
-  it('folds stray text into the current reasoning block', () => {
+  it('keeps streamed text as a separate text item instead of folding it into reasoning', () => {
     const thinking = appendTimelineChunk([], 'reasoning', 'Принято — масштаб')
     const folded = appendTimelineChunk(thinking, 'text', 'ируем от леса')
-    expect(folded).toHaveLength(1)
-    expect(folded[0].type).toBe('reasoning')
-    if (folded[0].type === 'reasoning') {
-      expect(folded[0].content).toBe('Принято — масштабируем от леса')
+    expect(folded.map((item) => item.type)).toEqual(['reasoning', 'text'])
+    if (folded[1].type === 'text') {
+      expect(folded[1].content).toBe('ируем от леса')
     }
   })
 
@@ -99,5 +103,145 @@ describe('timeline', () => {
     if (segments[3].kind === 'tools') {
       expect(segments[3].items).toHaveLength(1)
     }
+  })
+
+  it('passes tool-group items through as their own segment (no silent drop)', () => {
+    const group = {
+      id: 'tool-group-t1-t3',
+      type: 'tool-group' as const,
+      toolName: 'run_terminal',
+      count: 3,
+      items: [
+        { id: 't1', type: 'tool' as const, toolCall: { id: 't1', name: 'run_terminal', arguments: '{}', status: 'done' as const } },
+        { id: 't2', type: 'tool' as const, toolCall: { id: 't2', name: 'run_terminal', arguments: '{}', status: 'done' as const } },
+        { id: 't3', type: 'tool' as const, toolCall: { id: 't3', name: 'run_terminal', arguments: '{}', status: 'done' as const } }
+      ]
+    }
+    const timeline = [
+      { id: 'r1', type: 'reasoning' as const, content: 'think' },
+      group,
+      { id: 'x1', type: 'text' as const, content: 'done' }
+    ]
+
+    const segments = segmentTimeline(timeline)
+    expect(segments).toHaveLength(3)
+    expect(segments[0].kind).toBe('reasoning')
+    expect(segments[1].kind).toBe('tool-group')
+    if (segments[1].kind === 'tool-group') {
+      expect(segments[1].item.count).toBe(3)
+      expect(segments[1].item.toolName).toBe('run_terminal')
+    }
+    expect(segments[2].kind).toBe('text')
+  })
+})
+
+describe('groupTimelineTools', () => {
+  function toolItem(id: string, name: string, args = '{}') {
+    return { id, type: 'tool' as const, toolCall: { id, name, arguments: args, status: 'done' as const } }
+  }
+
+  it('collapses a run of three or more same-tool calls into one group item', () => {
+    const timeline = [
+      toolItem('t1', 'run_terminal'),
+      toolItem('t2', 'run_terminal'),
+      toolItem('t3', 'run_terminal'),
+      toolItem('t4', 'run_terminal')
+    ]
+
+    const grouped = groupTimelineTools(timeline)
+    expect(grouped).toHaveLength(1)
+    expect(grouped[0].type).toBe('tool-group')
+    if (grouped[0].type === 'tool-group') {
+      expect(grouped[0].toolName).toBe('run_terminal')
+      expect(grouped[0].count).toBe(4)
+      expect(grouped[0].items).toHaveLength(4)
+    }
+  })
+
+  it('keeps runs shorter than three as individual tool items', () => {
+    const timeline = [
+      toolItem('t1', 'run_terminal'),
+      toolItem('t2', 'run_terminal'),
+      toolItem('t3', 'write_file')
+    ]
+
+    const grouped = groupTimelineTools(timeline)
+    expect(grouped.map((item) => item.type)).toEqual(['tool', 'tool', 'tool'])
+  })
+
+  it('breaks runs on a different tool name', () => {
+    const timeline = [
+      toolItem('t1', 'run_terminal'),
+      toolItem('t2', 'run_terminal'),
+      toolItem('t3', 'run_terminal'),
+      toolItem('t4', 'write_file'),
+      toolItem('t5', 'run_terminal'),
+      toolItem('t6', 'run_terminal'),
+      toolItem('t7', 'run_terminal')
+    ]
+
+    const grouped = groupTimelineTools(timeline)
+    expect(grouped.map((item) => item.type)).toEqual(['tool-group', 'tool', 'tool-group'])
+    if (grouped[0].type === 'tool-group') {
+      expect(grouped[0].count).toBe(3)
+    }
+    if (grouped[2].type === 'tool-group') {
+      expect(grouped[2].count).toBe(3)
+    }
+  })
+
+  it('breaks runs on non-tool items', () => {
+    const timeline = [
+      toolItem('t1', 'run_terminal'),
+      toolItem('t2', 'run_terminal'),
+      toolItem('t3', 'run_terminal'),
+      { id: 'x1', type: 'text' as const, content: 'interlude' },
+      toolItem('t4', 'run_terminal'),
+      toolItem('t5', 'run_terminal'),
+      toolItem('t6', 'run_terminal')
+    ]
+
+    const grouped = groupTimelineTools(timeline)
+    expect(grouped.map((item) => item.type)).toEqual(['tool-group', 'text', 'tool-group'])
+  })
+
+  it('groups file edits by tool name and resolved file path', () => {
+    const pathArgs = (path: string): string => JSON.stringify({ path })
+    const timeline = [
+      toolItem('t1', 'search_replace', pathArgs('src/a.ts')),
+      toolItem('t2', 'search_replace', pathArgs('src/a.ts')),
+      toolItem('t3', 'search_replace', pathArgs('src/a.ts')),
+      toolItem('t4', 'search_replace', pathArgs('src/b.ts'))
+    ]
+
+    const grouped = groupTimelineTools(timeline)
+    expect(grouped.map((item) => item.type)).toEqual(['tool-group', 'tool'])
+    if (grouped[0].type === 'tool-group') {
+      expect(grouped[0].count).toBe(3)
+      expect(grouped[0].toolName).toBe('search_replace')
+    }
+  })
+
+  it('does not group file edits to different files', () => {
+    const pathArgs = (path: string): string => JSON.stringify({ path })
+    const timeline = [
+      toolItem('t1', 'write_file', pathArgs('src/a.ts')),
+      toolItem('t2', 'write_file', pathArgs('src/b.ts')),
+      toolItem('t3', 'write_file', pathArgs('src/c.ts'))
+    ]
+
+    const grouped = groupTimelineTools(timeline)
+    expect(grouped.map((item) => item.type)).toEqual(['tool', 'tool', 'tool'])
+  })
+
+  it('keeps a single tool item untouched', () => {
+    const timeline = [toolItem('t1', 'read_file')]
+    const grouped = groupTimelineTools(timeline)
+    expect(grouped).toHaveLength(1)
+    expect(grouped[0].type).toBe('tool')
+  })
+
+  it('handles an empty timeline', () => {
+    expect(groupTimelineTools([])).toEqual([])
   })
 })

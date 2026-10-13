@@ -262,7 +262,8 @@ const TOOLS: ToolDefinition[] = [
     function: {
       name: 'update_project_memory',
       description:
-        'Append, update, or delete dynamic project memory entries (does not edit AGENTS.md)',
+        'Append, update, or delete dynamic project memory entries (does not edit AGENTS.md). ' +
+        'For append/update ALWAYS pass content — the entry text to save.',
       parameters: {
         type: 'object',
         properties: {
@@ -271,7 +272,11 @@ const TOOLS: ToolDefinition[] = [
             enum: ['append', 'update', 'delete'],
             description: 'Memory operation'
           },
-          content: { type: 'string', description: 'Entry content (required for append/update)' },
+          content: {
+            type: 'string',
+            description:
+              'The entry text to save. REQUIRED for append and update — omit only for delete.'
+          },
           id: { type: 'string', description: 'Entry id (required for update/delete)' },
           category: {
             type: 'string',
@@ -279,7 +284,7 @@ const TOOLS: ToolDefinition[] = [
             description: 'Category for append/update'
           }
         },
-        required: ['action']
+        required: ['action', 'content']
       }
     }
   },

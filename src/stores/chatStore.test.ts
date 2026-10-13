@@ -55,13 +55,15 @@ describe('chatStore streaming', () => {
     ])
   })
 
-  it('keeps interleaved reasoning and text in one thinking block', () => {
+  it('keeps interleaved reasoning and text as separate items', () => {
     useChatStore.getState().appendReasoning('Принято — масштаб')
     useChatStore.getState().appendStream('ируем от леса')
     vi.advanceTimersByTime(100)
-    expect(useChatStore.getState().activeTimeline).toEqual([
-      expect.objectContaining({ type: 'reasoning', content: 'Принято — масштабируем от леса' })
+    expect(useChatStore.getState().activeTimeline.map((item) => item.type)).toEqual([
+      'reasoning',
+      'text'
     ])
+    expect(useChatStore.getState().activeTimeline[1]?.content).toBe('ируем от леса')
   })
 
   it('starts a text item after a heading following thinking', () => {

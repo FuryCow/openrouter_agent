@@ -292,9 +292,12 @@ export class OpenRouterClient {
             onReasoningChunk?.(reasoningChunk)
           }
 
-          if (choice.delta.content) {
-            content += choice.delta.content
-            onChunk?.(choice.delta.content)
+          // Some providers emit the literal string "null" as content
+          // before/around tool calls — it is not a real answer.
+          const contentChunk = choice.delta.content
+          if (contentChunk && contentChunk.trim() !== 'null') {
+            content += contentChunk
+            onChunk?.(contentChunk)
           }
 
           for (const current of mergeToolCallDelta(toolCallsMap, choice.delta.tool_calls)) {

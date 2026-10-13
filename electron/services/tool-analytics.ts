@@ -127,6 +127,12 @@ export function validateToolArguments(
   if (toolName === 'run_terminal' && !isMcpQualifiedToolName(toolName)) {
     if (!String(parsed.command ?? '').trim()) issues.push('empty_command')
   }
+  if (toolName === 'update_project_memory') {
+    // content is required for append/update but meaningless for delete.
+    if (parsed.action !== 'delete' && !String(parsed.content ?? '').trim()) {
+      issues.push('missing_required_argument')
+    }
+  }
 
   const blocking = issues.filter(
     (i) =>

@@ -276,6 +276,13 @@ export type TimelineItem =
   | { id: string; type: 'reasoning'; content: string }
   | { id: string; type: 'tool'; toolCall: ToolCallInfo }
   | { id: string; type: 'text'; content: string }
+  | {
+      id: string
+      type: 'tool-group'
+      toolName: string
+      count: number
+      items: Extract<TimelineItem, { type: 'tool' }>[]
+    }
 
 export interface ApiChatMessage {
   role: 'user' | 'assistant' | 'tool'

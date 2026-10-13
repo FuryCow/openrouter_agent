@@ -371,14 +371,15 @@ describe('chat follows the open project', () => {
 })
 
 describe('watching an answer stream in', () => {
-  it('keeps a word split across chunks inside the thinking, and shows a plan list as the answer', () => {
+  it('keeps a word split across chunks as visible text, not hidden inside thinking', () => {
     const thinking = appendTimelineChunk([], 'reasoning', 'Принято — масштаб')
     const stillThinking = appendTimelineChunk(thinking, 'text', 'ируем от леса')
-    expect(stillThinking).toHaveLength(1)
-    expect(stillThinking[0]?.type).toBe('reasoning')
+    expect(stillThinking.map((item) => item.type)).toEqual(['reasoning', 'text'])
+    expect(stillThinking[1]?.type === 'text' && stillThinking[1].content).toBe('ируем от леса')
 
-    const withPlan = appendTimelineChunk(thinking, 'text', '- Прочитать камеру\n- Поправить отсечение')
+    const withPlan = appendTimelineChunk(stillThinking, 'text', '- Прочитать камеру\n- Поправить отсечение')
     expect(withPlan.map((item) => item.type)).toEqual(['reasoning', 'text'])
+    expect(withPlan[1]?.type === 'text' && withPlan[1].content).toContain('ируем от леса')
     expect(withPlan[1]?.type === 'text' && withPlan[1].content).toContain('Прочитать камеру')
   })
 })

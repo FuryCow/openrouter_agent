@@ -66,6 +66,14 @@ export function classifyToolErrorMessage(message: string): StructuredToolError {
       retryable: false
     }
   }
+  if (lower.includes('content is required')) {
+    return {
+      kind: 'validation',
+      message,
+      hint: 'Pass the entry text in the "content" argument, e.g. {"action":"append","category":"note","content":"the text to remember"}.',
+      retryable: true
+    }
+  }
   if (lower.includes('invalid tool call') || lower.includes('must be')) {
     return {
       kind: 'validation',
