@@ -8,6 +8,7 @@ import {
   type ContextEstimate
 } from '@/hooks/useContextEstimate'
 import { formatTokenCount } from '@/lib/formatTokens'
+import { formatSessionCost } from '@/lib/pricing'
 import { formatNumber } from '@/i18n/t'
 import { useTokenUsageStore } from '@/stores/tokenUsageStore'
 import { useChatStore } from '@/stores/chatStore'
@@ -159,6 +160,7 @@ function PopoverBody({
             value={formatTokenCount(session.completionTokens)}
             sub={formatNumber(session.completionTokens)}
           />
+          <StatRow label={t('tokens.cost')} value={formatSessionCost(session.costUsd)} />
         </div>
       </div>
 

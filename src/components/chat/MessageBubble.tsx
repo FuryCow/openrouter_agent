@@ -18,6 +18,7 @@ import type { TimelineItem, ToolCallInfo, AgentRunOutcome, ChatFileAttachment } 
 import { cn, getFileName } from '@/lib/utils'
 import { FileIcon } from '@/components/ui/FileIcon'
 import {
+  flattenActivityItems,
   groupTimelineTools,
   resolveMessageTimeline,
   segmentTimeline,
@@ -607,16 +608,15 @@ function FinishedRunView({
  * headers. Same-tool runs are collapsed into a single "N × Terminal" row.
  */
 function ActivityFlatList({ items }: { items: TimelineItem[] }): React.ReactElement {
-  const grouped = useMemo(() => groupTimelineTools(items), [items])
+  // Unwrap nested groups instead of re-grouping: re-grouping the members of
+  // an expanded group collapses them straight back into the same row.
+  const flat = useMemo(() => flattenActivityItems(items), [items])
 
   return (
     <div className="space-y-px pb-1">
-      {grouped.map((item) => {
+      {flat.map((item) => {
         if (item.type === 'tool') {
           return <ToolCallCard key={item.id} toolCall={item.toolCall} />
-        }
-        if (item.type === 'tool-group') {
-          return <ToolGroupRow key={item.id} group={item} />
         }
         if (item.type === 'reasoning') {
           return <ThinkingBlock key={item.id} reasoning={item.content} />

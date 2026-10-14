@@ -337,6 +337,8 @@ export interface TokenUsage {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+  /** Exact USD cost reported by OpenRouter (usage.include); undefined when the provider omits it. */
+  costUsd?: number
 }
 
 export interface ToolCallAnalytics {

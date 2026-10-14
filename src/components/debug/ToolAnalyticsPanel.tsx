@@ -4,7 +4,10 @@ import { X, FolderOpen, BarChart3, CheckCircle2, XCircle, AlertTriangle } from '
 import { Button } from '../ui/button'
 import { ScrollArea } from '../ui/scroll-area'
 import { useAnalyticsStore } from '@/stores/analyticsStore'
-import type { AgentRunAnalytics, ToolCallAnalytics } from '@/types'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { estimateRunCostUsd, formatSessionCost } from '@/lib/pricing'
+import { formatTokenCount } from '@/lib/formatTokens'
+import type { AgentRunAnalytics, ModelInfo, ToolCallAnalytics } from '@/types'
 import { cn } from '@/lib/utils'
 import { formatDateTime } from '@/i18n/t'
 
@@ -47,7 +50,7 @@ function OutcomeBadge({ outcome }: { outcome: ToolCallAnalytics['outcome'] }): R
   )
 }
 
-function RunCard({ run }: { run: AgentRunAnalytics }): React.ReactElement {
+function RunCard({ run, models }: { run: AgentRunAnalytics; models: ModelInfo[] }): React.ReactElement {
   const { t } = useTranslation('tools')
   return (
     <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
@@ -63,6 +66,11 @@ function RunCard({ run }: { run: AgentRunAnalytics }): React.ReactElement {
               iterations: run.iterations,
               max: run.maxIterations
             })}
+          </div>
+          <div className="mt-0.5 text-[10px] font-mono text-zinc-500">
+            {t('analytics.tokens', { tokens: formatTokenCount(run.tokenUsage?.totalTokens ?? 0) })}
+            {' · '}
+            {t('analytics.cost', { cost: formatSessionCost(estimateRunCostUsd(run, models)) })}
           </div>
         </div>
         <div className="text-right text-[10px] font-mono text-zinc-500">
@@ -147,6 +155,7 @@ export function ToolAnalyticsPanel(): React.ReactElement | null {
   const runs = useAnalyticsStore((s) => s.runs)
   const setPanelOpen = useAnalyticsStore((s) => s.setPanelOpen)
   const loadRuns = useAnalyticsStore((s) => s.loadRuns)
+  const models = useSettingsStore((s) => s.models)
 
   useEffect(() => {
     if (panelOpen) {
@@ -186,7 +195,7 @@ export function ToolAnalyticsPanel(): React.ReactElement | null {
           ) : (
             <div className="space-y-3">
               {runs.map((run) => (
-                <RunCard key={run.runId} run={run} />
+                <RunCard key={run.runId} run={run} models={models} />
               ))}
             </div>
           )}

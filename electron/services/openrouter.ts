@@ -223,7 +223,8 @@ export class OpenRouterClient {
           ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
           ...toOpenRouterReasoningBody(reasoningEffort, reasoningContext),
           ...toOpenRouterProviderBody(modelProvider),
-          stream: true
+          stream: true,
+          usage: { include: true }
         }),
         signal
       })
@@ -277,7 +278,8 @@ export class OpenRouterClient {
             usage = {
               promptTokens: parsed.usage.prompt_tokens ?? 0,
               completionTokens: parsed.usage.completion_tokens ?? 0,
-              totalTokens: parsed.usage.total_tokens ?? 0
+              totalTokens: parsed.usage.total_tokens ?? 0,
+              costUsd: parsed.usage.cost ?? undefined
             }
           }
 
