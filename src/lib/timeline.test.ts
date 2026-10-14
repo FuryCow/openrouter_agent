@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   appendTimelineChunk,
+  flattenActivityItems,
   groupTimelineTools,
   segmentTimeline,
   upsertTimelineTool
@@ -243,5 +244,70 @@ describe('groupTimelineTools', () => {
 
   it('handles an empty timeline', () => {
     expect(groupTimelineTools([])).toEqual([])
+  })
+})
+
+describe('flattenActivityItems', () => {
+  function toolItem(id: string, name: string, args = '{}') {
+    return { id, type: 'tool' as const, toolCall: { id, name, arguments: args, status: 'done' as const } }
+  }
+
+  // Regression: the expanded body of a "Search × 3" row used to re-run
+  // groupTimelineTools on the group's own members, collapsing them back
+  // into another "Search × 3" row — clicking expanded the same group
+  // forever. The body must unwrap groups instead of re-grouping.
+  it('unwraps a tool-group into its member calls instead of re-grouping them', () => {
+    const group = {
+      id: 'tool-group-t1-t3',
+      type: 'tool-group' as const,
+      toolName: 'codebase_search',
+      count: 3,
+      items: [
+        toolItem('t1', 'codebase_search'),
+        toolItem('t2', 'codebase_search'),
+        toolItem('t3', 'codebase_search')
+      ]
+    }
+
+    const flat = flattenActivityItems([group])
+    expect(flat.map((item) => item.type)).toEqual(['tool', 'tool', 'tool'])
+    expect(flat.map((item) => (item.type === 'tool' ? item.toolCall.id : null))).toEqual([
+      't1',
+      't2',
+      't3'
+    ])
+  })
+
+  it('keeps reasoning and text items as-is', () => {
+    const items = [
+      { id: 'r1', type: 'reasoning' as const, content: 'think' },
+      { id: 'x1', type: 'text' as const, content: 'note' }
+    ]
+    expect(flattenActivityItems(items)).toEqual(items)
+  })
+
+  it('unwraps groups mixed with plain items, preserving order', () => {
+    const group = {
+      id: 'tool-group-t1-t2',
+      type: 'tool-group' as const,
+      toolName: 'run_terminal',
+      count: 2,
+      items: [toolItem('t1', 'run_terminal'), toolItem('t2', 'run_terminal')]
+    }
+    const items = [
+      { id: 'r1', type: 'reasoning' as const, content: 'think' },
+      group,
+      toolItem('t3', 'write_file'),
+      { id: 'x1', type: 'text' as const, content: 'done' }
+    ]
+
+    const flat = flattenActivityItems(items)
+    expect(flat.map((item) => item.type)).toEqual(['reasoning', 'tool', 'tool', 'tool', 'text'])
+    expect(flat.map((item) => item.id)).toEqual(['r1', 't1', 't2', 't3', 'x1'])
+  })
+
+  it('returns a plain list unchanged', () => {
+    const items = [toolItem('t1', 'read_file'), toolItem('t2', 'read_file')]
+    expect(flattenActivityItems(items)).toEqual(items)
   })
 })

@@ -200,3 +200,14 @@ function groupKeyForTool(toolCall: ToolCallInfo): string {
   const filePath = resolveToolFilePath(toolCall)
   return filePath ? `${toolCall.name}:${filePath}` : toolCall.name
 }
+
+/**
+ * Flatten a collapsed group's contents for its expanded body: unwrap
+ * tool-group items into their member calls and keep everything else as-is.
+ * Deliberately does NOT re-group — the members of a group share one group
+ * key by construction, so re-grouping would collapse them back into the
+ * very row the user just expanded (infinite "Search × 3" recursion).
+ */
+export function flattenActivityItems(items: TimelineItem[]): TimelineItem[] {
+  return items.flatMap((item) => (item.type === 'tool-group' ? item.items : [item]))
+}
