@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0-alpha.15] - 2026-10-13
+
+### Added
+
+- Session and per-run cost estimates in USD: "Cost (est.)" row in the token-usage ring popover and a tokens/cost line per run in Tool Analytics. Prices come from the loaded OpenRouter model catalog; the exact `usage.cost` reported by OpenRouter is preferred when the provider returns it. Unknown prices show "—" and never fake $0.00; switching models mid-session keeps per-run pricing pinned to that run's model.
+- Background queue runs now contribute their token usage and cost to the session totals.
+
+### Fixed
+
+- Expanding a collapsed tool-group row (e.g. "Search × 3") no longer re-collapses its members into the same row — the expanded body unwraps group members instead of re-grouping them.
+
 ## [1.0.0-alpha.14](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.14) - 2026-10-13
 
 ### Fixed
