@@ -64,7 +64,7 @@ describe('settings-migrations', () => {
     expect(migrated.settingsVersion).toBe(CURRENT_SETTINGS_VERSION)
   })
 
-  it('upgrade path alpha.15 → 1.0.0: flags stay strictly opt-in (undefined, not coerced)', () => {
+  it('upgrade path alpha.15 → 1.0.0: run queue defaults on, skills stays opt-in', () => {
     const legacy = {
       apiKey: 'k',
       model: 'm',
@@ -72,8 +72,13 @@ describe('settings-migrations', () => {
       // no skillsEnabled / runQueueEnabled — legacy users never had them
     }
     const migrated = migrateSettings(legacy)
+    expect(migrated.runQueueEnabled).toBe(true)
     expect(migrated.skillsEnabled).toBeUndefined()
-    expect(migrated.runQueueEnabled).toBeUndefined()
     expect(migrated.settingsVersion).toBe(CURRENT_SETTINGS_VERSION)
+  })
+
+  it('an explicit runQueueEnabled:false (user turned it off) is preserved by the migration', () => {
+    const migrated = migrateSettings({ apiKey: 'k', model: 'm', runQueueEnabled: false })
+    expect(migrated.runQueueEnabled).toBe(false)
   })
 })
