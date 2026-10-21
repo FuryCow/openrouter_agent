@@ -28,7 +28,7 @@
 
 The app runs on your machine. The workspace stays on disk. A request goes to OpenRouter only when you send a message, and it includes the context you attached: the conversation, open files, and tool results.
 
-Current release: [v1.0.0-alpha.8](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.8) · Windows (NSIS), macOS (DMG), Linux (AppImage) · MIT
+Current release: [v1.0.0-alpha.15](https://github.com/FuryCow/openrouter_agent/releases/tag/v1.0.0-alpha.15) · Windows (NSIS), macOS (DMG), Linux (AppImage) · MIT
 
 ## What you get
 
@@ -40,6 +40,9 @@ Current release: [v1.0.0-alpha.8](https://github.com/FuryCow/openrouter_agent/re
 | **Planner** | Drafts a plan and may edit only the markdown under `.openrouter/plans/` |
 | **Search** | Ripgrep, SQLite full-text, symbols, and an offline embedding index |
 | **MCP** | Extra tools from stdio, HTTP, or SSE servers, tested per server |
+| **Run queue** | Background agent runs with dependencies, pause/resume, survives restarts (opt-in flag) |
+| **Skills** | Markdown skills with progressive disclosure, distill a run into a skill (opt-in flag) |
+| **Cost tracking** | Session and per-run cost estimates in USD from OpenRouter pricing |
 
 Writes and shell commands stop for approval unless you turn auto-approve on for that category. Each run keeps a checkpoint, so one file or the whole run can be restored.
 
@@ -133,6 +136,13 @@ If the terminal fails after an Electron upgrade on Windows, install the [Spectre
 Search the tree before reading whole files. Shell search through `run_terminal` is blocked; use `grep_workspace` or `codebase_search`.
 
 MCP tools show up as `mcp__<serverId>__<toolName>`.
+
+## Known limitations
+
+- **Updates are manual:** the app notifies you about a new release and downloads the installer with one click, but it does not install it in the background — you run the installer yourself.
+- **Unsigned installers:** Windows SmartScreen and macOS Gatekeeper may warn on first launch because the binaries are not code-signed. See [Security](#security) for what to check.
+- **Experimental flags:** the run queue and skills features are behind opt-in flags in Settings and are considered experimental.
+- **English only:** the UI ships with an English locale; the i18n infrastructure is ready for more languages.
 
 ## Security
 
