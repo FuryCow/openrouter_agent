@@ -20,6 +20,7 @@ import {
 import { getRecentAnalyticsRuns, getAnalyticsLogDir } from './services/tool-analytics'
 import { loadChatMessages, saveChatMessages } from './services/chat-persistence'
 import { settingsSaveEffects } from './lib/settings-save'
+import { migrateSettings } from './lib/settings-migrations'
 import { writePlannerPlan } from './services/planner-plans'
 import { modeRequiresWorkspace } from './services/agent-modes'
 import { withRecentWorkspace } from './lib/recent-workspaces'
@@ -60,17 +61,10 @@ if (userDataOverride) {
 }
 
 function sanitizeSettings(settings: AppSettings): AppSettings {
-  const { modelsByMode: _legacyModes, maxTokens: _legacyMaxTokens, ...clean } =
-    settings as AppSettings & {
-      modelsByMode?: Partial<Record<string, string>>
-    }
-  let normalized = clean as AppSettings
+  let normalized = migrateSettings(settings)
 
   if (normalized.workingDirectory && isInsideAgentApp(normalized.workingDirectory)) {
     normalized = { ...normalized, workingDirectory: '' }
-  }
-  if (!normalized.locale) {
-    normalized = { ...normalized, locale: 'en' }
   }
   return normalized
 }

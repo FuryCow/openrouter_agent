@@ -101,6 +101,8 @@ export interface AppSettings {
   updateNotificationDismissedFor?: string
   agentAutoVerify?: boolean
   locale?: 'en'
+  /** Internal schema version, stamped by settings migrations. Not user-facing. */
+  settingsVersion?: number
 }
 
 export type ProjectMemoryCategory =
