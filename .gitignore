@@ -13,3 +13,7 @@ Thumbs.db
 .playwright-mcp/
 # Local screenshots / scratch captures (repo root only)
 /*.png
+/*.jpeg
+/*.jpg
+# TypeScript incremental build artifacts
+*.tsbuildinfo
