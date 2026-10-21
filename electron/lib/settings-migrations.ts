@@ -32,7 +32,7 @@ function toV1(raw: LegacySettings): AppSettings {
   return settings
 }
 
-/** v1 → v2: normalize collection fields to arrays, stamp the version. */
+/** v1 → v2: normalize collection fields to arrays, default the run queue on, stamp the version. */
 function toV2(settings: AppSettings): AppSettings {
   const next: AppSettings = { ...settings }
   if (next.recentWorkspaces !== undefined && !Array.isArray(next.recentWorkspaces)) {
@@ -44,6 +44,9 @@ function toV2(settings: AppSettings): AppSettings {
   if (next.mcpImportPaths !== undefined && !Array.isArray(next.mcpImportPaths)) {
     delete next.mcpImportPaths
   }
+  // Run queue is stable as of 1.0.0 — enable it for users who never set the flag.
+  // An explicit `false` (user turned it off) is preserved.
+  if (next.runQueueEnabled === undefined) next.runQueueEnabled = true
   next.settingsVersion = CURRENT_SETTINGS_VERSION
   return next
 }
